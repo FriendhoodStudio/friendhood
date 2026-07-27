@@ -1,0 +1,45 @@
+---
+import logo from '../assets/nav/friendhood-logo.svg';
+
+const links = [
+  { label: 'Email', href: 'mailto:hello@friendhood.co.uk' },
+  { label: 'Phone', href: '#' },
+  { label: 'Work', href: '#' },
+  { label: 'Approach', href: '#' },
+  { label: 'Instagram', href: '#' },
+  { label: 'LinkedIn', href: '#' },
+];
+
+const year = new Date().getFullYear();
+---
+
+<footer class="flex flex-col items-start gap-[76px] px-[var(--page-margin)] py-24">
+  <div class="flex w-full flex-col items-start gap-[76px]">
+    <div class="flex w-full flex-col items-start gap-[22px]">
+      <div class="h-px w-full bg-white/20"></div>
+      <p class="font-display max-w-[1576px] text-[83px] leading-none tracking-[-1.66px] text-white">
+        If you're thinking about tomorrow, talk to us today.
+      </p>
+    </div>
+
+    <div class="flex w-full flex-wrap items-center gap-8">
+      {links.map((link) => (
+        <a
+          href={link.href}
+          class="font-display inline-flex items-center justify-center rounded-[10px] border-2 border-white bg-white px-[25px] py-5 text-[83px] leading-none tracking-[-1.66px] text-black transition-colors duration-700 ease-in-out hover:bg-black hover:text-white"
+        >
+          {link.label}
+        </a>
+      ))}
+    </div>
+  </div>
+
+  <div class="flex w-full items-center justify-between">
+    <p class="font-tag text-[19px] leading-[0.96] tracking-[-0.38px] text-white">
+      All rights reserved &copy;{year}
+    </p>
+    <div class="flex items-center rounded-[11px] bg-black/40 px-[22px] py-[17px] backdrop-blur-[22px]">
+      <img src={logo.src} alt="Friendhood" class="h-[33px] w-auto" />
+    </div>
+  </div>
+</footer>

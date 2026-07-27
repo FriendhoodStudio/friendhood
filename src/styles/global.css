@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+:root {
+  --page-margin: 50px;
+}
+
+/*
+  Drop licensed font files into src/assets/fonts/ using the filenames below,
+  then uncomment the matching @font-face block. woff2 alone is fine if that's
+  all you have — drop the woff2-only rule and delete the src line for woff.
+*/
+
+/* @font-face {
+  font-family: "Greed Narrow";
+  src: url("../assets/fonts/GreedNarrow-Regular.woff2") format("woff2"),
+    url("../assets/fonts/GreedNarrow-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+} */
+
+@font-face {
+  font-family: "Greed Extended";
+  src: url("../assets/fonts/GreedExtended-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* @font-face {
+  font-family: "MNKY Marcel";
+  src: url("../assets/fonts/MNKYMarcel-Regular.woff2") format("woff2"),
+    url("../assets/fonts/MNKYMarcel-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+} */
+
+/* @font-face {
+  font-family: "Pitch Sans";
+  src: url("../assets/fonts/PitchSans-Regular.woff2") format("woff2"),
+    url("../assets/fonts/PitchSans-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+} */
+
+@theme {
+  /* TODO: uncomment @font-face rules above once font files are added */
+  --font-heading: "Greed Narrow", sans-serif;
+  --font-display: "Greed Extended", sans-serif;
+  --font-body: "MNKY Marcel", sans-serif;
+  --font-tag: "Pitch Sans", sans-serif;
+}

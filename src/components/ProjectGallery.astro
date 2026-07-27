@@ -1,0 +1,58 @@
+---
+import { Image } from 'astro:assets';
+import ProjectCaption from './ProjectCaption.astro';
+import floral from '../assets/gallery/floral.png';
+import blankFrame from '../assets/gallery/blank-frame.png';
+import kailoTriptych from '../assets/gallery/kailo-triptych.png';
+import darkWing from '../assets/gallery/dark-wing.png';
+
+const tags = ['Branding', 'Copy', 'Story'];
+---
+
+<section class="overflow-x-auto overflow-y-hidden">
+  <div class="flex gap-4 items-end w-max px-[var(--page-margin)] py-12">
+    <div class="flex flex-col gap-4 items-start justify-end shrink-0">
+      <Image
+        src={floral}
+        alt="Lankelly Chase project screenshot"
+        loading="eager"
+        class="h-[700px] w-[516px] rounded-[10px] object-cover"
+      />
+      <ProjectCaption title="Lankelly Chase" subtitle="Something about it here" tags={tags} />
+    </div>
+
+    <div class="flex flex-col gap-4 items-start justify-end shrink-0">
+      <Image
+        src={blankFrame}
+        alt="Lankelly Chase project screenshot"
+        loading="eager"
+        class="h-[534px] w-[996px] rounded-[10px] object-cover"
+      />
+      <ProjectCaption title="Lankelly Chase" subtitle="Something about it here" tags={tags} />
+    </div>
+
+    <div class="flex flex-col gap-4 items-start justify-end shrink-0">
+      <Image
+        src={kailoTriptych}
+        alt="Lankelly Chase project screenshot"
+        loading="eager"
+        class="h-[564px] w-[516px] rounded-[10px] object-cover"
+      />
+      <ProjectCaption title="Lankelly Chase" subtitle="Something about it here" tags={tags} />
+    </div>
+
+    <Image
+      src={darkWing}
+      alt="Project screenshot"
+      loading="eager"
+      class="h-[700px] w-[516px] rounded-[10px] object-cover shrink-0"
+    />
+
+    <Image
+      src={floral}
+      alt="Project screenshot"
+      loading="eager"
+      class="h-[661px] w-[516px] rounded-[10px] object-cover shrink-0"
+    />
+  </div>
+</section>
