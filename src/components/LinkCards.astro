@@ -1,0 +1,40 @@
+---
+import { fetchLinkCards } from '../lib/sanity/queries';
+import type { LinkCardItem } from '../types/linkCards';
+import DividerSmall from './DividerSmall.astro';
+
+const linkCardsData = await fetchLinkCards();
+const cards: LinkCardItem[] = linkCardsData?.cards ?? [];
+---
+
+{cards.length > 0 && (
+  <div class="flex flex-col items-start gap-vertical-s px-[var(--page-margin)]">
+    <DividerSmall label="More" />
+    <div data-reveal-group="link-cards" class="flex w-full flex-wrap items-center gap-x-gutter gap-y-vertical-l">
+      {cards.map((card) => (
+        <a
+          href={card.href}
+          class="link-card reveal-item group flex min-w-0 basis-[var(--col-4)] flex-col items-start gap-4"
+        >
+          <div class="aspect-[523/700] w-full overflow-hidden rounded-card">
+            <img
+              src={card.imageUrl}
+              alt={card.label}
+              class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+              loading="lazy"
+            />
+          </div>
+          <p class="font-heading text-h3 text-front transition-colors duration-300 ease-out group-hover:text-accent-yellow">
+            {card.label}
+          </p>
+        </a>
+      ))}
+    </div>
+  </div>
+)}
+
+<script>
+  import { initScrollRevealGroup } from '../lib/scrollReveal';
+
+  initScrollRevealGroup('link-cards');
+</script>

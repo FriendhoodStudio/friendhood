@@ -1,0 +1,151 @@
+---
+import { fetchServices } from '../lib/sanity/queries';
+import serviceIcon from '../assets/services/service-icon.png';
+import ServicesCarousel from './ServicesCarousel.astro';
+import type { ServiceItem } from '../types/services';
+
+interface Props {
+  /** Overrides the Sanity-fetched descriptor label above the heading. */
+  descriptor?: string;
+  /** Overrides the Sanity-fetched paragraph/heading text. */
+  heading?: string;
+  /** 'paragraph' (Home: Body 1, default) or 'display' (About: H2 headline). */
+  headingVariant?: 'paragraph' | 'display';
+}
+
+const { descriptor: descriptorProp, heading: headingProp, headingVariant = 'paragraph' } = Astro.props;
+
+const services = await fetchServices();
+
+const descriptor = descriptorProp ?? services?.descriptor ?? 'How we help';
+const paragraph =
+  headingProp ??
+  services?.paragraph ??
+  "We're a strategic branding studio built to help you understand now and make what's coming next. Creative expertise and guidance for people looking to build and change things, for good.";
+const fallbackNames = ['Strategy', 'Brand', 'Digital', 'Campaigns', 'Production', 'Engagement'];
+const serviceList: ServiceItem[] =
+  services?.services ??
+  fallbackNames.map((name) => ({
+    name,
+    cardTitle: name,
+    imageUrl: serviceIcon.src,
+    overview: '',
+    modules: [],
+  }));
+---
+
+<section class="flex flex-col gap-vertical-l px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="services">
+  <div class={`flex w-full flex-col items-start gap-vertical-s ${headingVariant === 'display' ? '' : 'max-w-[var(--col-6)]'}`}>
+    <p class="reveal-item font-tag text-detail text-front">{descriptor}</p>
+    <p
+      class={`reveal-item text-front ${headingVariant === 'display' ? 'font-display text-h2' : 'font-body text-body-1'}`}
+    >
+      {paragraph}
+    </p>
+  </div>
+
+  <div class="col-grid w-full gap-gutter">
+    {serviceList.map((service, i) => (
+      <div class="reveal-item group relative">
+        <div
+          class="services-glow pointer-events-none absolute -inset-1 -z-10 rounded-card opacity-0 blur-md transition-opacity duration-500 ease-out group-hover:opacity-70"
+          style="background: conic-gradient(from var(--glow-angle, 0deg), #EB8FB5, #E4552E, #B1B7EB, #889C3C, #EB8FB5);"
+        />
+        <button
+          type="button"
+          class="flex h-[96px] w-full cursor-pointer items-center justify-between gap-[15px] rounded-card border border-front/15 bg-[#29282d] px-[20px] py-[15px] text-left shadow-[0px_0px_4px_0px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
+          data-service-trigger
+          data-index={i}
+        >
+          <div class="flex min-w-0 flex-1 items-center gap-[15px]">
+            <div class="size-[63px] shrink-0 overflow-hidden rounded-full">
+              <img src={service.imageUrl} alt="" class="h-full w-full object-cover" />
+            </div>
+            <p class="truncate pb-[2px] font-body text-body-2 text-front">{service.name}</p>
+          </div>
+          <div class="flex size-[22px] shrink-0 items-center justify-center transition-transform duration-300 ease-out group-hover:scale-125 group-active:scale-90">
+            <svg viewBox="0 0 25 28" fill="none" class="h-full w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
+              <path class="expand-icon-tr" d="M12.5 1.5H23.5V12.5" stroke="#9C9C9C" stroke-width="3" />
+              <path class="expand-icon-bl" d="M12.5 26.5L1.5 26.5L1.5 15.5" stroke="#9C9C9C" stroke-width="3" />
+            </svg>
+          </div>
+        </button>
+      </div>
+    ))}
+  </div>
+</section>
+
+<ServicesCarousel services={serviceList} />
+
+<style>
+  /* Tile grid: 1/2/3 columns per row across the breakpoints, per Figma —
+     see .col-grid in global.css for why this is explicit breakpoint-gated
+     columns rather than an auto-fill/minmax formula. */
+
+  /* Glow: the conic-gradient's colours slowly cycle round while hovered —
+     the box itself never rotates, only --glow-angle does, so a wide row
+     doesn't sweep its corners through a huge arc the way transform:rotate()
+     on the whole shape would. @property makes the angle animatable at all
+     (plain custom properties can't be interpolated by keyframes). */
+  @property --glow-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+  @keyframes services-glow-spin {
+    to {
+      --glow-angle: 360deg;
+    }
+  }
+  .group:hover .services-glow {
+    animation: services-glow-spin 8s linear infinite;
+  }
+
+  /* Expand icon: the two corner brackets pull toward the center, then spring
+     back apart — overshooting slightly past their resting position before
+     settling, rather than just stopping there. A single play per hover-in. */
+  @keyframes expand-icon-pull-tr {
+    0% {
+      transform: translate(0, 0);
+    }
+    40% {
+      transform: translate(-3px, 3px);
+    }
+    75% {
+      transform: translate(1px, -1px);
+    }
+    100% {
+      transform: translate(0, 0);
+    }
+  }
+  @keyframes expand-icon-pull-bl {
+    0% {
+      transform: translate(0, 0);
+    }
+    40% {
+      transform: translate(3px, -3px);
+    }
+    75% {
+      transform: translate(-1px, 1px);
+    }
+    100% {
+      transform: translate(0, 0);
+    }
+  }
+  .group:hover .expand-icon-tr {
+    animation: expand-icon-pull-tr 0.7s ease-in-out;
+  }
+  .group:hover .expand-icon-bl {
+    animation: expand-icon-pull-bl 0.7s ease-in-out;
+  }
+</style>
+
+<script>
+  import { initScrollRevealGroup } from '../lib/scrollReveal';
+
+  // Tighter than the default: with 8 stacked items (text + 6 tiles), the
+  // default stagger/travel distance compounds across the group, so the
+  // later tiles needed a lot of extra scrolling to ever reach full opacity
+  // and their resting position — easy to scroll straight past mid-fade.
+  initScrollRevealGroup('services', { staggerVh: 0.02, endVh: 0.78 });
+</script>

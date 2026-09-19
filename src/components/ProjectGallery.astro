@@ -1,58 +1,139 @@
 ---
-import { Image } from 'astro:assets';
-import ProjectCaption from './ProjectCaption.astro';
-import floral from '../assets/gallery/floral.png';
-import blankFrame from '../assets/gallery/blank-frame.png';
-import kailoTriptych from '../assets/gallery/kailo-triptych.png';
-import darkWing from '../assets/gallery/dark-wing.png';
+import type { ProjectCardData } from '../types/project';
+import ProjectCard from './ProjectCard.astro';
 
-const tags = ['Branding', 'Copy', 'Story'];
+interface Props {
+  projects: ProjectCardData[];
+  /** Home shows bare images only; Work shows the full card with title/detail/tags. */
+  showCaption?: boolean;
+  /** 'scroll' = horizontal scroll strip (Home); 'grid' = wrapping 3-column grid (Work). */
+  layout?: 'scroll' | 'grid';
+}
+
+const { projects, showCaption = true, layout = 'scroll' } = Astro.props;
 ---
 
-<section class="overflow-x-auto overflow-y-hidden">
-  <div class="flex gap-4 items-end w-max px-[var(--page-margin)] py-12">
-    <div class="flex flex-col gap-4 items-start justify-end shrink-0">
-      <Image
-        src={floral}
-        alt="Lankelly Chase project screenshot"
-        loading="eager"
-        class="h-[700px] w-[516px] rounded-[10px] object-cover"
-      />
-      <ProjectCaption title="Lankelly Chase" subtitle="Something about it here" tags={tags} />
+{layout === 'scroll' ? (
+  <section class="overflow-x-auto overflow-y-hidden">
+    <div
+      data-reveal-group="project-gallery"
+      data-hover-shunt-row
+      class="flex w-max items-end gap-gutter px-[var(--page-margin)] pt-vertical-l pb-vertical-xl"
+    >
+      {projects.map((project) => <ProjectCard project={project} showCaption={showCaption} layout={layout} />)}
     </div>
-
-    <div class="flex flex-col gap-4 items-start justify-end shrink-0">
-      <Image
-        src={blankFrame}
-        alt="Lankelly Chase project screenshot"
-        loading="eager"
-        class="h-[534px] w-[996px] rounded-[10px] object-cover"
-      />
-      <ProjectCaption title="Lankelly Chase" subtitle="Something about it here" tags={tags} />
-    </div>
-
-    <div class="flex flex-col gap-4 items-start justify-end shrink-0">
-      <Image
-        src={kailoTriptych}
-        alt="Lankelly Chase project screenshot"
-        loading="eager"
-        class="h-[564px] w-[516px] rounded-[10px] object-cover"
-      />
-      <ProjectCaption title="Lankelly Chase" subtitle="Something about it here" tags={tags} />
-    </div>
-
-    <Image
-      src={darkWing}
-      alt="Project screenshot"
-      loading="eager"
-      class="h-[700px] w-[516px] rounded-[10px] object-cover shrink-0"
-    />
-
-    <Image
-      src={floral}
-      alt="Project screenshot"
-      loading="eager"
-      class="h-[661px] w-[516px] rounded-[10px] object-cover shrink-0"
-    />
+  </section>
+) : (
+  <div
+    data-reveal-group="project-gallery"
+    class="project-grid col-grid gap-x-gutter gap-y-vertical-l px-[var(--page-margin)] pt-vertical-m pb-vertical-xl"
+  >
+    {projects.map((project) => <ProjectCard project={project} showCaption={showCaption} layout={layout} />)}
   </div>
-</section>
+)}
+
+<style>
+  /* Column count (1/2/3 across breakpoints) comes from the shared .col-grid
+     class in global.css. Filtering the Work grid down to fewer cards than
+     fit a row can't shrink the column COUNT (CSS has no way to know how
+     many are hidden via display:none vs genuinely absent), so those extra
+     columns would otherwise stay 1fr and stretch to claim the leftover
+     width the missing cards would've used — [data-filtered] swaps to fixed
+     --col-4-width tracks instead, so a narrowed-down set just shows fewer
+     cards at their normal size rather than stretching the remaining ones.
+
+     Only from 768px up, where that's an actual risk (2 or 3 columns exist
+     to shrink down from). Below that there's only ever 1 column, so a lone
+     card is never "avoiding an awkward stretch" — full width IS its normal
+     size, filtered or not. Applying the fixed-track override there anyway
+     shrunk it to raw --col-4 (360px) instead: correct only at the exact
+     390px Figma reference width, and short of the real ~400px+ content
+     width on most actual phones (e.g. ~400px on a 430px-wide device),
+     visibly shrinking the card the moment a filter was clicked. */
+  @media (min-width: 768px) {
+    .project-grid[data-filtered] {
+      grid-template-columns: repeat(auto-fill, var(--col-4));
+    }
+  }
+</style>
+
+<script>
+  import { initScrollRevealGroup } from '../lib/scrollReveal';
+
+  initScrollRevealGroup('project-gallery');
+
+  // Home's horizontal strip: hovering a card widens it and shunts later
+  // siblings along — previously a CSS `transition: flex-basis`, which
+  // animates a layout property and forces the whole row to reflow on every
+  // single frame (visibly jerky). FLIP instead: apply the real flex-basis
+  // change instantly (one reflow, not one per frame), then animate only
+  // `transform` (translate + scale) from the old rects to the new ones,
+  // which is compositor-only — same technique as the Work page's filter
+  // transition.
+  // Widening (mouseenter) gets a springy pop — the overshoot reads as
+  // intentional there. Reversing that same overshoot on the way back out
+  // (mouseleave) instead looked like a double-bounce — snappy in, jerky
+  // out — so the leave direction uses a slower, plain ease-out with no
+  // overshoot.
+  const FLIP_DURATION_IN = 600;
+  const FLIP_EASING_IN = 'cubic-bezier(0.22, 1.36, 0.36, 1)';
+  const FLIP_DURATION_OUT = 750;
+  const FLIP_EASING_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  document.querySelectorAll<HTMLElement>('[data-hover-shunt-row]').forEach((row) => {
+    const cards = Array.from(
+      row.querySelectorAll<HTMLElement>('.project-card[data-layout="scroll"]:not([data-coming-soon])')
+    );
+    if (cards.length === 0) return;
+
+    function setWidened(target: HTMLElement | null) {
+      if (reduceMotion) {
+        cards.forEach((card) => card.classList.toggle('is-widened', card === target));
+        return;
+      }
+
+      // Measure BEFORE cancelling any in-flight animation — while it's
+      // still running, getBoundingClientRect() reflects its current
+      // mid-transition (transformed) position. Cancelling first and then
+      // measuring was the bug: cancel() snaps the card straight to its
+      // resting layout position, so a quick re-hover mid-swing measured
+      // "before" == "after" for that card and it just teleported instead
+      // of continuing to animate — that's the jerk when flicking the mouse
+      // between adjacent cards.
+      const before = new Map<HTMLElement, DOMRect>();
+      cards.forEach((card) => before.set(card, card.getBoundingClientRect()));
+
+      // Now safe to cancel — the new animation started below will override
+      // the snapped-back position before the browser ever paints it.
+      cards.forEach((card) => card.getAnimations().forEach((a) => a.cancel()));
+
+      cards.forEach((card) => card.classList.toggle('is-widened', card === target));
+
+      const duration = target ? FLIP_DURATION_IN : FLIP_DURATION_OUT;
+      const easing = target ? FLIP_EASING_IN : FLIP_EASING_OUT;
+
+      cards.forEach((card) => {
+        const prev = before.get(card)!;
+        const next = card.getBoundingClientRect();
+        const dx = prev.left - next.left;
+        // Only the hovered card's own width actually changes; siblings just
+        // shift position, so this naturally comes out to 1 for them.
+        const scaleX = next.width ? prev.width / next.width : 1;
+        if (Math.abs(dx) < 1 && Math.abs(scaleX - 1) < 0.01) return;
+        card.animate(
+          [
+            { translate: `${dx}px 0`, scale: `${scaleX} 1` },
+            { translate: '0 0', scale: '1 1' },
+          ],
+          { duration, easing }
+        );
+      });
+    }
+
+    cards.forEach((card) => {
+      card.addEventListener('mouseenter', () => setWidened(card));
+      card.addEventListener('mouseleave', () => setWidened(null));
+    });
+  });
+</script>

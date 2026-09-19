@@ -1,0 +1,148 @@
+---
+import logo from '../assets/nav/friendhood-logo.svg';
+import NavMenuOverlay from './NavMenuOverlay.astro';
+---
+
+<header class="group pointer-events-none fixed inset-x-0 top-0 z-50" data-nav-bar data-open="false">
+  <div class="relative z-50 flex items-center justify-center px-[var(--page-margin)] py-[var(--spacing-btn-y-nav)]">
+    <div
+      class="nav-pill pointer-events-auto flex items-center overflow-hidden rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px]"
+      data-nav-pill
+    >
+      <a
+        href="/"
+        class="flex items-center py-[15px] pl-[27px] pr-5"
+        style="height:var(--nav-menu-height)"
+        data-nav-logo
+      >
+        {/* Left padding is wider than the right on purpose: the logo SVG's own bounding box already
+            reserves ~7px on the right for the ® mark past the last full-height letter, so equal
+            code-level padding would leave the wordmark itself sitting closer to the left edge. */}
+        <img src={logo.src} alt="Friendhood — Home" class="h-[80%] w-auto" />
+      </a>
+
+      <button
+        type="button"
+        class="nav-toggle font-tag pointer-events-auto flex cursor-pointer items-center justify-center border-l border-front/15 px-[var(--spacing-btn-x)] py-[var(--spacing-btn-y)] text-detail text-front transition-[background-color] duration-300 ease-out hover:bg-[#29282d]"
+        style="height:var(--nav-menu-height)"
+        data-nav-toggle
+        aria-expanded="false"
+        aria-controls="nav-menu-overlay"
+      >
+        <span class="relative block h-[18px] overflow-hidden">
+          <span
+            data-nav-toggle-track
+            class="flex flex-col leading-none transition-transform duration-400 ease-in-out"
+          >
+            <span data-nav-toggle-label="menu" class="block h-[18px]">Menu</span>
+            <span data-nav-toggle-label="close" class="block h-[18px]">Close</span>
+          </span>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <NavMenuOverlay />
+</header>
+
+<style>
+  /*
+   * Pivots around its own vertical axis (a see-saw running top-to-bottom
+   * through the middle), not the bottom edge — pressing tips the right edge
+   * back and the left edge up together, rather than hinging the whole shape
+   * from its base. The press-in and flick-back use different timing on
+   * purpose: pressing is an immediate, linear-ish response (no spring — a
+   * spring on the way down would read as squishy, not firm); releasing
+   * overshoots slightly before settling, which is what makes it read as a
+   * physical flick rather than a fade.
+   */
+  .nav-pill {
+    transform: scale(0.9);
+    transform-origin: center;
+    transition: transform 320ms cubic-bezier(0.22, 1.36, 0.36, 1);
+  }
+  .nav-pill.is-pressed {
+    /* scale(0.9) carried through here too — otherwise pressing would snap
+       the pill back to full size at the same moment it tilts. --nav-tilt-sign
+       (set in script, +1 for Menu / -1 for the logo) picks which edge dips. */
+    transform: scale(0.9) perspective(600px) rotateY(calc(var(--nav-tilt-sign, 1) * 7deg));
+    transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  /* Release is driven by WAAPI (see script) so the swing-back can overshoot
+     past 0deg and settle, rather than just easing straight to rest — the
+     CSS transition above is only what plays while held down. */
+  .nav-pill.is-settling {
+    transition: none;
+  }
+</style>
+
+<script>
+  const bar = document.querySelector<HTMLElement>('[data-nav-bar]');
+  const pill = document.querySelector<HTMLElement>('[data-nav-pill]');
+  const toggle = document.querySelector<HTMLButtonElement>('[data-nav-toggle]');
+  const track = document.querySelector<HTMLElement>('[data-nav-toggle-track]');
+  const logo = document.querySelector<HTMLAnchorElement>('[data-nav-logo]');
+
+  toggle?.addEventListener('click', () => {
+    const isOpen = bar?.dataset.open === 'true';
+    const next = !isOpen;
+    bar?.setAttribute('data-open', String(next));
+    toggle?.setAttribute('aria-expanded', String(next));
+
+    track?.classList.toggle('-translate-y-1/2', next);
+  });
+
+  // Menu (right side) tilts the right edge back / left edge up: sign +1.
+  // The logo (left side) mirrors it — left edge back / right edge up — so
+  // pressing either end tips away from the side you're actually touching,
+  // sign -1. Both drive the same shared pill, one held at a time.
+  let activeSettle: Animation | null = null;
+
+  const press = (sign: 1 | -1) => {
+    if (!pill) return;
+    activeSettle?.cancel();
+    pill.classList.remove('is-settling');
+    pill.style.setProperty('--nav-tilt-sign', String(sign));
+    pill.classList.add('is-pressed');
+  };
+
+  const release = (sign: 1 | -1) => {
+    if (!pill || !pill.classList.contains('is-pressed')) return;
+
+    // Swing back with a slight overshoot past rest before settling, rather
+    // than easing straight to 0 — reads as a physical flick, not a fade.
+    activeSettle = pill.animate(
+      [
+        { transform: `scale(0.9) perspective(600px) rotateY(${sign * 7}deg)` },
+        { transform: `scale(0.9) perspective(600px) rotateY(${sign * -2}deg)`, offset: 0.55 },
+        { transform: `scale(0.9) perspective(600px) rotateY(${sign * 0.6}deg)`, offset: 0.8 },
+        { transform: 'scale(0.9) rotateY(0deg)' },
+      ],
+      { duration: 420, easing: 'ease-out', fill: 'forwards' }
+    );
+
+    // CSS transition would otherwise race the WAAPI animation for the same
+    // property and cause a visible stutter — suspend it for the swing.
+    pill.classList.add('is-settling');
+    pill.classList.remove('is-pressed');
+
+    const settle = activeSettle;
+    settle.finished
+      .then(() => {
+        settle.cancel();
+        pill.classList.remove('is-settling');
+        if (activeSettle === settle) activeSettle = null;
+      })
+      .catch(() => {});
+  };
+
+  toggle?.addEventListener('pointerdown', () => press(1));
+  toggle?.addEventListener('pointerup', () => release(1));
+  toggle?.addEventListener('pointerleave', () => release(1));
+  toggle?.addEventListener('pointercancel', () => release(1));
+
+  logo?.addEventListener('pointerdown', () => press(-1));
+  logo?.addEventListener('pointerup', () => release(-1));
+  logo?.addEventListener('pointerleave', () => release(-1));
+  logo?.addEventListener('pointercancel', () => release(-1));
+</script>

@@ -1,0 +1,647 @@
+---
+import { fetchHero } from '../lib/sanity/queries';
+
+const hero = await fetchHero();
+
+const headline = hero?.headline ?? 'For people thinking about tomorrow.';
+const headlineSwapWord = hero?.headlineSwapWord ?? 'people';
+const headlineHoverWords = hero?.headlineHoverWords ?? ['places', 'brands', 'orgs'];
+const tagline = hero?.tagline ?? 'Create your neighbourhood';
+const media = hero?.media;
+
+// Cycled by position (not matched by word text), so any word added in
+// Sanity automatically picks up the next colour in sequence — wrapping back
+// to the start if there are more words than colours.
+const colorSequence = ['#EB8FB5', '#E4552E', '#B1B7EB', '#889C3C', '#E7FE54'];
+
+// Splits the headline around the one literal word that rolls on hover, so
+// the rest of the sentence stays put — e.g. "For people thinking about
+// tomorrow." with swap word "people" becomes "For " + [people/places/...] +
+// " thinking about tomorrow.". Falls back to the plain headline if no swap
+// word is set, or it isn't actually present in the headline text.
+const swapIndex = headlineSwapWord ? headline.indexOf(headlineSwapWord) : -1;
+const headlineBefore = swapIndex >= 0 ? headline.slice(0, swapIndex) : headline;
+const headlineAfter = swapIndex >= 0 ? headline.slice(swapIndex + headlineSwapWord.length) : '';
+// The swap word itself is included as the first frame, so the resting state
+// (before any hover) reads identically to the plain headline. The list is
+// duplicated once at the end — see the script below for why.
+const hoverWords =
+  swapIndex >= 0 && headlineHoverWords.length > 0 ? [headlineSwapWord, ...headlineHoverWords] : [];
+const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
+// Colours for each hover word, built the same way loopWords duplicates the
+// first word at the end — so the looping duplicate frame gets the same
+// colour as the real first frame rather than the next one in sequence.
+const hoverWordColors = hoverWords.map((_, i) => colorSequence[i % colorSequence.length]);
+const loopColors = hoverWordColors.length > 0 ? [...hoverWordColors, hoverWordColors[0]] : [];
+
+// Pencil cursor for the doodle canvas — the "Pencil Cursor FIll" component
+// from the Figma library (node 7648:18454, the solid-body variant), inlined
+// as a base64 data URI at build time so there's no extra asset request.
+// Rendered at 30x30 (viewBox left as Figma's native 225.79x225.53 so it
+// scales down cleanly); the tip sits at the bottom-left corner of the
+// artwork, so the "1 29" hotspot in the style attribute below lands on it.
+const pencilCursorSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 225.79 225.53" fill="none">
+<path d="M76.93 215L5.84 219.69L13.13 151.21L161.54 2.81L225.33 66.6L76.93 215Z" fill="#0D0D0D"/>
+<path d="M221.01 52.69L173.1 4.78C166.72 -1.6 156.34 -1.6 149.97 4.78L140.1 14.65C139.93 14.82 139.78 15.01 139.65 15.21L130.02 24.84C129.85 25.01 129.7 25.19 129.57 25.39L16.98 137.99C14.07 140.9 11.99 144.54 10.95 148.52C10.92 148.64 10.89 148.76 10.87 148.89L0.04 221.51C-0.12 222.6 0.24 223.71 1.02 224.49C1.8 225.28 2.9 225.64 3.99 225.49L76.92 215C77.04 214.98 77.17 214.96 77.29 214.93C81.32 213.9 85.01 211.81 87.95 208.87L201.01 95.81C201.18 95.64 201.33 95.45 201.46 95.26L210.59 86.13C210.79 86 210.98 85.85 211.15 85.68L221.02 75.81C227.4 69.43 227.4 59.06 221.02 52.68L221.01 52.69ZM28.78 160.51C27.41 161.88 27.41 164.09 28.78 165.46C30.15 166.83 32.36 166.83 33.73 165.46C36.92 162.27 41.95 162.11 44.95 165.11C47.95 168.11 47.79 173.14 44.6 176.33C43.23 177.7 43.23 179.91 44.6 181.28C45.97 182.65 48.18 182.65 49.55 181.28C52.74 178.09 57.77 177.93 60.77 180.93C63.51 183.67 63.61 188.12 61.16 191.3C60.88 191.54 60.6 191.79 60.33 192.05C58.96 193.42 58.96 195.63 60.33 197C60.35 197.02 60.37 197.03 60.38 197.04C60.4 197.06 60.41 197.08 60.42 197.09C61.79 198.46 64 198.46 65.37 197.09C65.64 196.82 65.88 196.54 66.12 196.26C69.3 193.81 73.75 193.9 76.49 196.65C79.49 199.65 79.33 204.68 76.14 207.87C76.1 207.91 76.08 207.95 76.04 207.99C75.93 208.02 75.82 208.06 75.72 208.09L34.44 214.03C34.44 214.03 34.36 213.93 34.32 213.88L11.63 191.19L17.76 150.1C17.8 149.94 17.86 149.77 17.91 149.61C21.1 146.43 26.13 146.28 29.12 149.27C32.11 152.26 31.96 157.3 28.77 160.49L28.78 160.51ZM10.35 199.81L25.82 215.28L7.65 217.89L10.35 199.81ZM85.62 201.29C85.47 197.78 84.09 194.35 81.45 191.71C78.31 188.57 74.04 187.21 69.84 187.59C70.22 183.4 68.86 179.13 65.72 175.98C62.58 172.83 58.24 171.45 54.01 171.86C54.42 167.63 53.06 163.32 49.89 160.15C46.72 156.98 42.41 155.62 38.18 156.03C38.59 151.8 37.23 147.49 34.06 144.32C31.47 141.73 28.12 140.36 24.67 140.16L132.53 32.3L163.02 62.79L193.56 93.33L85.6 201.29H85.62ZM198.48 88.34L137.45 27.31L142.63 22.13L203.66 83.16L198.48 88.34ZM216.21 71.02L208.82 78.41L147.38 16.97L154.77 9.58C158.5 5.85 164.58 5.85 168.31 9.58L216.21 57.48C219.94 61.21 219.94 67.29 216.21 71.02Z" fill="#EEEEE9"/>
+<path d="M154.93 70.59C153.6 69.26 151.45 69.26 150.12 70.59L65.58 155.13C64.25 156.46 64.25 158.61 65.58 159.94C66.91 161.27 69.06 161.27 70.39 159.94L154.93 75.4C156.26 74.07 156.26 71.92 154.93 70.59Z" fill="#EEEEE9"/>
+<path d="M81.59 171.13C80.26 172.46 80.26 174.61 81.59 175.94C82.92 177.27 85.07 177.27 86.4 175.94L170.94 91.4C172.27 90.07 172.27 87.92 170.94 86.59C169.61 85.26 167.46 85.26 166.13 86.59L81.59 171.13Z" fill="#EEEEE9"/>
+<path d="M139.29 54.95C137.96 53.62 135.81 53.62 134.48 54.95L49.94 139.49C48.61 140.82 48.61 142.97 49.94 144.3C51.27 145.63 53.42 145.63 54.75 144.3L139.29 59.76C140.62 58.43 140.62 56.28 139.29 54.95Z" fill="#EEEEE9"/>
+</svg>`;
+const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).toString('base64')}`;
+---
+
+<section
+  class="relative flex flex-col items-center px-[var(--page-margin)]"
+  style="padding-top:calc(var(--spacing-vertical-xl) * 1.4); gap:calc(var(--spacing-vertical-xl) * 1.4)"
+  data-hero-section
+>
+  <p
+    class="relative z-20 max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front pointer-events-none [text-shadow:0_3px_20px_rgba(0,0,0,0.75)]"
+  >
+    {loopWords.length > 0 ? (
+      <Fragment>
+        {headlineBefore}<span
+          class="relative inline-block h-[1em] align-bottom overflow-hidden transition-[width] duration-500 ease-in-out"
+          data-hero-word-window
+        ><span class="flex flex-col items-start transition-transform duration-500 ease-in-out" data-hero-word-track>
+          {loopWords.map((word, i) => (
+            <span
+              class="block h-[1em] whitespace-nowrap leading-none"
+              data-hero-word
+              style={loopColors[i] ? `color:${loopColors[i]}` : undefined}
+            >{word}</span>
+          ))}
+        </span></span><br class="hero-mobile-break" />{headlineAfter}
+      </Fragment>
+    ) : (
+      headline
+    )}
+  </p>
+
+  <div class="flex w-full flex-col items-start gap-vertical-s">
+    <p class="w-full text-center font-tag text-detail text-front" data-hero-tagline>
+      <span class="relative z-20 inline-flex items-baseline pointer-events-none [text-shadow:0_1px_8px_rgba(0,0,0,0.55)]">
+        {tagline}
+        <span class="mb-[0.08em] ml-[0.25em] h-px w-[1.1em] self-end bg-front" aria-hidden="true"></span>
+        <img src={pencilCursor} alt="" class="h-[1em] w-auto drop-shadow-[0_1px_8px_rgba(0,0,0,0.55)]" />
+        {/* First-visit nudge toward the drawable canvas — shown once (see
+            script below, gated on localStorage) rather than every visit,
+            since a returning visitor already knows it's there. */}
+        <span
+          data-hero-draw-hint
+          class="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-card border border-front/15 bg-grey-600 px-3 py-1 font-tag text-detail text-front opacity-0 backdrop-blur-[14px] transition-opacity duration-500 ease-out"
+        >
+          Click &amp; drag the pencil
+        </span>
+      </span>
+    </p>
+
+    {media && (
+      <div
+        class="relative z-20 aspect-[1670/939] w-full cursor-default overflow-hidden rounded-card"
+        data-hero-media
+      >
+        {media.type === 'video' ? (
+          <video
+            src={media.url}
+            poster={media.posterUrl}
+            class="h-full w-full object-cover"
+            autoplay
+            muted
+            loop
+            playsinline
+          />
+        ) : (
+          <img src={media.url} alt={media.alt} class="h-full w-full object-cover" loading="eager" />
+        )}
+      </div>
+    )}
+  </div>
+
+  {/* Generative spray-paint backdrop, sitting below the headline/tagline
+      (z-20) but above the media — visitors interact with it to build up an
+      abstract painted backdrop behind the text, not to draw literal marks
+      on top of it. Deliberately not a freehand pencil trace: big grainy
+      sprayed clusters can't spell anything out, which sidesteps the
+      moderation problem a literal "write anything you like on our
+      homepage" tool would be. Spray colour tracks whichever hero-word
+      colour is currently showing (see script below), so the palette keeps
+      shifting the same way the headline does. */}
+  <canvas
+    class="absolute inset-0 z-10 h-full w-full touch-none"
+    style={`cursor: url("${pencilCursor}") 1 29, crosshair;`}
+    data-hero-canvas
+    aria-label="Add colour to your neighbourhood"
+  ></canvas>
+</section>
+
+<style>
+  /*
+   * Different hover/auto-advance words have different natural widths
+   * ("people" vs "orgs"), which on mobile is enough to shift where the
+   * headline's natural text-wrap falls — e.g. more of "thinking" fitting
+   * onto the first line for a shorter word — visibly shunting the rest of
+   * the headline up or down as the word swaps. Forcing a break right after
+   * the swap word on mobile only pins the wrap point so it can't move,
+   * regardless of which word is showing.
+   */
+  .hero-mobile-break {
+    display: none;
+  }
+  @media (max-width: 767px) {
+    .hero-mobile-break {
+      display: block;
+    }
+  }
+</style>
+
+<script>
+  // Scroll-scrubbed hero entrance, modeled on wearecollins.com's reel section:
+  // the media block grows from slightly-scaled-down to full size, and the small
+  // caption above it drifts upward, as the hero scrolls up through the viewport.
+  const media = document.querySelector<HTMLElement>('[data-hero-media]');
+  const tagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Shared with the doodle canvas below: whatever colour the headline word
+  // is currently showing is also the pen colour, so the two features read
+  // as one system rather than two unrelated animations. Matches the first
+  // hero-word colour by default (the resting state before any word swap).
+  let currentColor = '#EB8FB5';
+
+  function clamp(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function update() {
+    if (!media) return;
+    const rect = media.getBoundingClientRect();
+    const vh = window.innerHeight;
+    // progress: 0 while the media's top is still at the bottom of the viewport,
+    // 1 once it has scrolled up to ~35% from the top — i.e. fully "arrived".
+    const start = vh;
+    const end = vh * 0.35;
+    const progress = clamp((start - rect.top) / (start - end), 0, 1);
+
+    const scale = 0.88 + 0.12 * progress;
+    media.style.transform = `scale(${scale})`;
+
+    if (tagline) {
+      // Reaches its end state well before the image finishes scaling, so it
+      // visibly moves faster — same start point, shorter run.
+      const taglineEnd = vh * 0.65;
+      const taglineProgress = clamp((start - rect.top) / (start - taglineEnd), 0, 1);
+      tagline.style.transform = `translateY(${-taglineProgress * 48}px)`;
+      tagline.style.opacity = String(1 - taglineProgress * 0.6);
+    }
+  }
+
+  if (!reduceMotion && media) {
+    let rafId = 0;
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        update();
+        rafId = 0;
+      });
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+  }
+
+  // Headline hover word: each mouseenter rolls the track up by one word
+  // (same fixed-height-window + translateY technique as the nav's Menu/Close
+  // toggle). The word list is rendered with the first word duplicated at the
+  // end, so the roll can always move in the same direction — on landing on
+  // that duplicate, it's visually identical to the real first word, so the
+  // track jumps back to index 0 with transitions off for one frame, which
+  // reads as a seamless loop rather than a snap backwards.
+  const wordWindow = document.querySelector<HTMLElement>('[data-hero-word-window]');
+  const wordTrack = document.querySelector<HTMLElement>('[data-hero-word-track]');
+
+  if (wordWindow && wordTrack && !reduceMotion) {
+    // Rebind to non-null locals: TS narrowing from the outer if-check
+    // doesn't persist into the advance() closure defined below.
+    const win = wordWindow;
+    const track = wordTrack;
+    const frameCount = track.children.length;
+    // translateY(%) is relative to the track's OWN height (all frames
+    // stacked), not a single frame — so one frame is (100 / frameCount)%,
+    // not a flat 100%.
+    const framePercent = 100 / frameCount;
+    let index = 0;
+
+    // Each word has a different natural width. The window is sized to
+    // exactly the word currently showing (not the widest of the set) and
+    // transitions width alongside the roll, so the centered/balanced
+    // headline reflows around it instead of leaving a gap for shorter words.
+    // Widths are in pixels and font-size changes at each responsive
+    // breakpoint, so they're re-measured on resize (see below) rather than
+    // captured once — otherwise the box keeps its stale desktop/mobile size
+    // after the viewport crosses a breakpoint.
+    const frames = Array.from(track.children) as HTMLElement[];
+    let frameWidths = frames.map((frame) => frame.getBoundingClientRect().width);
+    if (frameWidths[0]) win.style.width = `${frameWidths[0]}px`;
+    if (frames[0]) currentColor = getComputedStyle(frames[0]).color;
+
+    function resetToFirstFrame() {
+      index = 0;
+      track.style.transitionDuration = '0ms';
+      track.style.transform = `translateY(0)`;
+      // Force a synchronous reflow so the 0ms jump is actually committed
+      // before restoring the real duration below — otherwise the browser can
+      // coalesce both style changes into the same frame and animate the
+      // "instant" reset over the full duration, rolling visibly backwards.
+      void track.offsetHeight;
+      track.style.transitionDuration = '';
+    }
+
+    function advance() {
+      if (frameCount <= 1) return;
+      // Self-correcting rather than relying on a prior transitionend to have
+      // reset the index: once we're sitting on (or, from a burst of rapid
+      // triggers, ever managed to reach) the final looping-duplicate frame,
+      // snap back to the real first frame before continuing. Waiting on
+      // transitionend alone was fragile — an interrupted transition (rapid
+      // re-triggers, or a backgrounded tab throttling/coalescing the
+      // touch-device auto-advance timer so several ticks fire back-to-back
+      // once it's foregrounded again) never fires that event, which left
+      // index permanently stuck at the last frame with nothing to recover it.
+      if (index >= frameCount - 1) resetToFirstFrame();
+      index++;
+      track.style.transform = `translateY(-${index * framePercent}%)`;
+      const width = frameWidths[index];
+      if (width) win.style.width = `${width}px`;
+      const frame = frames[index];
+      if (frame) currentColor = getComputedStyle(frame).color;
+    }
+
+    // Auto-advances on a timer on every screen (not just touch/no-hover
+    // devices) — the doodle canvas's pen colour rides on this same tick, so
+    // the palette needs to keep shifting even on desktop where a visitor
+    // never hovers the word. This also means the canvas overlay sitting on
+    // top of the hero (capturing pointer events for drawing) no longer
+    // blocks a hover-to-advance interaction that a mouseenter listener would
+    // otherwise depend on.
+    window.setInterval(advance, 2200);
+
+    let resizeRafId = 0;
+    window.addEventListener('resize', () => {
+      if (resizeRafId) return;
+      resizeRafId = requestAnimationFrame(() => {
+        resizeRafId = 0;
+        frameWidths = frames.map((frame) => frame.getBoundingClientRect().width);
+        const width = frameWidths[index];
+        if (!width) return;
+        // Instant, not animated — this is a layout correction for the new
+        // viewport/font-size, not a user-triggered roll.
+        win.style.transitionDuration = '0ms';
+        win.style.width = `${width}px`;
+        void win.offsetHeight;
+        win.style.transitionDuration = '';
+      });
+    });
+
+    // Normal (uninterrupted) case: once the transition into the final
+    // looping-duplicate frame actually completes, reset immediately rather
+    // than waiting for the next advance() call — this is what makes the
+    // loop look seamless. advance()'s own self-correction above is the
+    // fallback for when this event doesn't fire.
+    track.addEventListener('transitionend', (e) => {
+      if (e.target !== track || e.propertyName !== 'transform') return;
+      if (index !== frameCount - 1) return;
+      resetToFirstFrame();
+    });
+  }
+
+  // Generative spray-paint backdrop, sitting behind the headline/tagline
+  // (see the z-index note on the canvas markup) — deliberately NOT a
+  // freehand pencil trace any more. Letting visitors draw literal legible
+  // lines/text on a public marketing page is a moderation risk (nothing
+  // stops someone writing something you don't want on your homepage);
+  // big grainy sprayed clusters can't spell anything out, so there's no
+  // content to moderate. Colour is `currentColor`, kept live by the
+  // word-cycle block above — the two features share one variable rather
+  // than the canvas re-deriving the colour itself.
+  const canvas = document.querySelector<HTMLCanvasElement>('[data-hero-canvas]');
+  const heroSection = document.querySelector<HTMLElement>('[data-hero-section]');
+  const mediaEl = document.querySelector<HTMLElement>('[data-hero-media]');
+  const ctx = canvas?.getContext('2d') ?? null;
+
+  if (canvas && heroSection && ctx) {
+    // First-visit nudge toward the drawable canvas — shown once per
+    // browser (localStorage, not sessionStorage), since a returning
+    // visitor already knows it's there and re-showing it every visit
+    // would just be noise. Dismissed by the first real interaction, or
+    // after a few seconds unattended either way.
+    const hint = document.querySelector<HTMLElement>('[data-hero-draw-hint]');
+    const HINT_SEEN_KEY = 'friendhood-hero-hint-seen';
+    if (hint && !localStorage.getItem(HINT_SEEN_KEY)) {
+      const showTimeout = window.setTimeout(() => {
+        hint.style.opacity = '1';
+      }, 1200);
+      const hideHint = () => {
+        window.clearTimeout(showTimeout);
+        hint.style.opacity = '0';
+        localStorage.setItem(HINT_SEEN_KEY, '1');
+      };
+      canvas.addEventListener('pointerdown', hideHint, { once: true });
+      window.setTimeout(hideHint, 7000);
+    }
+
+    const dpr = () => window.devicePixelRatio || 1;
+
+    function resizeCanvas() {
+      if (!canvas || !heroSection) return;
+      const rect = heroSection.getBoundingClientRect();
+      const scale = dpr();
+      const nextWidth = Math.round(rect.width * scale);
+      const nextHeight = Math.round(rect.height * scale);
+      if (canvas.width === nextWidth && canvas.height === nextHeight) return;
+      // No bitmap to preserve across the resize — blobs are kept as data
+      // and the whole canvas redraws from that every frame regardless, so
+      // resizing just changes the backing store size; the next render-loop
+      // tick repaints everything at the new size on its own.
+      canvas.width = nextWidth;
+      canvas.height = nextHeight;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+    }
+
+    resizeCanvas();
+
+    let canvasResizeRafId = 0;
+    window.addEventListener('resize', () => {
+      if (canvasResizeRafId) return;
+      canvasResizeRafId = requestAnimationFrame(() => {
+        canvasResizeRafId = 0;
+        resizeCanvas();
+      });
+    });
+
+    // Each spray is a cluster of many small scattered particles — grainy
+    // and huge rather than a smooth glowing orb, so it reads as paint on a
+    // canvas rather than light. The particle scatter is rendered ONCE per
+    // spawn onto its own small offscreen canvas (cheap: a few hundred
+    // fill() calls that happen only at spawn time, not every frame); the
+    // main render loop then just drawImage()s that pre-rendered texture
+    // with the current fade opacity — one cheap draw call per cluster per
+    // frame, however many particles it's made of, which is what keeps this
+    // fast even with a lot of clusters alive (see the old line-based
+    // version's lag for what happens re-evaluating expensive per-shape
+    // work every single frame).
+    interface SprayCluster {
+      x: number;
+      y: number;
+      radius: number;
+      texture: HTMLCanvasElement;
+      spawnTime: number;
+    }
+    // A handful of brighter points per spawn are kept as live data (not
+    // baked into the dust texture) and individually twinkle + drift every
+    // frame — a real starfield needs a few points that visibly move/pulse,
+    // not just a static cloud. Only a bounded few per spawn, redrawn
+    // individually, is what keeps that affordable — the bulk "dust" stays
+    // in the cheap pre-rendered texture below it.
+    interface TwinkleStar {
+      x: number;
+      y: number;
+      radius: number;
+      r: number;
+      g: number;
+      b: number;
+      phase: number;
+      twinkleSpeed: number;
+      driftPhase: number;
+      spawnTime: number;
+    }
+    let clusters: SprayCluster[] = [];
+    let stars: TwinkleStar[] = [];
+    let renderRafId = 0;
+    const MIN_CLUSTER_RADIUS = 140;
+    const MAX_CLUSTER_RADIUS = 260;
+    // Fewer, size-varied particles read as scattered star-dust; the old
+    // 180-at-fairly-even-size was what made it look like an even coat of
+    // spray rather than something organic.
+    const PARTICLES_PER_CLUSTER = 110;
+    const STARS_PER_CLUSTER = 4;
+    const STAR_DRIFT_RADIUS = 7;
+    const STAR_DRIFT_PERIOD_MS = 5000;
+    const MAX_LIVE_STARS = 500;
+    const FADE_IN_MS = 250;
+    const HOLD_MS = 20000;
+    const FADE_MS = 5000;
+    // Spawning on every pointermove would be excessive — one cluster every
+    // ~130ms while the pointer's down reads as a steady build-up without
+    // turning to mud. MAX_LIVE_CLUSTERS is a hard backstop on top of that.
+    const SPAWN_INTERVAL_MS = 130;
+    const MAX_LIVE_CLUSTERS = 220;
+
+    // `currentColor` starts as a hardcoded hex default but gets overwritten
+    // with `getComputedStyle(...).color` as soon as the headline word first
+    // advances (see the word-cycle block above), which the browser reports
+    // back as "rgb(r, g, b)", not hex — so both forms need handling here.
+    function parseColor(color: string) {
+      if (color.startsWith('#')) {
+        const clean = color.slice(1);
+        return {
+          r: parseInt(clean.slice(0, 2), 16),
+          g: parseInt(clean.slice(2, 4), 16),
+          b: parseInt(clean.slice(4, 6), 16),
+        };
+      }
+      const match = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+      return match
+        ? { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]) }
+        : { r: 255, g: 255, b: 255 };
+    }
+
+    function buildSprayTexture(radius: number, r: number, g: number, b: number) {
+      const scale = dpr();
+      const size = Math.ceil(radius * 2 * scale);
+      const texture = document.createElement('canvas');
+      texture.width = size;
+      texture.height = size;
+      const tctx = texture.getContext('2d')!;
+      const center = size / 2;
+      for (let i = 0; i < PARTICLES_PER_CLUSTER; i++) {
+        // Uniform-area random point in a circle (not just random angle +
+        // random distance, which would bunch particles toward the centre)
+        // — sqrt(random) is the standard correction for that.
+        const angle = Math.random() * Math.PI * 2;
+        const dist = radius * scale * Math.sqrt(Math.random());
+        const px = center + Math.cos(angle) * dist;
+        const py = center + Math.sin(angle) * dist;
+        // Squaring random() skews toward small values with occasional
+        // bigger ones — mostly fine dust, not an even coat of same-sized
+        // dots, which is what read as "spray can" rather than star-dust.
+        const particleRadius = (0.75 + Math.pow(Math.random(), 2) * 4) * scale;
+        const alpha = 0.12 + Math.random() * 0.28;
+        tctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        tctx.beginPath();
+        tctx.arc(px, py, particleRadius, 0, Math.PI * 2);
+        tctx.fill();
+      }
+      return texture;
+    }
+
+    function spawnCluster(x: number, y: number, color: string) {
+      const { r, g, b } = parseColor(color);
+      const radius = MIN_CLUSTER_RADIUS + Math.random() * (MAX_CLUSTER_RADIUS - MIN_CLUSTER_RADIUS);
+      const spawnTime = performance.now();
+      clusters.push({ x, y, radius, texture: buildSprayTexture(radius, r, g, b), spawnTime });
+      if (clusters.length > MAX_LIVE_CLUSTERS) {
+        clusters.splice(0, clusters.length - MAX_LIVE_CLUSTERS);
+      }
+
+      for (let i = 0; i < STARS_PER_CLUSTER; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = radius * Math.sqrt(Math.random());
+        stars.push({
+          x: x + Math.cos(angle) * dist,
+          y: y + Math.sin(angle) * dist,
+          radius: 2.5 + Math.random() * 3.5,
+          r,
+          g,
+          b,
+          phase: Math.random() * Math.PI * 2,
+          // Slightly randomised per star so a cluster's stars don't all
+          // pulse in lockstep — that reads as one blinking light, not a
+          // handful of independent ones.
+          twinkleSpeed: 0.0009 + Math.random() * 0.0012,
+          driftPhase: Math.random() * Math.PI * 2,
+          spawnTime,
+        });
+      }
+      if (stars.length > MAX_LIVE_STARS) {
+        stars.splice(0, stars.length - MAX_LIVE_STARS);
+      }
+
+      if (!renderRafId) renderRafId = requestAnimationFrame(renderLoop);
+    }
+
+    function renderLoop() {
+      if (!ctx || !canvas) return;
+      const now = performance.now();
+      const scale = dpr();
+      clusters = clusters.filter((c) => now - c.spawnTime < HOLD_MS + FADE_MS);
+      stars = stars.filter((s) => now - s.spawnTime < HOLD_MS + FADE_MS);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Plain alpha compositing, not additive ("lighter") blending — layers
+      // like actual paint/pigment instead of brightening like light where
+      // clusters overlap, which is what made the previous version read as
+      // a light show rather than an abstract canvas.
+      for (const c of clusters) {
+        const age = now - c.spawnTime;
+        let opacity = 1;
+        if (age < FADE_IN_MS) opacity = age / FADE_IN_MS;
+        else if (age > HOLD_MS) opacity = Math.max(0, 1 - (age - HOLD_MS) / FADE_MS);
+
+        ctx.globalAlpha = opacity;
+        const half = c.texture.width / 2;
+        ctx.drawImage(c.texture, c.x * scale - half, c.y * scale - half);
+      }
+
+      // The twinkling stars draw on top of the dust — individually
+      // animated, so this is where the "alive" motion actually comes from.
+      // twinkle is sin()-squared (always >= 0) so it pulses between dim and
+      // bright rather than ever fully vanishing; drift is a tiny slow
+      // circular wobble, not a directed movement, so it reads as floating
+      // rather than travelling anywhere.
+      for (const s of stars) {
+        const age = now - s.spawnTime;
+        let opacity = 1;
+        if (age < FADE_IN_MS) opacity = age / FADE_IN_MS;
+        else if (age > HOLD_MS) opacity = Math.max(0, 1 - (age - HOLD_MS) / FADE_MS);
+        if (opacity <= 0) continue;
+
+        const twinkle = 0.35 + 0.65 * Math.pow(Math.sin(now * s.twinkleSpeed + s.phase), 2);
+        const driftAngle = (now / STAR_DRIFT_PERIOD_MS) * Math.PI * 2 + s.driftPhase;
+        const px = (s.x + Math.cos(driftAngle) * STAR_DRIFT_RADIUS) * scale;
+        const py = (s.y + Math.sin(driftAngle) * STAR_DRIFT_RADIUS) * scale;
+
+        // Glow via a radial gradient, not shadowBlur — shadowBlur is a real
+        // per-call blur convolution, which is exactly what made the old
+        // line-based version laggy once more than a handful of shapes
+        // needed it every frame. A gradient fill is comparatively cheap
+        // even at a few hundred stars alive at once.
+        const glowAlpha = 0.16 * opacity * twinkle;
+        const glowRadius = s.radius * 2.5 * scale;
+        const glow = ctx.createRadialGradient(px, py, 0, px, py, glowRadius);
+        glow.addColorStop(0, `rgba(${s.r}, ${s.g}, ${s.b}, ${glowAlpha})`);
+        glow.addColorStop(1, `rgba(${s.r}, ${s.g}, ${s.b}, 0)`);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Crisp bright core on top of its own glow.
+        ctx.globalAlpha = opacity * twinkle;
+        ctx.fillStyle = `rgb(${s.r}, ${s.g}, ${s.b})`;
+        ctx.beginPath();
+        ctx.arc(px, py, s.radius * scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      if (clusters.length > 0 || stars.length > 0) {
+        renderRafId = requestAnimationFrame(renderLoop);
+      } else {
+        // Nothing left to animate — stop rather than looping forever on a
+        // page nobody's actually touched.
+        renderRafId = 0;
+      }
+    }
+
+    function pointerPos(e: PointerEvent) {
+      const rect = canvas!.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    // The media block (image/video) sits below the canvas in z-order, same
+    // as everywhere else in the hero — but once a gesture is in progress
+    // the canvas holds pointer capture (see startSpawning), which bypasses
+    // normal z-index hit-testing and would otherwise happily keep spawning
+    // orbs over the video. Checked by geometry instead, against fresh
+    // coordinates each call rather than a cached rect, since the media can
+    // reflow at different breakpoints.
+    function isOverMedia(clientX: number, clientY: number) {
+      if (!mediaEl) return false;
+      const r = mediaEl.getBoundingClientRect();
+      return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+    }
+
+    let pointerDown = false;
+    let lastSpawnTime = 0;
+
+    function startSpawning(e: PointerEvent) {
+      if (isOverMedia(e.clientX, e.clientY)) return;
+      pointerDown = true;
+      const { x, y } = pointerPos(e);
+      spawnCluster(x, y, currentColor);
+      lastSpawnTime = e.timeStamp;
+      canvas!.setPointerCapture(e.pointerId);
+    }
+
+    function keepSpawning(e: PointerEvent) {
+      if (!pointerDown) return;
+      if (isOverMedia(e.clientX, e.clientY)) return;
+      if (e.timeStamp - lastSpawnTime < SPAWN_INTERVAL_MS) return;
+      const { x, y } = pointerPos(e);
+      spawnCluster(x, y, currentColor);
+      lastSpawnTime = e.timeStamp;
+    }
+
+    function stopSpawning() {
+      pointerDown = false;
+    }
+
+    canvas.addEventListener('pointerdown', startSpawning);
+    canvas.addEventListener('pointermove', keepSpawning);
+    canvas.addEventListener('pointerup', stopSpawning);
+    canvas.addEventListener('pointercancel', stopSpawning);
+  }
+</script>

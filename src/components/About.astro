@@ -1,0 +1,224 @@
+---
+import { fetchAbout } from '../lib/sanity/queries';
+
+const about = await fetchAbout();
+
+const introLabel = about?.introLabel ?? 'Who we are.';
+const introLabelMuted = about?.introLabelMuted ?? 'Built to change your world.';
+const introHeading =
+  about?.introHeading ??
+  "We're a strategic branding studio built to help you understand now and make what's coming next. Creative expertise and guidance for people looking to build and change things, for good.";
+const introImageUrl = about?.introImageUrl;
+const introImageWideUrl = about?.introImageWideUrl;
+
+const approachLabel = about?.approachLabel ?? 'Our approach';
+const approachHeading = about?.approachHeading ?? 'Who you are, amplified by strategic craft.';
+const approachCards = about?.approachCards ?? [];
+
+const clientsLabel = about?.clientsLabel ?? 'Client experience';
+const clients = about?.clients ?? [];
+---
+
+<section class="flex flex-col gap-vertical-l px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-intro">
+  <div class="flex w-full flex-col items-start gap-vertical-s">
+    <p class="reveal-item font-tag text-detail text-front">
+      {introLabel} <span class="text-services">{introLabelMuted}</span>
+    </p>
+    <p class="reveal-item font-display text-h2 text-front">{introHeading}</p>
+  </div>
+
+  <div class="intro-row full-bleed-scroll flex w-full items-start gap-gutter">
+    {introImageUrl && (
+      <div class="intro-image intro-image-narrow reveal-item shrink-0 overflow-hidden rounded-card">
+        <img src={introImageUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
+      </div>
+    )}
+    {introImageWideUrl && (
+      <div class="intro-image intro-image-wide reveal-item shrink-0 overflow-hidden rounded-card">
+        <img src={introImageWideUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  /*
+   * Below desktop, the two intro images DON'T reshape or stack into a
+   * one-slide-at-a-time carousel — per Figma (768 and 390 frames) they keep
+   * their own fixed pixel dimensions and simply overflow the viewport,
+   * scrolling as a peeking pair (narrow + wide both partially visible at
+   * once). Full-bleed break-out + scroll-padding-inline scroll mechanics
+   * come from the shared .full-bleed-scroll class (see global.css) — this
+   * block only has the intro-row-specific sizing.
+   *
+   * Both images share the SAME fixed height per tier (rather than each
+   * having its own aspect ratio) — confirmed directly against Figma's pixel
+   * values at both breakpoints (390: 318x425 / 360x425: 768: 355x465 /
+   * 728x464.54, i.e. equal by explicit height, not by a shared ratio).
+   * col-4/col-8 only coincidentally match the 768 tier's widths (354/728) —
+   * the 390 tier's narrow width (318) doesn't correspond to any existing
+   * grid token, so these are one-off pixel pairs, not derived from the grid.
+   */
+  .intro-image {
+    height: 425px;
+  }
+  .intro-image-narrow {
+    width: 318px;
+  }
+  .intro-image-wide {
+    width: 360px;
+  }
+  @media (min-width: 768px) {
+    .intro-image {
+      height: 465px;
+    }
+    .intro-image-narrow {
+      width: var(--col-4);
+    }
+    .intro-image-wide {
+      width: var(--col-8);
+    }
+  }
+  @media (min-width: 1440px) {
+    /* At desktop the row goes back to a static, non-scrolling side-by-side
+       layout — the overflow scrolling is a tablet/mobile-only affordance.
+       The narrow image keeps a fixed WIDTH
+       (--col-4) with its own ratio giving it a height; the wide image has a
+       flexible width with NO ratio of its own, stretching (align-items:
+       stretch + object-cover) to match whatever height the narrow image
+       ends up with — aspect-ratio-locking the wide image independently
+       only matched by coincidence at exactly the reference viewport each
+       tier's tokens were tuned for, and visibly drifted apart elsewhere. */
+    .intro-row {
+      align-items: stretch;
+    }
+    .intro-image {
+      height: auto;
+    }
+    .intro-image-narrow {
+      width: var(--col-4);
+      aspect-ratio: 523 / 700;
+    }
+    .intro-image-wide {
+      width: auto;
+      min-width: 0;
+      flex: 1 1 0%;
+    }
+  }
+</style>
+
+<slot name="services" />
+
+<section class="flex flex-col gap-vertical-l px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-approach">
+  <div class="flex w-full flex-col items-start gap-vertical-s">
+    <p class="reveal-item font-tag text-detail text-front">{approachLabel}</p>
+    <p class="reveal-item font-display text-h2 text-front">{approachHeading}</p>
+  </div>
+
+  <div class="approach-row full-bleed-scroll w-full gap-gutter">
+    {approachCards.map((card) => (
+      <div class="approach-card reveal-item flex flex-col items-start gap-[16px]">
+        <div class="aspect-[523/700] w-full overflow-hidden rounded-card">
+          <img src={card.imageUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
+        </div>
+        <div class="approach-copy flex w-full items-start gap-gutter">
+          <p class="approach-title font-heading text-h3 text-accent-yellow">{card.title}</p>
+          <p class="approach-text font-body text-body-3 text-front">{card.text}</p>
+        </div>
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  /*
+   * Below desktop, the cards become a swipeable horizontal carousel
+   * (scroll-snap, no JS needed) — each card gets a fixed column width so it
+   * scrolls as a discrete unit, and every card's image ends up the same
+   * height since they all share that width (aspect-ratio does the rest).
+   *
+   * At desktop the row switches to CSS Grid with auto-fill/minmax (same
+   * pattern as .services-grid) instead of a hardcoded 3-column track list —
+   * Sanity's approachCards array has no max-count validation, so a 4th (or
+   * 5th) card an editor adds in Studio reflows into however many columns
+   * actually fit, evenly stretched, rather than wrapping into a new row of
+   * mostly-empty tracks the way a fixed repeat(3, 1fr) would. It also still
+   * gets the general grid benefit over flexbox: tracks always divide the
+   * container's ACTUAL width exactly, at any real browser width, not just
+   * the 4 Figma reference breakpoints col-4 was measured against.
+   *
+   * auto-fill, not auto-fit: auto-fit collapses unfilled tracks and hands
+   * their space to the remaining items, which stretches a lone (or few)
+   * card(s) to fill the whole row — auto-fill keeps the empty tracks in
+   * place instead, so cards stay at their normal column width with blank
+   * space beside them until there are enough to actually fill the row.
+   *
+   * Full-bleed break-out + scroll-padding-inline scroll mechanics come from
+   * the shared .full-bleed-scroll class (see global.css) — this block only
+   * has the approach-row-specific scroll-snap, display mode, and card sizing.
+   */
+  .approach-row {
+    display: flex;
+    align-items: flex-start;
+    scroll-snap-type: x mandatory;
+  }
+  .approach-card {
+    flex-shrink: 0;
+    width: var(--col-4);
+    scroll-snap-align: start;
+  }
+  @media (min-width: 1440px) {
+    .approach-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--col-4), 1fr));
+      align-items: start;
+      scroll-snap-type: none;
+    }
+    .approach-card {
+      width: auto;
+    }
+  }
+
+  /*
+   * Title+text row: stacked (full card width each) below desktop so the
+   * title has as much room as possible to stay on one line; side-by-side
+   * from 1440px up, where cards are wide enough for both to sit together.
+   * The title never wraps mid-word on its own (white-space: nowrap) — at
+   * desktop it takes its natural width and the text absorbs the rest; if a
+   * card is ever too narrow for that even when stacked (e.g. some portrait
+   * tablet widths), the title is allowed to wrap there rather than overflow.
+   */
+  .approach-copy {
+    flex-direction: column;
+  }
+  .approach-text {
+    width: 100%;
+  }
+  @media (min-width: 1440px) {
+    .approach-copy {
+      flex-direction: row;
+    }
+    .approach-title {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .approach-text {
+      width: auto;
+      min-width: 0;
+      flex: 1 1 0%;
+    }
+  }
+</style>
+
+<section class="flex flex-col gap-vertical-s px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-clients">
+  <p class="reveal-item font-tag text-detail text-front">{clientsLabel}</p>
+  <p class="reveal-item w-full font-heading text-h3 text-[#5c5c5c]">{clients.join(' • ')}</p>
+</section>
+
+<script>
+  import { initScrollRevealGroup } from '../lib/scrollReveal';
+
+  for (const name of ['about-intro', 'about-approach', 'about-clients']) {
+    initScrollRevealGroup(name);
+  }
+</script>

@@ -1,0 +1,32 @@
+---
+import type { Category } from '../types/project';
+
+interface Props {
+  label: Category;
+  /** Item count shown after the label — the Figma "TagNumber" variant, used by the Work page filter bar. */
+  count?: number;
+  /** Renders as a click-to-filter button (Work page) instead of a link to /work?category=. */
+  asFilter?: boolean;
+  /** Selected state when used as a filter. */
+  active?: boolean;
+}
+
+const { label, count, asFilter = false, active = false } = Astro.props;
+
+const classes = `font-tag inline-flex shrink-0 items-center gap-[8px] rounded-card px-4 py-[7px] text-categories backdrop-blur-[15px] transition-colors duration-300 ease-out ${
+  active ? 'bg-front text-back' : 'bg-[#29282d] text-front hover:bg-front hover:text-back'
+}`;
+---
+
+{
+  asFilter ? (
+    <button type="button" data-category-slug={label.slug} class={classes} aria-pressed={active}>
+      {label.title}
+      {count !== undefined && <span class={active ? 'text-back/60' : 'text-[#9c9c9c]'}>{count}</span>}
+    </button>
+  ) : (
+    <a href={`/work?category=${label.slug}`} class={classes}>
+      {label.title}
+    </a>
+  )
+}

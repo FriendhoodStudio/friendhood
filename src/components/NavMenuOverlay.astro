@@ -1,0 +1,165 @@
+---
+import { fetchNavMenu } from '../lib/sanity/queries';
+import type { PageLink, ContactLink } from '../types/navMenu';
+
+const STAGGER_MS = 60;
+
+const navMenu = await fetchNavMenu();
+
+const pageLinks: PageLink[] = navMenu?.pageLinks ?? [
+  { label: 'Home', href: '/' },
+  { label: 'Work', href: '/work' },
+  { label: 'About', href: '/about' },
+];
+
+const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
+  { label: 'Email', linkType: 'email', email: 'hello@friendhood.co.uk' },
+  { label: 'LinkedIn', linkType: 'link', href: '#' },
+  { label: 'Instagram', linkType: 'link', href: '#' },
+];
+---
+
+<div
+  data-nav-overlay
+  class="pointer-events-none fixed inset-0 z-40 flex flex-col items-center justify-start overflow-y-auto bg-back/60 px-[var(--page-margin)] pt-[max(148px,min(var(--spacing-vertical-xl),12vh))] pb-[130px] text-center opacity-0 backdrop-blur-[25px] transition-opacity duration-400 ease-in-out group-data-[open=true]:pointer-events-auto group-data-[open=true]:opacity-100"
+>
+  <div class="flex flex-1 flex-col items-center gap-vertical-l">
+    <nav class="flex flex-col items-center gap-[15px]">
+      {pageLinks.map((link, i) => (
+        <a
+          href={link.href}
+          class="menu-item menu-link font-display text-h1 text-front"
+          data-delay={i * STAGGER_MS}
+        >
+          {link.label}
+        </a>
+      ))}
+    </nav>
+
+    <div class="flex flex-col items-center gap-[10px]">
+      <p class="menu-item font-tag text-detail text-front" data-delay={pageLinks.length * STAGGER_MS}>
+        Contact
+      </p>
+      <div class="flex flex-col items-center gap-vertical-xs">
+        {contactLinks.map((link, i) =>
+          link.linkType === 'email' ? (
+            <button
+              type="button"
+              data-copy-email
+              data-email={link.email}
+              class="menu-item menu-link font-heading text-h3 text-accent-yellow block cursor-pointer text-left"
+              data-delay={(pageLinks.length + 1 + i) * STAGGER_MS}
+            >
+              <span data-copy-email-label>{link.label}</span>
+            </button>
+          ) : (
+            <a
+              href={link.href}
+              class="menu-item menu-link font-heading text-h3 text-accent-yellow"
+              data-delay={(pageLinks.length + 1 + i) * STAGGER_MS}
+            >
+              {link.label}
+            </a>
+          )
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .menu-item {
+    opacity: 0;
+  }
+
+  /* Applied once the WAAPI entrance animation finishes and is cancelled —
+     see playEntrance() below. A fill:forwards WAAPI animation keeps
+     overriding the `translate` property indefinitely, which would silently
+     defeat the hover nudge below, so control is handed back to plain CSS. */
+  .menu-item.is-settled {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  .menu-link {
+    transition: translate 300ms ease-out;
+  }
+
+  .menu-link:hover {
+    translate: 16px 0;
+  }
+</style>
+
+<script>
+  const bar = document.querySelector<HTMLElement>('[data-nav-bar]');
+  const overlay = document.querySelector<HTMLElement>('[data-nav-overlay]');
+  const menuItems = overlay ? Array.from(overlay.querySelectorAll<HTMLElement>('.menu-item')) : [];
+
+  // Driven entirely via the Web Animations API (rather than a CSS `animation`
+  // that auto-plays once on page load and has to be reset) so entrance always
+  // plays fresh, every time the menu opens, with no reflow/restart hacks.
+  function playEntrance() {
+    menuItems.forEach((el) => {
+      el.getAnimations().forEach((anim) => anim.cancel());
+      el.classList.remove('is-settled');
+      const delay = Number(el.dataset.delay) || 0;
+      const opacityAnim = el.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: 575,
+        delay,
+        easing: 'ease-out',
+        fill: 'forwards',
+      });
+      const translateAnim = el.animate([{ translate: '0 24px' }, { translate: '0 0' }], {
+        duration: 575,
+        delay,
+        easing: 'cubic-bezier(0.22, 1.36, 0.36, 1)',
+        fill: 'forwards',
+      });
+      // Once the entrance settles, cancel the WAAPI animations (which would
+      // otherwise keep pinning `translate` via fill:forwards) and apply the
+      // same resting state via a plain CSS class, so the hover nudge on
+      // .menu-link can take over `translate` normally.
+      Promise.all([opacityAnim.finished, translateAnim.finished])
+        .then(() => {
+          opacityAnim.cancel();
+          translateAnim.cancel();
+          el.classList.add('is-settled');
+        })
+        .catch(() => {});
+    });
+  }
+
+  if (bar && overlay) {
+    const observer = new MutationObserver(() => {
+      const isOpen = bar.dataset.open === 'true';
+      overlay.toggleAttribute('inert', !isOpen);
+      if (isOpen) playEntrance();
+    });
+    observer.observe(bar, { attributes: true, attributeFilter: ['data-open'] });
+  }
+
+  const copyButtons = overlay ? overlay.querySelectorAll<HTMLButtonElement>('[data-copy-email]') : [];
+
+  copyButtons.forEach((copyButton) => {
+    const copyLabel = copyButton.querySelector<HTMLElement>('[data-copy-email-label]');
+
+    copyButton.addEventListener('click', async () => {
+      const email = copyButton.dataset.email ?? '';
+      if (!copyLabel) return;
+      const original = copyLabel.textContent;
+      try {
+        await navigator.clipboard.writeText(email);
+        copyLabel.textContent = 'Copied!';
+      } catch (err) {
+        // Surfaced instead of silently swallowed (e.g. blocked clipboard
+        // permission, insecure context) — otherwise a failure here looked
+        // identical to success: the button just did nothing either way.
+        console.error('Copy email to clipboard failed:', err);
+        copyLabel.textContent = "Couldn't copy";
+      }
+      setTimeout(() => {
+        copyLabel.textContent = original;
+      }, 1500);
+    });
+  });
+</script>

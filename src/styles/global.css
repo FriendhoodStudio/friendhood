@@ -1,54 +1,363 @@
 @import "tailwindcss";
 
-:root {
-  --page-margin: 50px;
-}
-
 /*
-  Drop licensed font files into src/assets/fonts/ using the filenames below,
-  then uncomment the matching @font-face block. woff2 alone is fine if that's
-  all you have — drop the woff2-only rule and delete the src line for woff.
+  WOFF2 first (browsers stop at the first format they support, so listing
+  both costs nothing at runtime) — ~62% smaller than the original .otf files
+  across all four (532KB combined -> 200KB) purely from WOFF2's compression,
+  same glyphs. .otf kept as a fallback for the small tail of browsers
+  without WOFF2 support.
 */
-
-/* @font-face {
-  font-family: "Greed Narrow";
-  src: url("../assets/fonts/GreedNarrow-Regular.woff2") format("woff2"),
-    url("../assets/fonts/GreedNarrow-Regular.woff") format("woff");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-} */
-
 @font-face {
   font-family: "Greed Extended";
-  src: url("../assets/fonts/GreedExtended-Regular.ttf") format("truetype");
+  src:
+    url("../assets/fonts/GreedExtended-Regular.woff2") format("woff2"),
+    url("../assets/fonts/GreedExtended-Regular.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
-/* @font-face {
-  font-family: "MNKY Marcel";
-  src: url("../assets/fonts/MNKYMarcel-Regular.woff2") format("woff2"),
-    url("../assets/fonts/MNKYMarcel-Regular.woff") format("woff");
+@font-face {
+  font-family: "Greed Narrow";
+  src:
+    url("../assets/fonts/GreedNarrow-Regular.woff2") format("woff2"),
+    url("../assets/fonts/GreedNarrow-Regular.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
-} */
+}
 
-/* @font-face {
-  font-family: "Pitch Sans";
-  src: url("../assets/fonts/PitchSans-Regular.woff2") format("woff2"),
-    url("../assets/fonts/PitchSans-Regular.woff") format("woff");
+@font-face {
+  font-family: "MNKY Marcel";
+  src:
+    url("../assets/fonts/MNKYMarcel-Regular.woff2") format("woff2"),
+    url("../assets/fonts/MNKYMarcel-Regular.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
-} */
+}
+
+@font-face {
+  font-family: "Pitch Sans";
+  src:
+    url("../assets/fonts/PitchSans-Regular.woff2") format("woff2"),
+    url("../assets/fonts/PitchSans-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /*
+    Figma grid column widths — base (390px) value, stepped up per breakpoint below.
+    Card height isn't a separate token: ProjectCard uses aspect-ratio (confirmed
+    constant across all 4 breakpoints against real Figma frame dimensions), so it
+    scales automatically with --col-4 rather than needing its own breakpoint values.
+
+    At the 390px breakpoint the grid collapses to a single full-width column, so
+    col-4/col-6/col-8 are all the same value (confirmed directly against the
+    Figma case study frame's Collaborators/Quote/Impact block measurements) —
+    col-6 and col-8 previously duplicated the 1920px values here by mistake,
+    which would have badly overflowed any layout using them on mobile.
+  */
+  --col-4: 360px;
+  --col-6: 360px;
+  --col-8: 360px;
+
+  /*
+    Case study "descriptor" label width (e.g. "Overview", "Services", "Impact"
+    sitting beside its copy) — full width at the base breakpoint so it stacks
+    above the copy instead of squeezing beside it, then a fixed column width
+    from 768px up per Figma.
+  */
+  --label-width: 100%;
+
+  /* Figma: Nav/MenuHeight — shared by the logo pill and Menu button */
+  --nav-menu-height: 53px;
+
+  /* Figma: page margin inset — base (390px) value, stepped up per breakpoint below */
+  --page-margin: 0.9375rem; /* 15px */
+}
 
 @theme {
-  /* TODO: uncomment @font-face rules above once font files are added */
+  /* Fonts */
   --font-heading: "Greed Narrow", sans-serif;
   --font-display: "Greed Extended", sans-serif;
   --font-body: "MNKY Marcel", sans-serif;
   --font-tag: "Pitch Sans", sans-serif;
+
+  /* Colors (Figma: Core/Front, Core/Back, Core/Accent-Yello, Services) */
+  --color-front: #eeeee9;
+  --color-back: #0d0d0d;
+  --color-accent-yellow: #e7fe54;
+  --color-services: #848484;
+  --color-grey-600: #29282db2;
+
+  /*
+    Type scale — paired size/line-height/letter-spacing per Figma text styles.
+    Sizes use rem (not px) so they respect a user's browser font-size/zoom
+    accessibility settings; letter-spacing stays in em since Figma's tracking
+    is defined as a percentage of font-size, and line-height stays unitless to
+    avoid compounding through nested elements.
+
+    Values below are the base (390px/mobile) size for each style — every size
+    is then stepped up per breakpoint further down this file, matching Figma's
+    4 breakpoint frames exactly. The steps are NOT a smooth/formulaic scale —
+    Figma's own per-breakpoint values for each style don't follow a single
+    curve (e.g. H3 rises from 390 to 768, holds flat into 1440, then rises
+    again at 1920), so this is implemented as exact per-breakpoint overrides
+    rather than a clamp()-interpolated curve.
+
+    Letter-spacing is constant across every breakpoint for every style — each
+    is bound to one of Figma's shared "Letter Spacing" variables (Tight = -2%,
+    Relaxed = 0%) or a literal percentage on the text style itself, and none of
+    them vary by size. Confirmed directly against Figma's variable defs (not
+    assumed) across every component that uses each style.
+  */
+  --text-h1: 2.5rem; /* 40px */
+  --text-h1--line-height: 1;
+  --text-h1--letter-spacing: -0.02em;
+
+  --text-h2: 2.3125rem; /* 37px */
+  --text-h2--line-height: 1;
+  --text-h2--letter-spacing: -0.02em;
+
+  --text-h3: 2rem; /* 32px */
+  --text-h3--line-height: 1;
+  --text-h3--letter-spacing: 0em;
+
+  --text-body-1: 1.5625rem; /* 25px */
+  --text-body-1--line-height: 1.15;
+  --text-body-1--letter-spacing: 0em;
+
+  --text-body-2: 1.3125rem; /* 21px */
+  --text-body-2--line-height: 1.15;
+  --text-body-2--letter-spacing: -0.02em;
+
+  --text-body-3: 1rem; /* 16px */
+  --text-body-3--line-height: 1.15;
+  --text-body-3--letter-spacing: 0em;
+
+  --text-detail: 0.875rem; /* 14px */
+  --text-detail--line-height: 0.96;
+  --text-detail--letter-spacing: -0.02em;
+
+  --text-categories: 0.8125rem; /* 13px */
+  --text-categories--line-height: 0.96;
+  --text-categories--letter-spacing: 0em;
+
+  /*
+    Spacing scale (named, additive to Tailwind's default scale). Also in rem,
+    also stepped per breakpoint below, for the same reasons as the type scale.
+  */
+  --spacing-vertical-xs: 0.25rem; /* 4px, constant across breakpoints */
+  --spacing-vertical-s: 0.8125rem; /* 13px */
+  --spacing-vertical-m: 1.25rem; /* 20px */
+  --spacing-vertical-l: 2.5rem; /* 40px */
+  --spacing-vertical-xl: 6.25rem; /* 100px */
+  --spacing-horizontal-xs: 0.25rem; /* 4px, constant across breakpoints */
+  --spacing-gutter: 0.9375rem; /* 15px */
+  --spacing-btn-x: 0.9375rem; /* 15px */
+  --spacing-btn-y: 0.625rem; /* 10px */
+  --spacing-btn-y-nav: 0.75rem; /* 12px */
+
+  /* Radius (Figma: CornerRadius, constant 10px at every breakpoint) */
+  --radius-card: 10px;
+}
+
+/*
+  Shared by every below-desktop horizontal-scroll row (Approach cards, About's
+  intro images, ...): breaks a padded child out to full viewport width so
+  scroll-snap has room to run edge-to-edge, then re-applies the page margin as
+  the row's OWN padding — which scroll-snap DOES respect, unlike padding on a
+  non-scrolling ancestor (content just runs flush to the row's own edge once
+  scrolled, ignoring the ancestor's padding entirely). `width` has to grow to
+  match the negative margin, not just the margin shift alone — w-full alone
+  resolves against the section's already-inset content box, so shifting that
+  fixed-width box left just runs it past the left edge without ever reaching
+  the right edge.
+
+  `scroll-padding-inline` (distinct from plain `padding-inline`) is what
+  actually tells the snap engine where the inset boundary is — plain padding
+  on a scroll-snap container only affects the padding box, not where the
+  initial/resting snap position lands, so on load it silently snaps straight
+  past the start padding (confirmed: scrollLeft lands on exactly the padding
+  amount instead of 0) until the user manually scrolls left.
+
+  At desktop every one of these rows goes back to a static, non-scrolling
+  layout — consumers add their own row-specific desktop rules (e.g.
+  scroll-snap-type, align-items) in their own media query alongside this.
+*/
+.full-bleed-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+  width: calc(100% + 2 * var(--page-margin));
+  margin-inline: calc(-1 * var(--page-margin));
+  padding-inline: var(--page-margin);
+  scroll-padding-inline: var(--page-margin);
+}
+.full-bleed-scroll::-webkit-scrollbar {
+  display: none;
+}
+@media (min-width: 1440px) {
+  .full-bleed-scroll {
+    overflow-x: visible;
+    width: 100%;
+    margin-inline: 0;
+    padding-inline: 0;
+    scroll-padding-inline: 0;
+  }
+}
+
+/*
+  Shared by every row of --col-4-sized cards that should evenly fill its row
+  width at ANY real viewport, wrapping into 1/2/3 columns across the
+  breakpoints (Services tiles, the Work project grid, case study Impact
+  stats — Approach cards' desktop tier does its own thing, see below).
+
+  Deliberately NOT `repeat(auto-fill, minmax(var(--col-4), 1fr))` — that
+  looks appealing ("let the browser figure out how many columns fit"), but
+  breaks badly across the WIDE, continuous range of container widths that
+  share the same --col-4 value between two breakpoints (e.g. 390–767px,
+  where --col-4 is a constant 360px): the moment the container is too
+  narrow to fit a 2nd column, auto-fill still creates only 1 track, and
+  that track's 1fr claims the ENTIRE leftover width — so a single card at,
+  say, 550px wide renders at ~520px (and, with aspect-ratio-locked media,
+  grotesquely tall) instead of staying near its intended 360px. Explicit,
+  breakpoint-matched column counts don't have that failure mode: at any
+  width within a tier, N columns always divide the row evenly, and N only
+  changes exactly where --col-4 itself does.
+
+  (Approach cards' desktop-only grid uses a literal repeat(3, 1fr) directly
+  rather than this class — it's scoped to exactly the 1440px+ range where 3
+  columns are guaranteed to fit throughout, so it was never exposed to this
+  failure mode and didn't need fixing.)
+*/
+.col-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  /* Tailwind's items-start utility compiles to align-items: flex-start,
+     which is a flex-only value — invalid (silently ignored) on a grid
+     container, leaving align-items at its grid default of stretch. Rows
+     with different-height cards would then stretch every card to match the
+     tallest in its row instead of top-aligning. */
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .col-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1440px) {
+  .col-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+/*
+  Landscape override: the breakpoints above key off width alone, so a
+  landscape phone or tablet gets whatever column count its width happens to
+  land on — same as a portrait device of that width. For tall portrait-ratio
+  cards (ProjectCard's 523/700), 2 columns at a landscape width means each
+  row is nearly as tall as the viewport itself, reading as excessive
+  scrolling in an orientation that actually has MORE width and LESS height
+  to work with than portrait. Landscape from phone-width up gets 3 narrower
+  (and so proportionally shorter, aspect-ratio-locked) columns instead of 2
+  — 640px comfortably clears every real landscape phone width (iPhone SE
+  landscape is the narrowest common case, at 667px) while staying well
+  above any real PORTRAIT phone width (the widest common case, iPhone Pro
+  Max portrait, is ~430px), so this can't misfire on a portrait device.
+  No upper bound needed — 1440px+ already resolves to 3 columns via its own
+  rule regardless of orientation, so this simply agrees with it there.
+*/
+@media (orientation: landscape) and (min-width: 640px) {
+  .col-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/*
+  Responsive type + spacing scale, matching Figma's 4 breakpoint frames exactly
+  (390/768/1440/1920px). Overriding the custom properties directly — rather than
+  adding new utility classes — means every existing `text-h1`, `gap-vertical-l`,
+  etc. class picks these up automatically wherever it's already used.
+
+  Letter-spacing is constant across every breakpoint for every style — see the
+  note above the base type scale.
+*/
+@media (min-width: 768px) {
+  :root {
+    --page-margin: 1.25rem; /* 20px */
+    --col-4: 354px;
+    --col-6: 354px;
+    --col-8: 728px;
+    --label-width: 167px;
+    --nav-menu-height: 68px;
+
+    --text-h1: 3.75rem; /* 60px */
+    --text-h2: 2.625rem; /* 42px */
+    --text-h3: 2.25rem; /* 36px */
+    --text-body-1: 1.5625rem; /* 25px */
+    --text-body-2: 1.375rem; /* 22px */
+    --text-body-3: 1.125rem; /* 18px */
+    --text-detail: 1rem; /* 16px */
+
+    --spacing-vertical-s: 0.9375rem; /* 15px */
+    --spacing-vertical-m: 1.875rem; /* 30px */
+    --spacing-vertical-l: 3.125rem; /* 50px */
+    --spacing-vertical-xl: 7.5rem; /* 120px */
+    --spacing-gutter: 1.25rem; /* 20px */
+    --spacing-btn-x: 1.25rem; /* 20px */
+    --spacing-btn-y: 0.9375rem; /* 15px */
+    --spacing-btn-y-nav: 1.25rem; /* 20px */
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --page-margin: 3.75rem; /* 60px */
+    --col-4: 413px;
+    --col-6: 640px;
+    --col-8: 867px;
+    --label-width: 187px;
+
+    --text-h1: 4.875rem; /* 78px */
+    --text-h2: 3.125rem; /* 50px */
+    --text-h3: 2.25rem; /* 36px */
+    --text-body-1: 1.625rem; /* 26px */
+    --text-body-2: 1.5625rem; /* 25px */
+    --text-body-3: 1.125rem; /* 18px */
+    --text-detail: 1.125rem; /* 18px */
+    --text-categories: 0.9375rem; /* 15px */
+
+    --spacing-vertical-s: 1.25rem; /* 20px */
+    --spacing-vertical-l: 4.375rem; /* 70px */
+    --spacing-vertical-xl: 11.875rem; /* 190px */
+    --spacing-gutter: 2.5rem; /* 40px */
+    --spacing-btn-x: 1.5625rem; /* 25px */
+    --spacing-btn-y: 1.25rem; /* 20px */
+    --spacing-btn-y-nav: 1.5625rem; /* 25px */
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --page-margin: 7.8125rem; /* 125px */
+    --col-4: 523px;
+    --col-6: 810px;
+    --col-8: 1097px;
+    --label-width: 237px;
+
+    --text-h1: 5.1875rem; /* 83px */
+    --text-h2: 3.5rem; /* 56px */
+    --text-h3: 2.375rem; /* 38px */
+    --text-body-1: 2rem; /* 32px */
+    --text-body-2: 1.8125rem; /* 29px */
+    --text-body-3: 1.125rem; /* 18px */
+
+    --spacing-vertical-m: 2.25rem; /* 36px */
+    --spacing-vertical-l: 4.6875rem; /* 75px */
+    --spacing-vertical-xl: 12.5rem; /* 200px */
+    --spacing-gutter: 3.125rem; /* 50px */
+    --spacing-btn-y-nav: 1.875rem; /* 30px */
+  }
 }

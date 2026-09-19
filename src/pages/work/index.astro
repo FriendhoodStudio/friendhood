@@ -1,0 +1,209 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProjectGallery from '../../components/ProjectGallery.astro';
+import CategoryTag from '../../components/CategoryTag.astro';
+import type { Category, ProjectCardData } from '../../types/project';
+import { fetchProjects } from '../../lib/sanity/queries';
+
+const projects: ProjectCardData[] = await fetchProjects();
+
+const categoryCounts = new Map<string, { category: Category; count: number }>();
+for (const project of projects) {
+  for (const category of project.categories) {
+    const existing = categoryCounts.get(category.slug);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      categoryCounts.set(category.slug, { category, count: 1 });
+    }
+  }
+}
+const categories = [...categoryCounts.values()].sort((a, b) => a.category.title.localeCompare(b.category.title));
+---
+
+<Layout title="Work | Friendhood">
+  <div class="flex flex-col gap-vertical-s px-[var(--page-margin)] pt-vertical-xl">
+    <p class="font-body text-body-3 text-front">Filter</p>
+    <div id="work-filters" class="items-center gap-horizontal-xs">
+      <button
+        type="button"
+        data-category-slug=""
+        class="font-tag inline-flex shrink-0 items-center gap-[8px] rounded-card bg-front px-4 py-[7px] text-categories text-back backdrop-blur-[15px] transition-colors duration-300 ease-out"
+        aria-pressed="true"
+      >
+        All
+        <span class="text-back/60">{projects.length}</span>
+      </button>
+      {categories.map(({ category, count }) => <CategoryTag label={category} count={count} asFilter />)}
+    </div>
+  </div>
+
+  <ProjectGallery projects={projects} showCaption={true} layout="grid" />
+</Layout>
+
+<style>
+  /*
+   * Figma's Work page composition (frames 7599:13010/12781/12552/7540:1586)
+   * has this row wrap onto multiple lines at 768px+, but at the 390px frame
+   * every tag sits in one un-wrapped row far wider than the viewport —
+   * deliberately left to scroll off the page rather than wrap.
+   */
+  #work-filters {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  @media (min-width: 768px) {
+    #work-filters {
+      flex-wrap: wrap;
+      overflow-x: visible;
+    }
+  }
+</style>
+
+<script>
+  // This is a static site (no SSR adapter), so filtering happens entirely
+  // client-side: every card renders normally, and this hides/shows them
+  // based on the active category. The filter bar's own click handlers drive
+  // this directly; the initial ?category= read just lets links from other
+  // pages (e.g. case study Services tags) land pre-filtered. "All" (slug "")
+  // and clicking the already-active tag again both clear the filter.
+  const filterBar = document.getElementById('work-filters');
+  const buttons = filterBar?.querySelectorAll<HTMLButtonElement>('button[data-category-slug]') ?? [];
+  const cards = document.querySelectorAll<HTMLElement>('.project-card');
+  const grid = document.querySelector<HTMLElement>('.project-grid');
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const FLIP_DURATION = 450;
+  const FLIP_EASING = 'cubic-bezier(0.22, 1.36, 0.36, 1)';
+
+  function applyFilter(slug: string) {
+    const matches = (card: HTMLElement) => {
+      const slugs = (card.dataset.categorySlugs ?? '').split(',');
+      return !slug || slugs.includes(slug);
+    };
+
+    if (reduceMotion) {
+      cards.forEach((card) => { card.style.display = matches(card) ? '' : 'none'; });
+      grid?.toggleAttribute('data-filtered', Boolean(slug));
+    } else {
+      // FLIP (First-Last-Invert-Play): measure every currently-visible card's
+      // position/size BEFORE anything changes, apply the display/data-filtered
+      // changes, then measure again and animate away the difference — since
+      // .project-grid resizes AND repositions surviving cards when the column
+      // count or fixed/growing track mode changes (see [data-filtered]), a
+      // plain fade would leave them visibly snapping to their new spot.
+      // Abandon whatever's still running first so rapid re-clicks (before a
+      // 450ms transition finishes) can't leave a card stuck mid-animation.
+      cards.forEach((card) => card.getAnimations().forEach((a) => a.cancel()));
+
+      const before = new Map<HTMLElement, DOMRect>();
+      cards.forEach((card) => {
+        if (card.style.display !== 'none') before.set(card, card.getBoundingClientRect());
+      });
+
+      const leaving: HTMLElement[] = [];
+      const entering: HTMLElement[] = [];
+      cards.forEach((card) => {
+        const shouldShow = matches(card);
+        const isShowing = card.style.display !== 'none';
+        if (isShowing && !shouldShow) leaving.push(card);
+        else if (!isShowing && shouldShow) entering.push(card);
+      });
+
+      const settle = () => {
+        entering.forEach((card) => { card.style.display = ''; });
+        grid?.toggleAttribute('data-filtered', Boolean(slug));
+
+        // Entrance for cards newly matching the filter, lightly staggered.
+        entering.forEach((card, i) => {
+          card.animate(
+            [
+              { opacity: 0, scale: 0.92 },
+              { opacity: 1, scale: 1 },
+            ],
+            { duration: FLIP_DURATION, delay: i * 40, easing: FLIP_EASING, fill: 'backwards' }
+          );
+        });
+
+        // Reposition/resize cards that stay visible but whose grid track
+        // moved or changed size — translate + scale from their OLD rect
+        // relative to the new one, then animate both back to identity.
+        before.forEach((prevRect, card) => {
+          if (leaving.includes(card)) return;
+          const next = card.getBoundingClientRect();
+          const dx = prevRect.left - next.left;
+          const dy = prevRect.top - next.top;
+          const scaleX = next.width ? prevRect.width / next.width : 1;
+          const scaleY = next.height ? prevRect.height / next.height : 1;
+          const moved = Math.abs(dx) > 1 || Math.abs(dy) > 1;
+          const resized = Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01;
+          if (!moved && !resized) return;
+          card.animate(
+            [
+              { translate: `${dx}px ${dy}px`, scale: `${scaleX} ${scaleY}` },
+              { translate: '0 0', scale: '1 1' },
+            ],
+            { duration: FLIP_DURATION, easing: FLIP_EASING }
+          );
+        });
+      };
+
+      if (leaving.length === 0) {
+        settle();
+      } else {
+        let pending = leaving.length;
+        leaving.forEach((card) => {
+          const anim = card.animate(
+            [
+              { opacity: 1, scale: 1 },
+              { opacity: 0, scale: 0.92 },
+            ],
+            { duration: 220, easing: 'ease-in', fill: 'forwards' }
+          );
+          anim.finished
+            .then(() => {
+              card.style.display = 'none';
+              pending--;
+              if (pending === 0) settle();
+            })
+            .catch(() => {});
+        });
+      }
+    }
+
+    buttons.forEach((button) => {
+      const isActive = button.dataset.categorySlug === slug;
+      button.setAttribute('aria-pressed', String(isActive));
+      button.classList.toggle('bg-front', isActive);
+      button.classList.toggle('text-back', isActive);
+      button.classList.toggle('bg-[#29282d]', !isActive);
+      button.classList.toggle('text-front', !isActive);
+      const count = button.querySelector('span');
+      if (count) count.classList.toggle('text-back/60', isActive);
+      if (count) count.classList.toggle('text-[#9c9c9c]', !isActive);
+    });
+  }
+
+  let activeSlug = '';
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const slug = button.dataset.categorySlug ?? '';
+      activeSlug = activeSlug === slug ? '' : slug;
+      applyFilter(activeSlug);
+      const url = new URL(window.location.href);
+      if (activeSlug) {
+        url.searchParams.set('category', activeSlug);
+      } else {
+        url.searchParams.delete('category');
+      }
+      window.history.replaceState({}, '', url);
+    });
+  });
+
+  const initialCategory = new URLSearchParams(window.location.search).get('category');
+  if (initialCategory) {
+    activeSlug = initialCategory;
+    applyFilter(activeSlug);
+  }
+</script>

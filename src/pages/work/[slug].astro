@@ -1,0 +1,202 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import CategoryTag from '../../components/CategoryTag.astro';
+import DividerSmall from '../../components/DividerSmall.astro';
+import ProjectGallery from '../../components/ProjectGallery.astro';
+import { fetchProjectSlugs, fetchCaseStudy } from '../../lib/sanity/queries';
+
+export async function getStaticPaths() {
+  const slugs = await fetchProjectSlugs();
+  return slugs.map((slug) => ({ params: { slug } }));
+}
+
+const { slug } = Astro.params;
+const caseStudy = await fetchCaseStudy(slug!);
+
+if (!caseStudy) {
+  throw new Error(`No case study found for slug "${slug}" despite a matching project slug at build time.`);
+}
+
+const { footer } = caseStudy;
+const showImpact = footer.showImpact && footer.impactStats.length > 0;
+const showMore = (footer.showCollaborators && footer.collaborators.length > 0) || (footer.showQuote && footer.quote);
+
+// Per Figma, the Services/category tags row sits directly under the FIRST
+// Overview block in the body (75px gap — --spacing-vertical-l — not the
+// --spacing-vertical-xl rhythm between top-level sections). If a case study
+// has no Overview block at all, fall back to showing it right after the
+// opener rather than silently dropping the categories.
+const firstOverviewIndex = caseStudy.body.findIndex((block) => block.type === 'overview');
+---
+
+<Layout title={`${caseStudy.title} | Friendhood`}>
+  <div class="flex flex-col gap-vertical-xl px-[var(--page-margin)] pt-vertical-xl">
+    <div class="flex w-full flex-col items-start gap-vertical-l" data-reveal-group="case-study-header">
+      <div class="reveal-item flex w-full flex-col items-start gap-[21px]">
+        <p class="font-tag text-detail text-front">{caseStudy.title}</p>
+        <p class="font-display text-h1 text-front">{caseStudy.openingStatement}</p>
+      </div>
+
+      <div class="reveal-item aspect-[1670/940] w-full overflow-hidden rounded-card">
+        <img src={caseStudy.heroImageUrl} alt="" class="h-full w-full object-cover" loading="eager" />
+      </div>
+
+      {firstOverviewIndex === -1 && (
+        <div class="reveal-item flex w-full flex-wrap items-start gap-gutter">
+          <p class="w-[var(--label-width)] shrink-0 font-tag text-detail text-front">Services</p>
+          <div class="flex flex-1 flex-wrap items-center gap-horizontal-xs">
+            {caseStudy.categories.map((category) => <CategoryTag label={category} />)}
+          </div>
+        </div>
+      )}
+    </div>
+
+    <div class="flex w-full flex-col items-start gap-vertical-l" data-reveal-group="case-study-body">
+      {caseStudy.body.map((block, index) =>
+        block.type === 'media' ? (
+          <div class="reveal-item flex w-full items-start gap-gutter">
+            {block.items.map((item) => (
+              <div
+                class={`overflow-hidden rounded-card ${block.items.length === 2 ? 'aspect-[810/940] flex-1' : 'aspect-[1670/940] w-full'}`}
+              >
+                {item.type === 'video' ? (
+                  <video src={item.url} class="h-full w-full object-cover" autoplay muted loop playsinline />
+                ) : (
+                  <img src={item.url} alt="" class="h-full w-full object-cover" loading="lazy" />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : block.type === 'paragraph' ? (
+          <div class="reveal-item flex w-[var(--col-6)] flex-col items-start gap-[14px] py-vertical-l">
+            <div class="h-px w-full bg-front/20"></div>
+            <div class="flex w-full flex-col items-start gap-vertical-s">
+              <p class="font-tag text-detail text-front">{block.label}</p>
+              <p class="w-full font-body text-body-2 text-front">{block.text}</p>
+            </div>
+          </div>
+        ) : (
+          <div class="reveal-item flex w-full flex-col items-start gap-vertical-l">
+            <div class="flex w-full flex-col items-start gap-[14px]">
+              <div class="h-px w-full bg-front/20"></div>
+              <div class="flex w-full flex-wrap items-start gap-gutter">
+                <p class="w-[var(--label-width)] shrink-0 font-tag text-detail text-front">{block.label}</p>
+                <p class="min-w-0 flex-1 font-display text-h2 text-front">{block.text}</p>
+              </div>
+            </div>
+
+            {index === firstOverviewIndex && (
+              <div class="flex w-full flex-wrap items-start gap-gutter">
+                <p class="w-[var(--label-width)] shrink-0 font-tag text-detail text-front">Services</p>
+                <div class="flex flex-1 flex-wrap items-center gap-horizontal-xs">
+                  {caseStudy.categories.map((category) => <CategoryTag label={category} />)}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      )}
+    </div>
+
+    {(showImpact || showMore) && (
+      <div class="flex w-full flex-col items-start gap-vertical-l" data-reveal-group="case-study-footer">
+        {showImpact && (
+          <div class="reveal-item flex w-full flex-col items-start gap-vertical-s">
+            <DividerSmall label="Impact" />
+            <div class="col-grid w-full gap-gutter">
+              {footer.impactStats.map((stat) => (
+                <div class="flex flex-col items-center justify-center gap-[5px] rounded-card bg-[#29282d] py-vertical-l">
+                  <p class="font-display text-h1 text-front">{stat.value}</p>
+                  <p class="font-body text-body-3 text-front">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showMore && (
+          <div class="reveal-item more-grid w-full">
+            {footer.showCollaborators && footer.collaborators.length > 0 && (
+              <div class="more-grid-collaborators flex flex-col items-start gap-vertical-s">
+                <DividerSmall label="Collaborators" />
+                <div class="flex flex-col items-start gap-[5px]">
+                  {footer.collaborators.map((collaborator) => (
+                    <p class="font-body text-body-2 text-front">{collaborator.role} — {collaborator.name}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {footer.showQuote && footer.quote && (
+              <div class="more-grid-testimonial flex flex-col items-start gap-vertical-m">
+                <p class="font-heading text-h3 text-front">"{footer.quote.text}"</p>
+                <div class="flex flex-col items-start">
+                  <p class="font-body text-body-3 text-services">{footer.quote.attributionName}</p>
+                  {footer.quote.attributionCompany && (
+                    <p class="font-body text-body-3 text-services">{footer.quote.attributionCompany}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+
+  {caseStudy.relatedProjects.length > 0 && (
+    <div class="flex flex-col gap-vertical-s pt-vertical-xl">
+      <div class="px-[var(--page-margin)]">
+        <DividerSmall label="Discover more" />
+      </div>
+      <ProjectGallery projects={caseStudy.relatedProjects} showCaption={true} layout="grid" />
+    </div>
+  )}
+</Layout>
+
+<style>
+  /*
+   * Collaborators and Testimonial sit in fixed left/right columns rather
+   * than just "first/second child" — each is explicitly pinned to its own
+   * grid-column, so turning one off leaves that column empty instead of the
+   * survivor sliding over to fill it (e.g. Collaborators off still leaves
+   * Testimonial anchored on the right, with blank space to its left, not
+   * centered or full-width). Stacks into a single column below 768px,
+   * where left/right has no meaning — Collaborators-then-Testimonial is
+   * just the natural DOM/reading order there.
+   *
+   * row-gap/column-gap set separately (not a single `gap`) since they mean
+   * different things here: column-gap is the horizontal gutter between the
+   * two side-by-side blocks at 768px+; row-gap is the vertical space
+   * between them once stacked below that, which should match the same
+   * vertical-l rhythm used between every other element in the case study
+   * body, not the (much smaller) gutter value. Harmless to set both
+   * unconditionally — this grid only ever has 2 items, so it's never both
+   * multi-row AND multi-column at once, meaning only one of the two is ever
+   * actually in effect at a given breakpoint.
+   */
+  .more-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    row-gap: var(--spacing-vertical-l);
+    column-gap: var(--spacing-gutter);
+  }
+  @media (min-width: 768px) {
+    .more-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .more-grid-collaborators {
+      grid-column: 1;
+    }
+    .more-grid-testimonial {
+      grid-column: 2;
+    }
+  }
+</style>
+
+<script>
+  import { initScrollRevealGroup } from '../../lib/scrollReveal';
+
+  for (const name of ['case-study-header', 'case-study-body', 'case-study-footer']) {
+    initScrollRevealGroup(name);
+  }
+</script>

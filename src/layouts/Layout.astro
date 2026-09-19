@@ -1,13 +1,23 @@
 ---
 import '../styles/global.css';
-import Nav from '../components/Nav.astro';
+import NavBar from '../components/NavBar.astro';
 import Footer from '../components/Footer.astro';
+import BackSoon from '../components/BackSoon.astro';
 
 interface Props {
   title?: string;
 }
 
 const { title = 'Friendhood' } = Astro.props;
+
+// Site-wide gate: set SITE_LOCKED=true only on the Production environment
+// (host's project settings, not this file) to show "Back soon" on the real
+// domain while every other page still routes through this same Layout —
+// so nav/footer links to Work/About can't be used to route around it.
+// Leave it unset on Preview deployments so those still render the full
+// site for internal review/sharing. Flip it off in Production once ready
+// to launch.
+const isLocked = import.meta.env.SITE_LOCKED === 'true';
 ---
 
 <html lang="en">
@@ -18,9 +28,9 @@ const { title = 'Friendhood' } = Astro.props;
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>
-  <body class="bg-black">
-    <Nav />
-    <slot />
+  <body class="bg-back">
+    <NavBar />
+    {isLocked ? <BackSoon /> : <slot />}
     <Footer />
   </body>
 </html>

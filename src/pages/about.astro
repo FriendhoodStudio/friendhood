@@ -1,0 +1,16 @@
+---
+import Layout from '../layouts/Layout.astro';
+import About from '../components/About.astro';
+import Services from '../components/Services.astro';
+import { fetchAbout } from '../lib/sanity/queries';
+
+const about = await fetchAbout();
+const servicesLabel = about?.servicesLabel ?? 'Our services';
+const servicesHeading = about?.servicesHeading ?? 'Built to change your world.';
+---
+
+<Layout title="About | Friendhood">
+  <About>
+    <Services slot="services" descriptor={servicesLabel} heading={servicesHeading} headingVariant="display" />
+  </About>
+</Layout>

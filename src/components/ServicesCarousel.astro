@@ -1,0 +1,493 @@
+---
+import type { ServiceItem } from '../types/services';
+import ModuleTag from './ModuleTag.astro';
+import emailIcon from '../assets/services/email-icon.svg';
+
+interface Props {
+  services: ServiceItem[];
+}
+
+const { services } = Astro.props;
+// Rendered 5x (not 3x) so the carousel can loop seamlessly: scrolling out of
+// the outer copies silently jumps back into the equivalent position nearer
+// the middle. Sustained/fast swiping (real scroll momentum, not just a JS
+// scrollLeft assignment) was occasionally outrunning a 3-copy buffer and
+// hitting the true start/end of the track instead of wrapping — five copies
+// triples the buffer before that can happen. Must stay in sync with
+// REPEAT_COUNT in the script below.
+const REPEAT_COUNT = 5;
+const looped = Array.from({ length: REPEAT_COUNT }, () => services).flat();
+// vw-based (not a fixed px value stepped per breakpoint like most of the
+// site) since this needs to hold up continuously across the whole mobile/
+// tablet range, portrait AND landscape, not just the 4 Figma reference
+// widths — same reasoning as .col-grid's landscape override elsewhere.
+// Was 85vw: at narrow mobile widths the centered card left only ~5px of the
+// next one peeking past the inter-card gap, giving no visible hint the
+// track scrolls. 72vw keeps a clearer ~30-60px peek on both sides at real
+// mobile widths, while the 446px cap (unchanged) already gives a generous
+// peek from ~525px up — this only needed narrowing at the low end.
+const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
+---
+
+<div
+  data-services-overlay
+  data-open="false"
+  class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/50 opacity-0 backdrop-blur-[25px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100"
+>
+  <div
+    data-services-track
+    class="flex w-full items-center gap-6 overflow-x-auto px-[10vw] py-[10px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    style="scroll-snap-type: x mandatory;"
+  >
+    {looped.map((service, i) => (
+      <div
+        class="services-card flex shrink-0 flex-col items-center gap-[10px] rounded-card bg-accent-yellow/90 px-[10px] pt-[10px] pb-[20px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
+        style={cardSizeStyle}
+        data-service-card
+        data-index={i}
+        data-name={service.name}
+      >
+        <button
+          type="button"
+          class="h-1 w-[94px] shrink-0 cursor-pointer rounded-full bg-[#29282d] transition-[background-color,scale] duration-300 ease-in-out hover:scale-x-125 hover:bg-back active:scale-90"
+          data-services-close
+          aria-label="Close"
+        />
+        <div class="flex w-full flex-col items-start gap-[14px]">
+          <div class="relative h-[275px] w-full overflow-hidden rounded-card">
+            <img src={service.imageUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
+            <div class="absolute inset-x-0 top-0 flex items-start justify-end px-[15px] pt-[10px]">
+              <div class="group relative">
+                <button
+                  type="button"
+                  class="copy-email-btn flex h-[52px] w-[52px] cursor-pointer items-center justify-center rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px] transition-[scale] duration-300 ease-out hover:scale-110"
+                  data-copy-email
+                  data-email="hello@friendhood.co.uk"
+                  aria-label="Copy email address"
+                >
+                  <img
+                    src={emailIcon.src}
+                    alt=""
+                    class="h-full w-full transition-opacity duration-300 ease-out group-hover:opacity-90 group-active:opacity-70"
+                  />
+                </button>
+                <span
+                  data-copy-email-status
+                  class="pointer-events-none absolute right-0 top-full mt-2 whitespace-nowrap rounded-card border border-front/15 bg-grey-600 px-3 py-1 opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out group-hover:opacity-100"
+                >
+                  <span class="relative block h-[18px] overflow-hidden">
+                    <span
+                      data-copy-email-status-track
+                      class="flex flex-col font-tag text-detail leading-none text-front transition-transform duration-400 ease-in-out"
+                    >
+                      <span class="block h-[18px]">Enquire now</span>
+                      <span data-copy-email-status-result class="block h-[18px]"></span>
+                    </span>
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="flex w-full flex-col gap-[12px] px-[20px]">
+            <p class="font-heading text-h3 text-back">{service.cardTitle}</p>
+            <div class="h-px w-full bg-back/30"></div>
+            <p class="font-tag text-detail text-back">{service.overview}</p>
+            <div class="h-px w-full bg-back/30"></div>
+            <div class="flex w-full flex-col items-start gap-[10px]">
+              <p class="font-tag text-categories text-[#5c5c5c]">Example Modules</p>
+              <div class="flex flex-wrap gap-1">
+                {service.modules.map((moduleName) => <ModuleTag label={moduleName} />)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  /* Fixed rather than content-sized — overview text length and module-tag
+     count both vary per service, which left cards with visibly uneven
+     bottoms since several sit partially visible side-by-side in the
+     carousel at once. Internal gaps/padding were tightened alongside this
+     specifically so real content still fits without clipping. */
+  .services-card {
+    height: 620px;
+  }
+
+  /* Press/release feel for the copy-email button, matching the nav pill's
+     quick-firm-press + springy-overshoot-release — scale-based here rather
+     than the pill's 3D tilt, since this is a small round icon button, not
+     a wide shape a see-saw motion would read on. Release is driven by
+     WAAPI (see script) so it can overshoot past 1 before settling; this
+     transition is only what plays while actually held down. */
+  .copy-email-btn.is-pressed {
+    transform: scale(0.82);
+    transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .copy-email-btn.is-settling {
+    transition: none;
+  }
+</style>
+
+<script>
+  const overlay = document.querySelector<HTMLElement>('[data-services-overlay]');
+  const track = document.querySelector<HTMLElement>('[data-services-track]');
+  const cards = track ? Array.from(track.querySelectorAll<HTMLElement>('[data-service-card]')) : [];
+  // Must match REPEAT_COUNT in the frontmatter above.
+  const REPEAT_COUNT = 5;
+  const setSize = cards.length / REPEAT_COUNT;
+
+  let copyButtons: HTMLButtonElement[] = [];
+
+  function isOpen() {
+    return overlay?.dataset.open === 'true';
+  }
+
+  function setOpen(next: boolean) {
+    if (!overlay) return;
+    overlay.dataset.open = String(next);
+    overlay.toggleAttribute('inert', !next);
+  }
+
+  // Center the given card in the track, optionally without a smooth scroll
+  // (used when first opening, so it doesn't visibly animate into place).
+  function centerCard(card: HTMLElement, smooth: boolean) {
+    if (!track) return;
+    const targetLeft =
+      card.offsetLeft - track.clientWidth / 2 + card.offsetWidth / 2;
+    track.scrollTo({ left: targetLeft, behavior: smooth ? 'smooth' : 'instant' });
+  }
+
+  function currentIndex(): number {
+    if (!track) return 0;
+    const center = track.scrollLeft + track.clientWidth / 2;
+    let closest = 0;
+    let closestDist = Infinity;
+    cards.forEach((card, i) => {
+      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+      const dist = Math.abs(cardCenter - center);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = i;
+      }
+    });
+    return closest;
+  }
+
+  // Scale/fade cards by distance from the track's visual center — the closer
+  // to center, the larger and more opaque, per the Figma annotation calling for
+  // "the rest smaller and faded". Shared by the idle scroll state and the
+  // entrance/exit animations below, so a card's animated end-state always
+  // matches what it settles to at rest.
+  //
+  // Falloff floors (at t=1, the peeking card just off to either side): was
+  // 0.3 opacity / 0.75 scale, which — especially now that the resting card
+  // width narrowed to give a bigger peek (see cardSizeStyle above) — left
+  // the peeking card too washed out to read as "the next card" rather than
+  // just background blur. 0.55 / 0.85 keeps the same de-emphasis language
+  // (still clearly secondary to the centered card) while staying legible.
+  function cardVisualState(card: HTMLElement, center: number) {
+    if (!track) return { scale: 1, opacity: 1 };
+    const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+    const dist = Math.abs(cardCenter - center);
+    const t = Math.min(dist / (track.clientWidth / 2), 1);
+    return { scale: 1 - t * 0.15, opacity: 1 - t * 0.45 };
+  }
+
+  function updateCardAppearance() {
+    if (!track) return;
+    const center = track.scrollLeft + track.clientWidth / 2;
+    cards.forEach((card) => {
+      const { scale, opacity } = cardVisualState(card, center);
+      card.style.transform = `scale(${scale})`;
+      card.style.opacity = String(opacity);
+    });
+  }
+
+  // Infinite loop: once scrolled deep enough into an outer copy, silently
+  // jump by exactly one copy's width — content repeats, so the jump is
+  // invisible. The 1.5-copy-wide dead zone at each end (rather than 0.5) is
+  // the buffer that absorbs scroll-momentum overshoot from fast/sustained
+  // swiping before it could ever reach the track's true start/end.
+  function handleLoop() {
+    if (!track) return;
+    const setWidth = track.scrollWidth / REPEAT_COUNT;
+    const dead = setWidth * 1.5;
+    if (track.scrollLeft < dead) {
+      track.scrollLeft += setWidth;
+    } else if (track.scrollLeft > track.scrollWidth - dead) {
+      track.scrollLeft -= setWidth;
+    }
+  }
+
+  let rafId = 0;
+  function onScroll() {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      updateCardAppearance();
+      handleLoop();
+      rafId = 0;
+    });
+  }
+
+  // Per the Figma annotation, the carousel "emerges from bottom of page" — driven
+  // via WAAPI (not a CSS transition) so it can play per-card, staggered from the
+  // centered card outward, and the exact reverse (outward in first, center last)
+  // on close. Each card animates its own translateY entrance while holding its
+  // cardVisualState scale/opacity as the end value, so it settles exactly where
+  // updateCardAppearance would have put it — no fighting between the two.
+  const SLIDE_DISTANCE = 120;
+  const STAGGER_MS = 80;
+  const STAGGER_RANGE = 2; // cards more than this far from center share the outermost delay
+  let openedCardIndex = 0;
+
+  function playOpenAnimation() {
+    if (!track) return;
+    const center = track.scrollLeft + track.clientWidth / 2;
+    cards.forEach((card, i) => {
+      card.getAnimations().forEach((anim) => anim.cancel());
+      // Same stale-hit-test-after-cancel concern as below, but for a leftover
+      // animation from a previous open/close cycle (e.g. a close animation
+      // still in its pre-start delay when the carousel is reopened) — flush
+      // right away rather than only after this new animation's own finish.
+      void card.offsetWidth;
+      const { scale, opacity } = cardVisualState(card, center);
+      const distance = Math.min(Math.abs(i - openedCardIndex), STAGGER_RANGE);
+      const anim = card.animate(
+        [
+          { transform: `translateY(${SLIDE_DISTANCE}px) scale(${scale})`, opacity: 0 },
+          { transform: `translateY(0) scale(${scale})`, opacity },
+        ],
+        {
+          duration: 600,
+          delay: distance * STAGGER_MS,
+          easing: 'cubic-bezier(0.22, 1.36, 0.36, 1)',
+          fill: 'forwards',
+        }
+      );
+      // Release the animation once it settles so its fill:forwards effect stops
+      // pinning transform/opacity — otherwise it permanently overrides the live
+      // updates updateCardAppearance() makes as the user scrolls/drags afterward,
+      // and the centered card stops rescaling.
+      anim.finished
+        .then(() => {
+          anim.cancel();
+          // Chromium can leave a stale compositor hit-test region behind for a
+          // card right after a WAAPI animation on it is cancelled — the paint
+          // is correct (and elementFromPoint agrees), but real pointer input
+          // can still resolve to the old hit-test rect for a bit, so clicks on
+          // e.g. the copy-email button land on the track underneath instead.
+          // Forcing a synchronous layout read flushes that stale state.
+          void card.offsetWidth;
+        })
+        .catch(() => {});
+    });
+  }
+
+  function playCloseAnimation() {
+    if (!track) return;
+    const center = track.scrollLeft + track.clientWidth / 2;
+    cards.forEach((card, i) => {
+      card.getAnimations().forEach((anim) => anim.cancel());
+      void card.offsetWidth;
+      const { scale, opacity } = cardVisualState(card, center);
+      const distance = Math.min(Math.abs(i - openedCardIndex), STAGGER_RANGE);
+      // Reverse of the open stagger: farthest-from-center cards leave first,
+      // the centered card leaves last.
+      const delay = (STAGGER_RANGE - distance) * STAGGER_MS;
+      card.animate(
+        [
+          { transform: `translateY(0) scale(${scale})`, opacity, offset: 0 },
+          { transform: `translateY(${SLIDE_DISTANCE}px) scale(${scale})`, opacity, offset: 0.55 },
+          { transform: `translateY(${SLIDE_DISTANCE}px) scale(${scale})`, opacity: 0, offset: 1 },
+        ],
+        { duration: 700, delay, easing: 'ease-in', fill: 'forwards' }
+      );
+    });
+  }
+
+  // The just-opened card is still settling into its centered position for a
+  // brief moment after openAt() returns — the scroll-snap suspension above
+  // covers most of it, but real (trusted) clicks landing in this window have
+  // been observed to occasionally hit the track underneath a button instead
+  // of the button itself, which the backdrop-click-to-close handler below
+  // would otherwise read as "clicked outside a card" and close on. Ignoring
+  // backdrop-close clicks for a short settle window after opening means a
+  // mistimed click is just a no-op instead of spuriously closing the carousel.
+  const OPEN_SETTLE_MS = 400;
+  let openedAt = 0;
+
+  function openAt(index: number) {
+    setOpen(true);
+    openedAt = performance.now();
+    // Open on the middle copy so looping has room to move in both directions.
+    openedCardIndex = Math.floor(REPEAT_COUNT / 2) * setSize + index;
+    const card = cards[openedCardIndex];
+    if (card) centerCard(card, false);
+    updateCardAppearance();
+    playOpenAnimation();
+  }
+
+  function close() {
+    playCloseAnimation();
+    setOpen(false);
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-service-trigger]').forEach((trigger) => {
+    trigger.addEventListener('click', () => {
+      const index = Number(trigger.dataset.index) || 0;
+      openAt(index);
+    });
+  });
+
+  document.querySelectorAll<HTMLElement>('[data-services-close]').forEach((btn) => {
+    btn.addEventListener('click', close);
+  });
+
+  // Clicking anywhere that isn't a card (the overlay backdrop, or the track's own
+  // padding/gap areas around the cards) closes the carousel.
+  overlay?.addEventListener('click', (e) => {
+    if (performance.now() - openedAt < OPEN_SETTLE_MS) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-service-card]')) return;
+    close();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!isOpen() || !track) return;
+    if (e.key === 'Escape') {
+      close();
+    } else if (e.key === 'ArrowRight') {
+      const next = cards[currentIndex() + 1];
+      if (next) centerCard(next, true);
+    } else if (e.key === 'ArrowLeft') {
+      const prev = cards[currentIndex() - 1];
+      if (prev) centerCard(prev, true);
+    }
+  });
+
+  track?.addEventListener('scroll', onScroll, { passive: true });
+
+  // Mouse drag-to-scroll (touch/trackpad already scroll the track natively).
+  let dragging = false;
+  let dragMoved = false;
+  let dragPointerId = 0;
+  let dragStartX = 0;
+  let dragStartScroll = 0;
+
+  track?.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || !track) return;
+    dragging = true;
+    dragMoved = false;
+    dragPointerId = e.pointerId;
+    dragStartX = e.clientX;
+    dragStartScroll = track.scrollLeft;
+  });
+
+  track?.addEventListener('pointermove', (e) => {
+    if (!dragging || !track) return;
+    // Both scroll-snap suspension AND pointer capture are deferred until real
+    // drag movement is detected, rather than happening unconditionally on
+    // every pointerdown (i.e. every plain click too) — either one running on
+    // a click with no drag has been observed to make Chrome's compositor-
+    // thread hit-testing briefly resolve the click to the track underneath
+    // instead of the card/button actually under the cursor, which the
+    // backdrop-click-to-close handler reads as "clicked outside a card" and
+    // closes the carousel on.
+    if (!dragMoved) {
+      dragMoved = true;
+      track.style.scrollSnapType = 'none';
+      track.setPointerCapture(dragPointerId);
+    }
+    track.scrollLeft = dragStartScroll - (e.clientX - dragStartX);
+  });
+
+  function endDrag() {
+    dragging = false;
+    if (track && dragMoved) track.style.scrollSnapType = 'x mandatory';
+    dragMoved = false;
+  }
+
+  track?.addEventListener('pointerup', endDrag);
+  track?.addEventListener('pointercancel', endDrag);
+
+  copyButtons = overlay ? Array.from(overlay.querySelectorAll<HTMLButtonElement>('[data-copy-email]')) : [];
+  copyButtons.forEach((copyButton) => {
+    const status = copyButton.parentElement?.querySelector<HTMLElement>('[data-copy-email-status]');
+    const track = status?.querySelector<HTMLElement>('[data-copy-email-status-track]');
+    const result = status?.querySelector<HTMLElement>('[data-copy-email-status-result]');
+    let hideTimeout = 0;
+
+    // Same two-row roll used for the nav's Menu/Close toggle: a fixed-height
+    // window with both labels stacked in a flex column, translated up by
+    // half its own height to swap which row shows. The tooltip element also
+    // doubles as the hover label ("Enquire now", shown via CSS group-hover)
+    // — the inline opacity set here temporarily overrides that, then clears
+    // afterward so it falls back to plain CSS hover behavior once the
+    // click-feedback window ends, rather than getting stuck.
+    function showStatus(text: string) {
+      if (!status || !track || !result) return;
+      window.clearTimeout(hideTimeout);
+      result.textContent = text;
+      status.style.opacity = '1';
+      track.classList.add('-translate-y-1/2');
+      hideTimeout = window.setTimeout(() => {
+        status.style.opacity = '';
+        track.classList.remove('-translate-y-1/2');
+      }, 1500);
+    }
+
+    // Press/release: same quick-firm-press-in then springy-overshoot-release
+    // as the nav pill, scale-based instead of the pill's 3D tilt.
+    let settleAnim: Animation | null = null;
+
+    copyButton.addEventListener('pointerdown', () => {
+      settleAnim?.cancel();
+      copyButton.classList.remove('is-settling');
+      copyButton.classList.add('is-pressed');
+    });
+
+    const releasePress = () => {
+      if (!copyButton.classList.contains('is-pressed')) return;
+      settleAnim = copyButton.animate(
+        [
+          { transform: 'scale(0.82)' },
+          { transform: 'scale(1.12)', offset: 0.55 },
+          { transform: 'scale(0.97)', offset: 0.8 },
+          { transform: 'scale(1)' },
+        ],
+        { duration: 380, easing: 'ease-out', fill: 'forwards' }
+      );
+      copyButton.classList.add('is-settling');
+      copyButton.classList.remove('is-pressed');
+
+      const anim = settleAnim;
+      anim.finished
+        .then(() => {
+          anim.cancel();
+          copyButton.classList.remove('is-settling');
+        })
+        .catch(() => {});
+    };
+
+    copyButton.addEventListener('pointerup', releasePress);
+    copyButton.addEventListener('pointerleave', releasePress);
+    copyButton.addEventListener('pointercancel', releasePress);
+
+    copyButton.addEventListener('click', async () => {
+      const email = copyButton.dataset.email ?? '';
+      try {
+        await navigator.clipboard.writeText(email);
+        showStatus('Email copied');
+      } catch (err) {
+        // Surfaced instead of silently swallowed — a failure here (blocked
+        // clipboard permission, insecure context, etc.) previously looked
+        // identical to success: the button just did nothing either way.
+        console.error('Copy email to clipboard failed:', err);
+        showStatus("Couldn't copy — try again");
+      }
+    });
+  });
+</script>

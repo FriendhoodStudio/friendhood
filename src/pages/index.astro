@@ -1,8 +1,22 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import Hero from '../components/Hero.astro';
+import Services from '../components/Services.astro';
+import SectionFeature from '../components/SectionFeature.astro';
 import ProjectGallery from '../components/ProjectGallery.astro';
+import LogoCarousel from '../components/LogoCarousel.astro';
+import LinkCards from '../components/LinkCards.astro';
+import type { ProjectCardData } from '../types/project';
+import { fetchFeaturedProjects } from '../lib/sanity/queries';
+
+const projects: ProjectCardData[] = await fetchFeaturedProjects();
 ---
 
 <Layout title="Friendhood">
-  <ProjectGallery />
+  <Hero />
+  <Services />
+  <SectionFeature />
+  <ProjectGallery projects={projects} showCaption={false} />
+  <LogoCarousel />
+  <LinkCards />
 </Layout>

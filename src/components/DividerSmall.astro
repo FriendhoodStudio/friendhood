@@ -1,0 +1,16 @@
+---
+// Figma: Divider_Small — a horizontal rule with a small label beneath it,
+// gap fixed at 15px in the design regardless of breakpoint. Label is
+// optional — some uses (e.g. the case study Collaborators/Quote footer)
+// just want the rule on its own, with no generic caption underneath.
+interface Props {
+  label?: string;
+}
+
+const { label } = Astro.props;
+---
+
+<div class="flex w-full flex-col items-start gap-[15px]">
+  <div class="h-px w-full bg-front/20"></div>
+  {label && <p class="font-tag text-detail text-front">{label}</p>}
+</div>

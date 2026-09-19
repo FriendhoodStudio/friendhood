@@ -1,0 +1,32 @@
+---
+import { fetchFeaturedWork } from '../lib/sanity/queries';
+
+const featuredWork = await fetchFeaturedWork();
+
+const descriptor = featuredWork?.descriptor ?? 'Our work';
+const heading = featuredWork?.heading ?? 'Featured work';
+const buttonLabel = featuredWork?.buttonLabel ?? 'See more';
+const buttonHref = featuredWork?.buttonHref ?? '/work';
+---
+
+<div
+  data-reveal-group="section-feature"
+  class="flex w-full max-w-[var(--col-6)] flex-col items-start gap-vertical-s px-[var(--page-margin)] pt-vertical-xl"
+>
+  <div class="flex w-full flex-col items-start gap-vertical-s">
+    <p class="reveal-item font-tag text-detail text-front">{descriptor}</p>
+    <p class="reveal-item font-display text-h2 text-front">{heading}</p>
+  </div>
+  <a
+    href={buttonHref}
+    class="reveal-item inline-flex items-center justify-center rounded-card bg-front px-btn-x py-btn-y font-tag text-detail text-back transition-colors duration-700 ease-in-out hover:bg-accent-yellow active:scale-95 active:bg-accent-yellow/70"
+  >
+    {buttonLabel}
+  </a>
+</div>
+
+<script>
+  import { initScrollRevealGroup } from '../lib/scrollReveal';
+
+  initScrollRevealGroup('section-feature');
+</script>

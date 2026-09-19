@@ -1,0 +1,14 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="51.1822" height="51.7898" viewBox="0 0 51.1822 51.7898" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="EmailButton-Icon">
+<foreignObject x="-4" y="-3.99999" width="59.1822" height="59.7898"><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(2px);clip-path:url(#bgblur_0_0_4_clip_path);height:100%;width:100%"></div></foreignObject><ellipse id="BG" data-figma-bg-blur-radius="4" cx="25.5911" cy="25.8949" rx="25.5911" ry="25.8949" fill="#29282D" fill-opacity="0.7"/>
+<g id="EmailButtonIcon">
+<g id="Group 10">
+<path id="Polygon 5" d="M35.0088 18.0822C37.301 18.0823 38.7262 20.5799 37.5801 22.5887L28.5211 38.4654C27.0951 40.9646 23.3493 40.234 22.9739 37.3837L22.1093 30.8181C21.9372 29.5112 21.2616 28.3271 20.2291 27.5229L15.0432 23.4841C12.7913 21.7301 14.039 18.0823 16.8909 18.0822L35.0088 18.0822Z" stroke="#D8D8D8" stroke-width="2"/>
+</g>
+<path id="Vector 49" d="M34.154 22.7865C34.6309 22.5079 34.7956 21.8932 34.5219 21.4135C34.2482 20.9338 33.6397 20.7708 33.1628 21.0494L33.6584 21.918L34.154 22.7865ZM20.7313 29.4701L21.2268 30.3386L34.154 22.7865L33.6584 21.918L33.1628 21.0494L20.2357 28.6015L20.7313 29.4701Z" fill="#D8D8D8"/>
+</g>
+</g>
+<defs>
+<clipPath id="bgblur_0_0_4_clip_path" transform="translate(4 3.99999)"><ellipse cx="25.5911" cy="25.8949" rx="25.5911" ry="25.8949"/>
+</clipPath></defs>
+</svg>

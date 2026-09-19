@@ -1,0 +1,143 @@
+---
+import type { ProjectCardData } from '../types/project';
+import CategoryTag from './CategoryTag.astro';
+
+interface Props {
+  project: ProjectCardData;
+  /**
+   * Home shows bare images only (no caption); Work shows the full card with
+   * title/detail/tags. See CaseStudy-Card (Work) vs ProjectCard_Image (Home) in Figma.
+   */
+  showCaption?: boolean;
+  /**
+   * 'scroll' (Home) = fixed --col-4 width, hover widens the card and shunts
+   * later siblings along the horizontally-scrolling strip. 'grid' (Work) =
+   * the row fills the full page width via CSS Grid, so every card's width
+   * is track-determined, not a fixed --col-4 — flex-basis (and the shunt
+   * hover it drives) has no meaning there, see the style block below.
+   */
+  layout?: 'scroll' | 'grid';
+}
+
+const { project, showCaption = true, layout = 'scroll' } = Astro.props;
+// In 'scroll' layout the card's width IS --col-4 (fixed, never grows to fill
+// leftover space), so height computed from that same token via a fixed
+// ratio stays correct even while the hover interaction widens the card —
+// unlike `aspect-ratio`, which would recompute against the box's own live
+// width and grow the row taller as it widens.
+//
+// In 'grid' layout the card's rendered width is whatever its grid track
+// ends up (.col-grid's 1fr columns fill the row, so it's often somewhat
+// wider than raw --col-4) — a fixed height computed from --col-4
+// alone would no longer match that actual width, stretching the image out
+// of proportion. `aspect-ratio` recomputing against live width is exactly
+// what's wanted there instead (grid cards never widen on hover, so there's
+// no "grows taller mid-hover" risk to avoid).
+//
+// Tall/Short alternation (`cardVariant`) is a Home-only device for visual rhythm
+// in the bare-image row. The Work grid (showCaption) always uses CaseStudy-Card's
+// fixed 700/523 "Tall" image ratio, confirmed directly against Figma — variant
+// never affects Work sizing, so every card there lines up in a clean grid.
+const heightRatio = showCaption ? 700 / 523 : project.variant === '2' ? 610 / 523 : 700 / 523;
+const mediaStyle = layout === 'grid' ? `aspect-ratio:${1 / heightRatio}` : `height:calc(var(--col-4) * ${heightRatio})`;
+---
+
+<div
+  class="project-card reveal-item group flex flex-col items-start gap-vertical-s"
+  data-layout={layout}
+  data-category-slugs={project.categories.map((category) => category.slug).join(',')}
+  data-coming-soon={project.comingSoon ? '' : undefined}
+>
+  <Fragment>
+    {project.comingSoon ? (
+      <div class="contents">
+        <div class="relative w-full overflow-hidden rounded-card" style={mediaStyle}>
+          {project.media?.type === 'video' ? (
+            <video
+              src={project.media.url}
+              poster={project.media.posterUrl}
+              class="h-full w-full object-cover"
+              autoplay
+              muted
+              loop
+              playsinline
+            />
+          ) : (
+            project.media && <img src={project.media.url} alt={project.media.alt} class="h-full w-full object-cover" loading="eager" />
+          )}
+          <div class="absolute inset-0 flex items-center justify-center bg-[#29282d]/70">
+            <p class="font-body text-body-2 text-front">Coming soon</p>
+          </div>
+        </div>
+
+        {showCaption && (
+          <>
+            <p class="font-heading text-h3 text-front">{project.title}</p>
+            <p class="font-body text-body-3 text-front">{project.detail}</p>
+          </>
+        )}
+      </div>
+    ) : (
+      <a href={project.href} class="contents">
+        <div class="w-full overflow-hidden rounded-card" style={mediaStyle}>
+          {project.media?.type === 'video' ? (
+            <video
+              src={project.media.url}
+              poster={project.media.posterUrl}
+              class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+              autoplay
+              muted
+              loop
+              playsinline
+            />
+          ) : (
+            project.media && (
+              <img
+                src={project.media.url}
+                alt={project.media.alt}
+                class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                loading="eager"
+              />
+            )
+          )}
+        </div>
+
+        {showCaption && (
+          <>
+            <p class="font-heading text-h3 text-front">{project.title}</p>
+            <p class="font-body text-body-3 text-front">{project.detail}</p>
+          </>
+        )}
+      </a>
+    )}
+  </Fragment>
+
+  {showCaption && (
+    <div class="flex flex-wrap items-center gap-horizontal-xs">
+      {project.categories.map((category) => <CategoryTag label={category} />)}
+    </div>
+  )}
+</div>
+
+<style>
+  /* 'scroll' (Home): fixed --col-4 width; widens on hover to shunt later
+     siblings along the strip, driven from ProjectGallery.astro's script via
+     FLIP (instant real flex-basis change, animated purely with transform)
+     rather than a CSS `transition: flex-basis` — animating flex-basis
+     directly forces a synchronous layout recalc of the whole row on every
+     single frame, which is what made this visibly jerky. 'grid' (Work): sized
+     by its CSS Grid track instead (set on the .project-grid container in
+     ProjectGallery.astro) so the row always fills the full page width at any
+     real viewport, not just the exact 1440/1920 px --col-4 was measured
+     against — flex-basis has no effect on a grid item, so the widen behaviour
+     is scoped to 'scroll' only.
+  */
+  .project-card[data-layout='scroll'] {
+    flex-shrink: 0;
+    width: var(--col-4);
+    transform-origin: left center;
+  }
+  .project-card[data-layout='scroll'].is-widened {
+    flex-basis: calc(var(--col-4) * 1.15);
+  }
+</style>

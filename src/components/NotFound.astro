@@ -1,0 +1,82 @@
+---
+---
+
+<section class="flex w-full flex-col items-center gap-vertical-m px-[var(--page-margin)] pt-vertical-xl pb-vertical-xl text-center">
+  <p class="max-w-[var(--col-8)] text-balance font-display text-h1 text-front">
+    <span class="block leading-none" style="color:#E4552E">404</span>
+    <span class="block leading-none">Looks like you wandered out of the Friendhood!</span>
+  </p>
+
+  <div class="flex flex-wrap items-center justify-center gap-btn-y">
+    <a
+      href="/"
+      class="not-found-btn font-display inline-flex items-center justify-center rounded-card bg-front px-btn-x py-btn-y text-h1 text-back transition-colors duration-700 ease-in-out hover:bg-accent-yellow active:bg-accent-yellow/70"
+    >
+      Home
+    </a>
+    <a
+      href="/work"
+      class="not-found-btn font-display inline-flex items-center justify-center rounded-card bg-front px-btn-x py-btn-y text-h1 text-back transition-colors duration-700 ease-in-out hover:bg-accent-yellow active:bg-accent-yellow/70"
+    >
+      Work
+    </a>
+    <a
+      href="/about"
+      class="not-found-btn font-display inline-flex items-center justify-center rounded-card bg-front px-btn-x py-btn-y text-h1 text-back transition-colors duration-700 ease-in-out hover:bg-accent-yellow active:bg-accent-yellow/70"
+    >
+      About
+    </a>
+  </div>
+</section>
+
+<style>
+  /* Same press/release feel as the footer's Button_XL pills — quick press-in,
+     springy overshoot-past-rest on release, driven by WAAPI so it can
+     overshoot past 1. */
+  .not-found-btn.is-pressed {
+    transform: scale(0.95);
+    transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .not-found-btn.is-settling {
+    transition: none;
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('.not-found-btn').forEach((btn) => {
+    let settleAnim: Animation | null = null;
+
+    btn.addEventListener('pointerdown', () => {
+      settleAnim?.cancel();
+      btn.classList.remove('is-settling');
+      btn.classList.add('is-pressed');
+    });
+
+    const releasePress = () => {
+      if (!btn.classList.contains('is-pressed')) return;
+      settleAnim = btn.animate(
+        [
+          { transform: 'scale(0.95)' },
+          { transform: 'scale(1.04)', offset: 0.55 },
+          { transform: 'scale(0.99)', offset: 0.8 },
+          { transform: 'scale(1)' },
+        ],
+        { duration: 380, easing: 'ease-out', fill: 'forwards' }
+      );
+      btn.classList.add('is-settling');
+      btn.classList.remove('is-pressed');
+
+      const anim = settleAnim;
+      anim.finished
+        .then(() => {
+          anim.cancel();
+          btn.classList.remove('is-settling');
+        })
+        .catch(() => {});
+    };
+
+    btn.addEventListener('pointerup', releasePress);
+    btn.addEventListener('pointerleave', releasePress);
+    btn.addEventListener('pointercancel', releasePress);
+  });
+</script>

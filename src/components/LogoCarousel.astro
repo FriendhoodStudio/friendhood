@@ -1,0 +1,86 @@
+---
+import { fetchLogoCarousel } from '../lib/sanity/queries';
+import type { LogoItem } from '../types/logoCarousel';
+
+const logoCarousel = await fetchLogoCarousel();
+const logos: LogoItem[] = logoCarousel?.logos ?? [];
+// Track renders the list twice back-to-back and scrolls exactly one copy's
+// width, so the loop point is invisible — the classic seamless-marquee trick.
+const looped = [...logos, ...logos];
+---
+
+{logos.length > 0 && (
+  <section class="reveal-item overflow-hidden pb-vertical-xl" data-logo-carousel>
+    <div class="flex w-max items-center gap-[var(--logo-gap)]" data-logo-track>
+      {looped.map((logo) => (
+        <img
+          src={logo.logoUrl}
+          alt={logo.name}
+          class="h-[var(--logo-height)] w-auto shrink-0 object-contain opacity-75"
+          loading="lazy"
+        />
+      ))}
+    </div>
+  </section>
+)}
+
+<style>
+  [data-logo-carousel] {
+    /* No confirmed Figma spec for this component (still placeholder shapes
+       there) — 75px read as disproportionately small next to the other
+       breakpoints (75→110→165→220 is a much bigger jump mobile-to-tablet
+       than any other step); bumped up to smooth that out. */
+    --logo-height: 95px;
+    --logo-gap: 36px;
+  }
+
+  [data-logo-track] {
+    animation: logo-scroll 40s linear infinite;
+  }
+
+  @media (min-width: 768px) {
+    [data-logo-carousel] {
+      --logo-height: 110px;
+      --logo-gap: 40px;
+    }
+  }
+
+  @media (min-width: 1440px) {
+    [data-logo-carousel] {
+      --logo-height: 165px;
+      --logo-gap: 70px;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    [data-logo-carousel] {
+      --logo-height: 220px;
+      --logo-gap: 90px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-logo-track] {
+      animation: none;
+    }
+  }
+
+  @keyframes logo-scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+</style>
+
+<script>
+  import { initScrollReveal } from '../lib/scrollReveal';
+
+  // The whole band fades/rises in as a single unit rather than staggering
+  // per logo — the logos are already in continuous horizontal motion via the
+  // marquee animation, so revealing them individually would look chaotic.
+  const carousel = document.querySelector<HTMLElement>('[data-logo-carousel]');
+  if (carousel) initScrollReveal([carousel]);
+</script>

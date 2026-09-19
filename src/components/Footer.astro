@@ -1,45 +1,183 @@
 ---
-import logo from '../assets/nav/friendhood-logo.svg';
+import { fetchFooter } from '../lib/sanity/queries';
+import type { FooterLink } from '../types/footer';
 
-const links = [
-  { label: 'Email', href: 'mailto:hello@friendhood.co.uk' },
-  { label: 'Phone', href: '#' },
-  { label: 'Work', href: '#' },
-  { label: 'Approach', href: '#' },
-  { label: 'Instagram', href: '#' },
-  { label: 'LinkedIn', href: '#' },
+const footer = await fetchFooter();
+
+const headline = footer?.headline ?? "If you're thinking about tomorrow, talk to us today.";
+const links: FooterLink[] = footer?.links ?? [
+  { label: 'Email us', href: 'mailto:hello@friendhood.co.uk' },
 ];
 
 const year = new Date().getFullYear();
 ---
 
-<footer class="flex flex-col items-start gap-[76px] px-[var(--page-margin)] py-24">
-  <div class="flex w-full flex-col items-start gap-[76px]">
+<footer
+  class="flex flex-col items-start gap-vertical-l px-[var(--page-margin)] pt-vertical-xl pb-vertical-m"
+  data-reveal-group="footer"
+>
+  <div class="flex w-full flex-col items-start gap-vertical-l">
     <div class="flex w-full flex-col items-start gap-[22px]">
-      <div class="h-px w-full bg-white/20"></div>
-      <p class="font-display max-w-[1576px] text-[83px] leading-none tracking-[-1.66px] text-white">
-        If you're thinking about tomorrow, talk to us today.
+      <div class="h-px w-full bg-front/20"></div>
+      <p class="reveal-item font-display text-h1 text-front">
+        {headline}
       </p>
     </div>
 
-    <div class="flex w-full flex-wrap items-center gap-8">
-      {links.map((link) => (
-        <a
-          href={link.href}
-          class="font-display inline-flex items-center justify-center rounded-[10px] border-2 border-white bg-white px-[25px] py-5 text-[83px] leading-none tracking-[-1.66px] text-black transition-colors duration-700 ease-in-out hover:bg-black hover:text-white"
-        >
-          {link.label}
-        </a>
-      ))}
+    <div class="flex w-full flex-wrap items-center gap-btn-y">
+      {links.map((link) =>
+        link.href.startsWith('mailto:') ? (
+          <div class="reveal-item group relative">
+            <button
+              type="button"
+              data-copy-email
+              data-email={link.href.replace('mailto:', '')}
+              class="footer-btn font-display inline-flex cursor-pointer items-center justify-center rounded-card bg-front px-btn-x py-btn-y text-h1 text-back transition-colors duration-700 ease-in-out hover:bg-accent-yellow active:bg-accent-yellow/70"
+            >
+              {link.label}
+            </button>
+            {/* Same hover-hint-doubles-as-copy-confirmation tooltip as the
+                service cards' email button — border/colour/blur match, and
+                the roll animation swaps "Click to copy" for the result. */}
+            <span
+              data-copy-email-status
+              class="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-card border border-front/15 bg-grey-600 px-3 py-1 opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out group-hover:opacity-100"
+            >
+              <span class="relative block h-[18px] overflow-hidden">
+                <span
+                  data-copy-email-status-track
+                  class="flex flex-col font-tag text-detail leading-none text-front transition-transform duration-400 ease-in-out"
+                >
+                  <span class="block h-[18px]">Click to copy</span>
+                  <span data-copy-email-status-result class="block h-[18px]"></span>
+                </span>
+              </span>
+            </span>
+          </div>
+        ) : (
+          <a
+            href={link.href}
+            class="footer-btn reveal-item font-display inline-flex items-center justify-center rounded-card bg-front px-btn-x py-btn-y text-h1 text-back transition-colors duration-700 ease-in-out hover:bg-accent-yellow active:bg-accent-yellow/70"
+          >
+            {link.label}
+          </a>
+        )
+      )}
     </div>
   </div>
 
-  <div class="flex w-full items-center justify-between">
-    <p class="font-tag text-[19px] leading-[0.96] tracking-[-0.38px] text-white">
-      All rights reserved &copy;{year}
+  <div class="flex w-full items-end justify-between">
+    <p class="font-tag text-detail text-front">
+      Friendhood Ltd. All rights reserved &copy;{year}
     </p>
-    <div class="flex items-center rounded-[11px] bg-black/40 px-[22px] py-[17px] backdrop-blur-[22px]">
-      <img src={logo.src} alt="Friendhood" class="h-[33px] w-auto" />
-    </div>
   </div>
 </footer>
+
+<style>
+  /* Press/release feel matching the nav pill and the service cards' email
+     button: quick firm press-in, then a springy overshoot-past-rest on
+     release rather than just snapping back — scale-based, same as the
+     email button, not the nav pill's 3D tilt (these are wide text pills,
+     not a shape a see-saw motion reads well on). Release is driven by
+     WAAPI (see script) so it can overshoot past 1; this transition is only
+     what plays while actually held down. */
+  .footer-btn.is-pressed {
+    transform: scale(0.95);
+    transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .footer-btn.is-settling {
+    transition: none;
+  }
+</style>
+
+<script>
+  import { initScrollRevealGroup } from '../lib/scrollReveal';
+
+  initScrollRevealGroup('footer');
+
+  // Overshoot-and-settle press feedback, same as the nav pill and the
+  // service cards' email button — applied to every footer button (the
+  // copy-email one and the plain links alike) rather than the flat
+  // active:scale-95 they had before.
+  document.querySelectorAll<HTMLElement>('.footer-btn').forEach((btn) => {
+    let settleAnim: Animation | null = null;
+
+    btn.addEventListener('pointerdown', () => {
+      settleAnim?.cancel();
+      btn.classList.remove('is-settling');
+      btn.classList.add('is-pressed');
+    });
+
+    const releasePress = () => {
+      if (!btn.classList.contains('is-pressed')) return;
+      settleAnim = btn.animate(
+        [
+          { transform: 'scale(0.95)' },
+          { transform: 'scale(1.04)', offset: 0.55 },
+          { transform: 'scale(0.99)', offset: 0.8 },
+          { transform: 'scale(1)' },
+        ],
+        { duration: 380, easing: 'ease-out', fill: 'forwards' }
+      );
+      btn.classList.add('is-settling');
+      btn.classList.remove('is-pressed');
+
+      const anim = settleAnim;
+      anim.finished
+        .then(() => {
+          anim.cancel();
+          btn.classList.remove('is-settling');
+        })
+        .catch(() => {});
+    };
+
+    btn.addEventListener('pointerup', releasePress);
+    btn.addEventListener('pointerleave', releasePress);
+    btn.addEventListener('pointercancel', releasePress);
+  });
+
+  // Same copy-to-clipboard + status-roll pattern as the service cards' email
+  // button, rather than a plain `mailto:` link — see the tooltip markup
+  // above for the matching border/colour/blur treatment.
+  const copyButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-copy-email]'));
+  copyButtons.forEach((copyButton) => {
+    const status = copyButton.parentElement?.querySelector<HTMLElement>('[data-copy-email-status]');
+    const track = status?.querySelector<HTMLElement>('[data-copy-email-status-track]');
+    const result = status?.querySelector<HTMLElement>('[data-copy-email-status-result]');
+    let hideTimeout = 0;
+
+    // Fixed-height window with both labels stacked in a flex column,
+    // translated up by half its own height to swap which row shows — same
+    // roll used for the nav's Menu/Close toggle. The tooltip element also
+    // doubles as the hover label ("Click to copy", shown via CSS
+    // group-hover) — the inline opacity set here temporarily overrides
+    // that, then clears afterward so it falls back to plain CSS hover
+    // behaviour once the click-feedback window ends, rather than getting
+    // stuck.
+    function showStatus(text: string) {
+      if (!status || !track || !result) return;
+      window.clearTimeout(hideTimeout);
+      result.textContent = text;
+      status.style.opacity = '1';
+      track.classList.add('-translate-y-1/2');
+      hideTimeout = window.setTimeout(() => {
+        status.style.opacity = '';
+        track.classList.remove('-translate-y-1/2');
+      }, 1500);
+    }
+
+    copyButton.addEventListener('click', async () => {
+      const email = copyButton.dataset.email ?? '';
+      try {
+        await navigator.clipboard.writeText(email);
+        showStatus('Email copied');
+      } catch (err) {
+        // Surfaced instead of silently swallowed — a failure here (blocked
+        // clipboard permission, insecure context, etc.) previously looked
+        // identical to success: the button just did nothing either way.
+        console.error('Copy email to clipboard failed:', err);
+        showStatus("Couldn't copy — try again");
+      }
+    });
+  });
+</script>
