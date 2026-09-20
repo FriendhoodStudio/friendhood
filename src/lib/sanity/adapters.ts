@@ -7,6 +7,7 @@ import type { LogoItem, LogoCarouselData } from '../../types/logoCarousel';
 import type { LinkCardItem, LinkCardsData } from '../../types/linkCards';
 import type { CaseStudyBlock, CaseStudyData, CaseStudyMediaItem } from '../../types/caseStudy';
 import type { ApproachCard, AboutData } from '../../types/about';
+import type { CarouselImageItem } from '../../types/carousel';
 
 const projectId = import.meta.env.PUBLIC_SANITY_PROJECT_ID;
 const dataset = import.meta.env.PUBLIC_SANITY_DATASET || 'production';
@@ -50,7 +51,6 @@ export interface RawProject {
   slug: string;
   detail: string;
   categories: Category[];
-  cardVariant: '1' | '2';
   comingSoon?: boolean;
   // Home/Work grid thumbnail media — distinct from the case study's own heroImage below.
   // Not required (and possibly unset) while comingSoon is true — see below.
@@ -78,7 +78,6 @@ export function toProjectCardData(raw: RawProject): ProjectCardData {
       },
       raw.title
     ),
-    variant: raw.cardVariant,
     href: `/work/${raw.slug}`,
     comingSoon: raw.comingSoon ?? false,
   };
@@ -91,6 +90,7 @@ export function toProjectCardDataList(rawList: RawProject[]): ProjectCardData[] 
 export interface RawCaseStudyMediaItem {
   _type: 'image' | 'file';
   asset?: SanityImageSource;
+  alt?: string;
   videoUrl?: string;
 }
 
@@ -99,19 +99,18 @@ export interface RawCaseStudyMediaBlock {
   items: RawCaseStudyMediaItem[];
 }
 
-export interface RawCaseStudyOverviewBlock {
-  _type: 'overviewBlock';
-  label: string;
-  text: string;
-}
-
 export interface RawCaseStudyParagraphBlock {
   _type: 'paragraphBlock';
   label: string;
   text: string;
 }
 
-export type RawCaseStudyBlock = RawCaseStudyMediaBlock | RawCaseStudyOverviewBlock | RawCaseStudyParagraphBlock;
+export interface RawCaseStudyCarouselBlock {
+  _type: 'carouselBlock';
+  images: RawCarouselImage[];
+}
+
+export type RawCaseStudyBlock = RawCaseStudyMediaBlock | RawCaseStudyParagraphBlock | RawCaseStudyCarouselBlock;
 
 export interface RawCaseStudyFooter {
   showImpact?: boolean;
@@ -126,7 +125,8 @@ export interface RawCaseStudy {
   title: string;
   slug: string;
   openingStatement: string;
-  heroImage: SanityImageSource;
+  heroImage: SanityImageSource & { alt?: string };
+  overview?: { label: string; text: string };
   categories: Category[];
   body?: RawCaseStudyBlock[];
   footer?: RawCaseStudyFooter;
@@ -139,6 +139,12 @@ export function toCaseStudyData(raw: RawCaseStudy): CaseStudyData {
     slug: raw.slug,
     openingStatement: raw.openingStatement,
     heroImageUrl: urlFor(raw.heroImage).width(1670).fit('max').url(),
+    // Falls back to a generic-but-non-empty description when an editor
+    // hasn't filled in the Alt text field yet (e.g. every case study
+    // created before that field existed) — never render an empty alt on
+    // real content imagery, but let Studio-authored text take priority.
+    heroImageAlt: raw.heroImage.alt || `${raw.title} case study hero image`,
+    overview: raw.overview,
     categories: raw.categories,
     body: (raw.body ?? [])
       .map((block): CaseStudyBlock | null => {
@@ -155,14 +161,33 @@ export function toCaseStudyData(raw: RawCaseStudy): CaseStudyData {
               (item): CaseStudyMediaItem =>
                 item._type === 'file'
                   ? { type: 'video', url: item.videoUrl! }
-                  : { type: 'image', url: urlFor(item.asset!).width(1670).fit('max').url() }
+                  : {
+                      type: 'image',
+                      url: urlFor(item.asset!).width(1670).fit('max').url(),
+                      alt: item.alt || `${raw.title} project image`,
+                    }
             );
           return items.length > 0 ? { type: 'media', items } : null;
         }
-        if (block._type === 'paragraphBlock') {
-          return { type: 'paragraph', label: block.label, text: block.text };
+        if (block._type === 'carouselBlock') {
+          // Same incomplete-mid-edit-draft tolerance as the media block
+          // above — a freshly-added array entry with no image uploaded yet
+          // is dropped rather than crashing the page.
+          const images = (block.images ?? [])
+            .filter((item) => !!item.image?.asset)
+            .map(
+              (item): CarouselImageItem => ({
+                url: urlFor(item.image)
+                  .width(item.wide ? 2200 : 1200)
+                  .fit('max')
+                  .url(),
+                alt: item.image.asset?.altText || `${raw.title} project image`,
+                wide: item.wide,
+              })
+            );
+          return images.length > 0 ? { type: 'carousel', images } : null;
         }
-        return { type: 'overview', label: block.label, text: block.text };
+        return { type: 'paragraph', label: block.label, text: block.text };
       })
       .filter((block): block is CaseStudyBlock => block !== null),
     footer: {
@@ -182,6 +207,7 @@ export interface RawHero extends RawMedia {
   headlineSwapWord?: string;
   headlineHoverWords?: string[];
   tagline: string;
+  reelVideoUrl?: string;
 }
 
 export function toHeroData(raw: RawHero): HeroData {
@@ -191,6 +217,7 @@ export function toHeroData(raw: RawHero): HeroData {
     headlineHoverWords: raw.headlineHoverWords,
     tagline: raw.tagline,
     media: toMedia(raw, raw.headline),
+    reelVideoUrl: raw.reelVideoUrl,
   };
 }
 
@@ -269,15 +296,24 @@ export function toLinkCardsData(raw: RawLinkCards): LinkCardsData {
 export interface RawApproachCard {
   title: string;
   text: string;
-  image: SanityImageSource;
+  image: SanityImageSource & { alt?: string };
+}
+
+export interface RawCarouselImage {
+  _key: string;
+  // The GROQ projection dereferences `asset` (`asset->`) so `altText` — set
+  // once on the asset itself, e.g. in the Media Library, or wherever this
+  // same image was first uploaded elsewhere on the site — comes along with
+  // it, rather than needing its own per-usage alt field.
+  image: SanityImageSource & { asset?: { altText?: string } };
+  wide: boolean;
 }
 
 export interface RawAbout {
   introLabel: string;
   introLabelMuted: string;
   introHeading: string;
-  introImage: SanityImageSource;
-  introImageWide: SanityImageSource;
+  introImages: RawCarouselImage[];
   servicesLabel: string;
   servicesHeading: string;
   approachLabel: string;
@@ -292,8 +328,18 @@ export function toAboutData(raw: RawAbout): AboutData {
     introLabel: raw.introLabel,
     introLabelMuted: raw.introLabelMuted,
     introHeading: raw.introHeading,
-    introImageUrl: urlFor(raw.introImage).width(1200).fit('max').url(),
-    introImageWideUrl: urlFor(raw.introImageWide).width(2200).fit('max').url(),
+    // Same incomplete-mid-edit-draft tolerance as the case-study carousel
+    // block below — a freshly-added array entry with no image uploaded yet
+    // is dropped rather than crashing the whole site build.
+    introImages: raw.introImages
+      .filter((item) => !!item.image?.asset)
+      .map(
+        (item): CarouselImageItem => ({
+          url: urlFor(item.image).width(item.wide ? 2200 : 1200).fit('max').url(),
+          alt: item.image.asset?.altText || 'Friendhood',
+          wide: item.wide,
+        })
+      ),
     servicesLabel: raw.servicesLabel,
     servicesHeading: raw.servicesHeading,
     approachLabel: raw.approachLabel,
@@ -303,6 +349,7 @@ export function toAboutData(raw: RawAbout): AboutData {
         title: card.title,
         text: card.text,
         imageUrl: urlFor(card.image).width(1200).fit('max').url(),
+        imageAlt: card.image.alt || card.title,
       })
     ),
     clientsLabel: raw.clientsLabel,

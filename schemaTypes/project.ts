@@ -60,13 +60,48 @@ export default defineType({
         'Always shown directly under the opening statement — not part of the modular body below, since Figma marks this placement as fixed for every case study. (Distinct from the Card image below, which is the thumbnail shown on the Home/Work grids.)',
       type: 'image',
       options: { hotspot: true },
+      fields: [
+        defineField({
+          name: 'alt',
+          title: 'Alt text',
+          description:
+            'Describes the image for screen readers and search engines — this is real case study content, not decoration, so please fill it in.',
+          type: 'string',
+        }),
+      ],
       validation: (rule) => rule.required(),
+    }),
+    defineField({
+      name: 'overview',
+      title: 'Overview',
+      description:
+        'Large, full-width statement shown directly under the hero image, right before the Services/category tags — a fixed part of every case study, not part of the modular body below. Figma: "CaseStudy-Overview".',
+      type: 'object',
+      fields: [
+        defineField({
+          name: 'label',
+          title: 'Label',
+          type: 'string',
+          initialValue: 'Overview',
+          validation: (rule) => rule.required(),
+        }),
+        defineField({
+          name: 'text',
+          title: 'Text',
+          type: 'text',
+          rows: 4,
+          validation: (rule) => rule.required(),
+        }),
+      ],
+      preview: {
+        select: { title: 'label', subtitle: 'text' },
+      },
     }),
     defineField({
       name: 'body',
       title: 'Case study body',
       description:
-        'The modular middle content of the case study — mix and reorder Media and Overview blocks freely. Length and image count vary per project.',
+        'The modular middle content of the case study — mix and reorder Media and Paragraph blocks freely. Length and image count vary per project.',
       type: 'array',
       of: [
         {
@@ -81,7 +116,18 @@ export default defineType({
                 'One item renders full width; two render side by side. Mix images and video freely — video plays muted, autoplaying, looped, matching the Project card video treatment.',
               type: 'array',
               of: [
-                { type: 'image', options: { hotspot: true } },
+                {
+                  type: 'image',
+                  options: { hotspot: true },
+                  fields: [
+                    defineField({
+                      name: 'alt',
+                      title: 'Alt text',
+                      description: 'Describes the image for screen readers and search engines.',
+                      type: 'string',
+                    }),
+                  ],
+                },
                 { type: 'file', title: 'Video', options: { accept: 'video/*' } },
               ],
               validation: (rule) => rule.required().min(1).max(2),
@@ -91,34 +137,6 @@ export default defineType({
             select: { media: 'items.0', count: 'items.length' },
             prepare({ media, count }) {
               return { title: 'Media', subtitle: count === 2 ? '2 images (side by side)' : '1 image', media };
-            },
-          },
-        },
-        {
-          type: 'object',
-          name: 'overviewBlock',
-          title: 'Overview (headline)',
-          description: 'Large, full-width statement text. Figma: "CaseStudy-Overview".',
-          fields: [
-            defineField({
-              name: 'label',
-              title: 'Label',
-              type: 'string',
-              initialValue: 'Overview',
-              validation: (rule) => rule.required(),
-            }),
-            defineField({
-              name: 'text',
-              title: 'Text',
-              type: 'text',
-              rows: 4,
-              validation: (rule) => rule.required(),
-            }),
-          ],
-          preview: {
-            select: { title: 'label', subtitle: 'text' },
-            prepare({ title, subtitle }) {
-              return { title: `${title} (Headline)`, subtitle };
             },
           },
         },
@@ -148,6 +166,28 @@ export default defineType({
             select: { title: 'label', subtitle: 'text' },
             prepare({ title, subtitle }) {
               return { title: `${title} (Paragraph)`, subtitle };
+            },
+          },
+        },
+        {
+          type: 'object',
+          name: 'carouselBlock',
+          title: 'Image carousel',
+          description:
+            'A scrollable row of images with prev/next controls, alternating narrow/wide sizes — same ImageCarousel module used on the About page. Drag to reorder, toggle "Wide" per image, any number of images.',
+          fields: [
+            defineField({
+              name: 'images',
+              title: 'Images',
+              type: 'array',
+              of: [{ type: 'carouselImage' }],
+              validation: (rule) => rule.required().min(1),
+            }),
+          ],
+          preview: {
+            select: { media: 'images.0.image', count: 'images.length' },
+            prepare({ media, count }) {
+              return { title: 'Image carousel', subtitle: `${count} image${count === 1 ? '' : 's'}`, media };
             },
           },
         },
@@ -216,22 +256,6 @@ export default defineType({
           if (parent?.cardMediaType === 'video' && !value) return 'Required when media type is Video';
           return true;
         }),
-    }),
-    defineField({
-      name: 'cardVariant',
-      title: 'Card height',
-      description:
-        'Tall/Short alternate in the Home highlights row. The Work page always uses the Tall image ratio regardless of this setting.',
-      type: 'string',
-      options: {
-        list: [
-          { title: 'Tall', value: '1' },
-          { title: 'Short', value: '2' },
-        ],
-        layout: 'radio',
-      },
-      initialValue: '1',
-      validation: (rule) => rule.required(),
     }),
     defineField({
       name: 'footer',

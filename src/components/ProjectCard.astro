@@ -10,16 +10,18 @@ interface Props {
    */
   showCaption?: boolean;
   /**
-   * 'scroll' (Home) = fixed --col-4 width, hover widens the card and shunts
-   * later siblings along the horizontally-scrolling strip. 'grid' (Work) =
-   * the row fills the full page width via CSS Grid, so every card's width
-   * is track-determined, not a fixed --col-4 — flex-basis (and the shunt
-   * hover it drives) has no meaning there, see the style block below.
+   * 'scroll' (Home) = fixed --col-4 width, tilts in 3D toward the cursor on
+   * hover (see ProjectGallery.astro's script). 'grid' (Work) = the row fills
+   * the full page width via CSS Grid, so every card's width is
+   * track-determined, not a fixed --col-4 — no tilt there; the media zooms
+   * in slightly on hover instead (see mediaClass below).
    */
   layout?: 'scroll' | 'grid';
+  /** Position within the row — drives the automatic Tall/Short alternation below. */
+  index?: number;
 }
 
-const { project, showCaption = true, layout = 'scroll' } = Astro.props;
+const { project, showCaption = true, layout = 'scroll', index = 0 } = Astro.props;
 // In 'scroll' layout the card's width IS --col-4 (fixed, never grows to fill
 // leftover space), so height computed from that same token via a fixed
 // ratio stays correct even while the hover interaction widens the card —
@@ -34,12 +36,23 @@ const { project, showCaption = true, layout = 'scroll' } = Astro.props;
 // what's wanted there instead (grid cards never widen on hover, so there's
 // no "grows taller mid-hover" risk to avoid).
 //
-// Tall/Short alternation (`cardVariant`) is a Home-only device for visual rhythm
-// in the bare-image row. The Work grid (showCaption) always uses CaseStudy-Card's
-// fixed 700/523 "Tall" image ratio, confirmed directly against Figma — variant
-// never affects Work sizing, so every card there lines up in a clean grid.
-const heightRatio = showCaption ? 700 / 523 : project.variant === '2' ? 610 / 523 : 700 / 523;
+// Tall/Short alternation is a Home-only device for visual rhythm in the bare-image
+// row — driven automatically by position (odd index = Short) rather than a manual
+// per-project field, so editors don't have to think about it and the rhythm can't
+// drift out of alternation as projects get added/reordered/featured. The Work grid
+// (showCaption) always uses CaseStudy-Card's fixed 700/523 "Tall" image ratio,
+// confirmed directly against Figma — position never affects Work sizing, so every
+// card there lines up in a clean grid.
+const heightRatio = showCaption ? 610 / 523 : index % 2 === 1 ? 610 / 523 : 700 / 523;
 const mediaStyle = layout === 'grid' ? `aspect-ratio:${1 / heightRatio}` : `height:calc(var(--col-4) * ${heightRatio})`;
+// 'scroll' (Home) cards get the 3D tilt instead (see ProjectGallery.astro's
+// script) — the inner image zoom stacked awkwardly on top of that (two
+// competing hover effects on the same card), so it's scoped to 'grid'
+// (Work) only, which has no tilt of its own.
+const mediaClass =
+  layout === 'grid'
+    ? 'h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105'
+    : 'h-full w-full object-cover';
 ---
 
 <div
@@ -71,10 +84,10 @@ const mediaStyle = layout === 'grid' ? `aspect-ratio:${1 / heightRatio}` : `heig
         </div>
 
         {showCaption && (
-          <>
-            <p class="font-heading text-h3 text-front">{project.title}</p>
-            <p class="font-body text-body-3 text-front">{project.detail}</p>
-          </>
+          <div class="flex w-full flex-col items-start gap-[10px]">
+            <h3 class="font-heading text-h3 text-front">{project.title}</h3>
+            <p class="font-body text-body-3 text-grey-300">{project.detail}</p>
+          </div>
         )}
       </div>
     ) : (
@@ -84,60 +97,63 @@ const mediaStyle = layout === 'grid' ? `aspect-ratio:${1 / heightRatio}` : `heig
             <video
               src={project.media.url}
               poster={project.media.posterUrl}
-              class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+              class={mediaClass}
               autoplay
               muted
               loop
               playsinline
             />
           ) : (
-            project.media && (
-              <img
-                src={project.media.url}
-                alt={project.media.alt}
-                class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-                loading="eager"
-              />
-            )
+            project.media && <img src={project.media.url} alt={project.media.alt} class={mediaClass} loading="eager" />
           )}
         </div>
 
         {showCaption && (
-          <>
-            <p class="font-heading text-h3 text-front">{project.title}</p>
-            <p class="font-body text-body-3 text-front">{project.detail}</p>
-          </>
+          <div class="flex w-full flex-col items-start gap-[10px]">
+            <h3 class="font-heading text-h3 text-front">{project.title}</h3>
+            <p class="font-body text-body-3 text-grey-300">{project.detail}</p>
+          </div>
         )}
       </a>
     )}
   </Fragment>
 
   {showCaption && (
-    <div class="flex flex-wrap items-center gap-horizontal-xs">
-      {project.categories.map((category) => <CategoryTag label={category} />)}
+    <div class="mt-[5px] flex flex-wrap items-center gap-horizontal-xs">
+      {project.categories.slice(0, 3).map((category) => <CategoryTag label={category} />)}
     </div>
   )}
 </div>
 
 <style>
-  /* 'scroll' (Home): fixed --col-4 width; widens on hover to shunt later
-     siblings along the strip, driven from ProjectGallery.astro's script via
-     FLIP (instant real flex-basis change, animated purely with transform)
-     rather than a CSS `transition: flex-basis` — animating flex-basis
-     directly forces a synchronous layout recalc of the whole row on every
-     single frame, which is what made this visibly jerky. 'grid' (Work): sized
-     by its CSS Grid track instead (set on the .project-grid container in
-     ProjectGallery.astro) so the row always fills the full page width at any
-     real viewport, not just the exact 1440/1920 px --col-4 was measured
-     against — flex-basis has no effect on a grid item, so the widen behaviour
-     is scoped to 'scroll' only.
+  /* 'scroll' (Home): fixed --col-4 width. Used to widen on hover and shunt
+     later siblings along the strip (a real flex-basis change, FLIP-animated)
+     — replaced with a 3D tilt (see ProjectGallery.astro's script) because
+     moving any card's actual width/position at all kept reintroducing jerk
+     on fast mouse-off, even after fixing the underlying FLIP
+     measure-before-cancel bug. A tilt only ever touches the hovered card's
+     own transform, so there's no layout left to jerk. 'grid' (Work) is
+     sized by its CSS Grid track instead (set on .project-grid in
+     ProjectGallery.astro), and doesn't get the tilt — scoped to 'scroll'
+     only, same as before.
   */
   .project-card[data-layout='scroll'] {
     flex-shrink: 0;
     width: var(--col-4);
-    transform-origin: left center;
+    transform-origin: center;
   }
-  .project-card[data-layout='scroll'].is-widened {
-    flex-basis: calc(var(--col-4) * 1.15);
+
+  /* Same press-tilt treatment as the nav pill's Menu button (right edge
+     back/down, left edge up), just triggered by hover instead of a
+     pointerdown/pointerup press. Entering is a quick firm tilt-in via this
+     CSS transition; the swing back out on mouseoff is WAAPI-driven (see
+     ProjectGallery.astro's script) so it can overshoot past 0deg before
+     settling, rather than easing straight back to flat. */
+  .project-card[data-layout='scroll'].is-tilted {
+    transform: perspective(900px) rotateY(7deg);
+    transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .project-card[data-layout='scroll'].is-settling {
+    transition: none;
   }
 </style>

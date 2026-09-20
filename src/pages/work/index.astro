@@ -21,14 +21,18 @@ for (const project of projects) {
 const categories = [...categoryCounts.values()].sort((a, b) => a.category.title.localeCompare(b.category.title));
 ---
 
-<Layout title="Work | Friendhood">
+<Layout
+  title="Work | Friendhood"
+  description="Case studies and creative work from Friendhood, a creative consultancy for people thinking about tomorrow."
+>
   <div class="flex flex-col gap-vertical-s px-[var(--page-margin)] pt-vertical-xl">
-    <p class="font-body text-body-3 text-front">Filter</p>
+    <h1 class="sr-only">Our work</h1>
+    <p class="font-body text-body-3 text-front">Filter projects</p>
     <div id="work-filters" class="items-center gap-horizontal-xs">
       <button
         type="button"
         data-category-slug=""
-        class="font-tag inline-flex shrink-0 items-center gap-[8px] rounded-card bg-front px-4 py-[7px] text-categories text-back backdrop-blur-[15px] transition-colors duration-300 ease-out"
+        class="font-tag inline-flex shrink-0 items-center gap-[8px] rounded-small bg-front px-4 py-[7px] text-categories text-back backdrop-blur-[15px] transition-colors duration-300 ease-out"
         aria-pressed="true"
       >
         All
@@ -114,6 +118,19 @@ const categories = [...categoryCounts.values()].sort((a, b) => a.category.title.
       const settle = () => {
         entering.forEach((card) => { card.style.display = ''; });
         grid?.toggleAttribute('data-filtered', Boolean(slug));
+
+        // The scroll-scrubbed reveal system (scrollReveal.ts) sets each
+        // card's opacity/translate directly via inline style, computed from
+        // its position at the last real scroll/resize event — which is
+        // stale the instant filtering reflows the grid (surviving cards
+        // moving up to fill gaps left by removed ones). Nothing else
+        // re-triggers that recalculation, so a card whose pre-filter
+        // position hadn't been scrolled to yet stays stuck invisible
+        // (opacity: 0) even though it's now sitting in plain view — only a
+        // genuine user scroll would ever recompute it and reveal it. A
+        // synthetic scroll event forces that recalculation immediately
+        // instead of leaving it to chance.
+        window.dispatchEvent(new Event('scroll'));
 
         // Entrance for cards newly matching the filter, lightly staggered.
         entering.forEach((card, i) => {

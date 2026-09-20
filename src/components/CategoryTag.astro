@@ -13,7 +13,7 @@ interface Props {
 
 const { label, count, asFilter = false, active = false } = Astro.props;
 
-const classes = `font-tag inline-flex shrink-0 items-center gap-[8px] rounded-card px-4 py-[7px] text-categories backdrop-blur-[15px] transition-colors duration-300 ease-out ${
+const classes = `font-tag inline-flex shrink-0 items-center gap-[8px] rounded-small px-4 py-[7px] text-categories backdrop-blur-[15px] transition-colors duration-300 ease-out ${
   active ? 'bg-front text-back' : 'bg-[#29282d] text-front hover:bg-front hover:text-back'
 }`;
 ---

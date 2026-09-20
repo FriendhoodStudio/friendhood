@@ -9,6 +9,7 @@ import services from './services';
 import featuredWork from './featuredWork';
 import logoCarousel from './logoCarousel';
 import linkCards from './linkCards';
+import carouselImage from './carouselImage';
 
 export const schemaTypes = [
   project,
@@ -22,4 +23,5 @@ export const schemaTypes = [
   featuredWork,
   logoCarousel,
   linkCards,
+  carouselImage,
 ];

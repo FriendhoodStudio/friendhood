@@ -33,7 +33,23 @@ export function initScrollReveal(items: HTMLElement[], options: ScrollRevealOpti
     const maxScroll = document.documentElement.scrollHeight - vh;
     const atBottom = window.scrollY >= maxScroll - 1;
 
-    items.forEach((el, i) => {
+    // Stagger rank is each item's position among only the CURRENTLY VISIBLE
+    // items, recomputed every call — not the fixed array index captured
+    // once at init. An item can be dynamically hidden/reflowed after init
+    // (e.g. the Work page's category filter hiding non-matching cards), and
+    // a stagger delay based on stale original-DOM-order position becomes
+    // actively wrong once that happens: a card that used to be #8 of 16
+    // keeps waiting for "its turn" per that old position even after
+    // filtering moves it up into row 1 of a 6-card grid, so it never reads
+    // as revealed until a real scroll happens to satisfy the wrong math —
+    // which is exactly what looked like cards vanishing/reappearing on
+    // scroll after using the Work page's filter. Skipping hidden items
+    // entirely (rather than still giving them a rank) also means they
+    // don't consume a stagger slot a visible item should have.
+    let visibleIndex = 0;
+    items.forEach((el) => {
+      if (el.style.display === 'none') return;
+      const i = visibleIndex++;
       const rect = el.getBoundingClientRect();
       const offset = i * vh * staggerVh;
       const start = vh * startVh - offset;

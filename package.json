@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@astrojs/react": "^6.0.5",
+    "@astrojs/sitemap": "^3.7.4",
     "@sanity/astro": "^3.5.1",
     "@sanity/client": "^8.6.1",
     "@sanity/image-url": "^2.1.1",

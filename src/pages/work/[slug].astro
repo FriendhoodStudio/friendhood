@@ -3,6 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import CategoryTag from '../../components/CategoryTag.astro';
 import DividerSmall from '../../components/DividerSmall.astro';
 import ProjectGallery from '../../components/ProjectGallery.astro';
+import ImageCarousel from '../../components/ImageCarousel.astro';
 import { fetchProjectSlugs, fetchCaseStudy } from '../../lib/sanity/queries';
 
 export async function getStaticPaths() {
@@ -20,39 +21,44 @@ if (!caseStudy) {
 const { footer } = caseStudy;
 const showImpact = footer.showImpact && footer.impactStats.length > 0;
 const showMore = (footer.showCollaborators && footer.collaborators.length > 0) || (footer.showQuote && footer.quote);
-
-// Per Figma, the Services/category tags row sits directly under the FIRST
-// Overview block in the body (75px gap — --spacing-vertical-l — not the
-// --spacing-vertical-xl rhythm between top-level sections). If a case study
-// has no Overview block at all, fall back to showing it right after the
-// opener rather than silently dropping the categories.
-const firstOverviewIndex = caseStudy.body.findIndex((block) => block.type === 'overview');
 ---
 
-<Layout title={`${caseStudy.title} | Friendhood`}>
+<Layout
+  title={`${caseStudy.title} | Friendhood`}
+  description={caseStudy.openingStatement}
+  image={caseStudy.heroImageUrl}
+>
   <div class="flex flex-col gap-vertical-xl px-[var(--page-margin)] pt-vertical-xl">
     <div class="flex w-full flex-col items-start gap-vertical-l" data-reveal-group="case-study-header">
       <div class="reveal-item flex w-full flex-col items-start gap-[21px]">
-        <p class="font-tag text-detail text-front">{caseStudy.title}</p>
-        <p class="font-display text-h1 text-front">{caseStudy.openingStatement}</p>
+        <h1 class="font-tag text-detail text-grey-300">{caseStudy.title}</h1>
+        <p class="w-full font-display text-h1 text-front">{caseStudy.openingStatement}</p>
       </div>
 
       <div class="reveal-item aspect-[1670/940] w-full overflow-hidden rounded-card">
-        <img src={caseStudy.heroImageUrl} alt="" class="h-full w-full object-cover" loading="eager" />
+        <img src={caseStudy.heroImageUrl} alt={caseStudy.heroImageAlt} class="h-full w-full object-cover" loading="eager" />
       </div>
 
-      {firstOverviewIndex === -1 && (
-        <div class="reveal-item flex w-full flex-wrap items-start gap-gutter">
-          <p class="w-[var(--label-width)] shrink-0 font-tag text-detail text-front">Services</p>
-          <div class="flex flex-1 flex-wrap items-center gap-horizontal-xs">
-            {caseStudy.categories.map((category) => <CategoryTag label={category} />)}
+      {caseStudy.overview && (
+        <div class="reveal-item flex w-full flex-col items-start gap-[14px]">
+          <div class="h-px w-full bg-front/20"></div>
+          <div class="flex w-full flex-wrap items-start gap-gutter">
+            <h2 class="w-[var(--label-width)] shrink-0 font-tag text-detail text-grey-300">{caseStudy.overview.label}</h2>
+            <p class="min-w-0 flex-1 font-display text-h2 text-front">{caseStudy.overview.text}</p>
           </div>
         </div>
       )}
+
+      <div class="reveal-item flex w-full flex-wrap items-start gap-gutter">
+        <p class="w-[var(--label-width)] shrink-0 font-tag text-detail text-grey-300">Services</p>
+        <div class="flex flex-1 flex-wrap items-center gap-horizontal-xs">
+          {caseStudy.categories.map((category) => <CategoryTag label={category} />)}
+        </div>
+      </div>
     </div>
 
     <div class="flex w-full flex-col items-start gap-vertical-l" data-reveal-group="case-study-body">
-      {caseStudy.body.map((block, index) =>
+      {caseStudy.body.map((block) =>
         block.type === 'media' ? (
           <div class="reveal-item flex w-full items-start gap-gutter">
             {block.items.map((item) => (
@@ -62,37 +68,20 @@ const firstOverviewIndex = caseStudy.body.findIndex((block) => block.type === 'o
                 {item.type === 'video' ? (
                   <video src={item.url} class="h-full w-full object-cover" autoplay muted loop playsinline />
                 ) : (
-                  <img src={item.url} alt="" class="h-full w-full object-cover" loading="lazy" />
+                  <img src={item.url} alt={item.alt} class="h-full w-full object-cover" loading="lazy" />
                 )}
               </div>
             ))}
           </div>
-        ) : block.type === 'paragraph' ? (
-          <div class="reveal-item flex w-[var(--col-6)] flex-col items-start gap-[14px] py-vertical-l">
+        ) : block.type === 'carousel' ? (
+          <ImageCarousel images={block.images} />
+        ) : (
+          <div class="paragraph-span reveal-item flex w-[var(--col-8)] flex-col items-start gap-[14px] py-vertical-l">
             <div class="h-px w-full bg-front/20"></div>
             <div class="flex w-full flex-col items-start gap-vertical-s">
-              <p class="font-tag text-detail text-front">{block.label}</p>
+              <h2 class="font-tag text-detail text-grey-300">{block.label}</h2>
               <p class="w-full font-body text-body-2 text-front">{block.text}</p>
             </div>
-          </div>
-        ) : (
-          <div class="reveal-item flex w-full flex-col items-start gap-vertical-l">
-            <div class="flex w-full flex-col items-start gap-[14px]">
-              <div class="h-px w-full bg-front/20"></div>
-              <div class="flex w-full flex-wrap items-start gap-gutter">
-                <p class="w-[var(--label-width)] shrink-0 font-tag text-detail text-front">{block.label}</p>
-                <p class="min-w-0 flex-1 font-display text-h2 text-front">{block.text}</p>
-              </div>
-            </div>
-
-            {index === firstOverviewIndex && (
-              <div class="flex w-full flex-wrap items-start gap-gutter">
-                <p class="w-[var(--label-width)] shrink-0 font-tag text-detail text-front">Services</p>
-                <div class="flex flex-1 flex-wrap items-center gap-horizontal-xs">
-                  {caseStudy.categories.map((category) => <CategoryTag label={category} />)}
-                </div>
-              </div>
-            )}
           </div>
         )
       )}
@@ -154,6 +143,16 @@ const firstOverviewIndex = caseStudy.body.findIndex((block) => block.type === 'o
 </Layout>
 
 <style>
+  /* Narrower still at desktop — 6 columns rather than 8, same as the
+     Home page's Services paragraph, once there's enough width that 8
+     columns of body copy reads as too wide a measure. Matches the same
+     1200px threshold as the rest of the "L" tier (see global.css). */
+  @media (min-width: 1200px) {
+    .paragraph-span {
+      width: var(--col-6);
+    }
+  }
+
   /*
    * Collaborators and Testimonial sit in fixed left/right columns rather
    * than just "first/second child" — each is explicitly pinned to its own

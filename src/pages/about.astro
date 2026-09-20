@@ -7,9 +7,15 @@ import { fetchAbout } from '../lib/sanity/queries';
 const about = await fetchAbout();
 const servicesLabel = about?.servicesLabel ?? 'Our services';
 const servicesHeading = about?.servicesHeading ?? 'Built to change your world.';
+const description =
+  about?.introHeading ??
+  "We're a strategic branding studio built to help you understand now and make what's coming next. Creative expertise and guidance for people looking to build and change things, for good.";
+// Prefers a wide image for the OG/meta card (reads better cropped), falling
+// back to whatever the first carousel image is if none are marked wide.
+const ogImage = about?.introImages.find((image) => image.wide)?.url ?? about?.introImages[0]?.url;
 ---
 
-<Layout title="About | Friendhood">
+<Layout title="About | Friendhood" description={description} image={ogImage}>
   <About>
     <Services slot="services" descriptor={servicesLabel} heading={servicesHeading} headingVariant="display" />
   </About>

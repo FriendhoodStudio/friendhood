@@ -16,10 +16,10 @@ const year = new Date().getFullYear();
   class="flex flex-col items-start gap-vertical-l px-[var(--page-margin)] pt-vertical-xl pb-vertical-m"
   data-reveal-group="footer"
 >
-  <div class="flex w-full flex-col items-start gap-vertical-l">
+  <div class="flex w-full flex-col items-start gap-vertical-m">
     <div class="flex w-full flex-col items-start gap-[22px]">
       <div class="h-px w-full bg-front/20"></div>
-      <p class="reveal-item font-display text-h1 text-front">
+      <p class="footer-headline reveal-item w-full font-display text-h1 text-front">
         {headline}
       </p>
     </div>
@@ -41,7 +41,7 @@ const year = new Date().getFullYear();
                 the roll animation swaps "Click to copy" for the result. */}
             <span
               data-copy-email-status
-              class="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-card border border-front/15 bg-grey-600 px-3 py-1 opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out group-hover:opacity-100"
+              class="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-m border border-front/15 bg-grey-600 px-3 py-1 opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out group-hover:opacity-100"
             >
               <span class="relative block h-[18px] overflow-hidden">
                 <span
@@ -66,14 +66,32 @@ const year = new Date().getFullYear();
     </div>
   </div>
 
-  <div class="flex w-full items-end justify-between">
-    <p class="font-tag text-detail text-front">
-      Friendhood Ltd. All rights reserved &copy;{year}
-    </p>
+  <div class="footer-legal-row flex w-full flex-col items-start gap-[8px]">
+    <p class="footer-legal font-body text-front">Friendhood is a limited company registered in Scotland (SC685765)</p>
+    <p class="footer-legal font-body text-front">All rights reserved &copy;{year}</p>
   </div>
 </footer>
 
 <style>
+  /* 100% width on mobile and tablet; constrained to 9 grid columns at
+     desktop (1440px+) and up. No --col-9 token exists (col-4/6/8 are
+     independently Figma-measured, not a formula) — derived from the same
+     n-columns + (n-1)-gutters grid math as those, using the existing
+     --col-8 and gutter tokens: 1 column = (col8 - 7*gutter) / 8, so
+     9 columns = 9 * that + 8*gutter, which simplifies to the expression
+     below. Referencing the live custom properties (not a hardcoded px
+     value) means this stays correct at both the 1440 and 1920 tiers
+     automatically, since col-8/gutter each already have their own
+     per-tier value. */
+  .footer-headline {
+    max-width: none;
+  }
+  @media (min-width: 1200px) {
+    .footer-headline {
+      max-width: calc((9 * var(--col-8) + var(--spacing-gutter)) / 8);
+    }
+  }
+
   /* Press/release feel matching the nav pill and the service cards' email
      button: quick firm press-in, then a springy overshoot-past-rest on
      release rather than just snapping back — scale-based, same as the
@@ -87,6 +105,30 @@ const year = new Date().getFullYear();
   }
   .footer-btn.is-settling {
     transition: none;
+  }
+
+  /* Stacked on mobile (the two lines are long enough that side-by-side
+     would force wrapping or crowd the edges on a narrow screen); back to
+     the original side-by-side, edge-anchored row from tablet up, where
+     there's enough width for both to sit comfortably on one line. */
+  @media (min-width: 768px) {
+    .footer-legal-row {
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+  }
+
+  /* Detail size scaled down 10% at every breakpoint — references the live
+     --text-detail token (rather than a hardcoded per-tier value) so it
+     keeps tracking that token's own responsive steps automatically; scoped
+     to this row only, not a change to --text-detail itself, which is also
+     used elsewhere (nav Menu button, category tags, ...) and shouldn't
+     shrink along with it. */
+  .footer-legal {
+    font-size: calc(var(--text-detail) * 0.9);
+    line-height: var(--text-detail--line-height);
+    letter-spacing: var(--text-detail--letter-spacing);
   }
 </style>
 

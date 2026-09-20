@@ -14,7 +14,6 @@ export interface ProjectCardData {
   detail: string;
   categories: Category[];
   media?: ProjectMedia;
-  variant: '1' | '2';
   href: string;
   /** Shows a "Coming soon" placeholder over the card image and disables click-through. */
   comingSoon: boolean;

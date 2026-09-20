@@ -16,7 +16,7 @@ const cards: LinkCardItem[] = linkCardsData?.cards ?? [];
           href={card.href}
           class="link-card reveal-item group flex min-w-0 basis-[var(--col-4)] flex-col items-start gap-4"
         >
-          <div class="aspect-[523/700] w-full overflow-hidden rounded-card">
+          <div class="aspect-[523/610] w-full overflow-hidden rounded-card">
             <img
               src={card.imageUrl}
               alt={card.label}
@@ -24,9 +24,9 @@ const cards: LinkCardItem[] = linkCardsData?.cards ?? [];
               loading="lazy"
             />
           </div>
-          <p class="font-heading text-h3 text-front transition-colors duration-300 ease-out group-hover:text-accent-yellow">
+          <h3 class="font-heading text-h3 text-front transition-colors duration-300 ease-out group-hover:text-accent-yellow">
             {card.label}
-          </p>
+          </h3>
         </a>
       ))}
     </div>

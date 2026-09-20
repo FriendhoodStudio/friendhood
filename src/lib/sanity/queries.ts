@@ -54,8 +54,7 @@ const PROJECTS_QUERY = `*[_type == "project"] | order(orderRank asc) {
   cardMediaType,
   cardImage,
   "cardVideoUrl": cardVideo.asset->url,
-  cardVideoPoster,
-  cardVariant
+  cardVideoPoster
 }`;
 
 export async function fetchProjects(): Promise<ProjectCardData[]> {
@@ -78,16 +77,23 @@ const CASE_STUDY_QUERY = `*[_type == "project" && slug.current == $slug][0]{
   "slug": slug.current,
   openingStatement,
   heroImage,
+  overview,
   "categories": categories[]->{ title, "slug": slug.current },
   body[]{
     _type,
     items[]{
       _type,
       asset,
+      alt,
       "videoUrl": asset->url
     },
     label,
-    text
+    text,
+    images[]{
+      _key,
+      "image": image{ ..., "asset": asset-> },
+      wide
+    }
   },
   footer,
   relatedProjects[]->{
@@ -100,8 +106,7 @@ const CASE_STUDY_QUERY = `*[_type == "project" && slug.current == $slug][0]{
     cardMediaType,
     cardImage,
     "cardVideoUrl": cardVideo.asset->url,
-    cardVideoPoster,
-    cardVariant
+    cardVideoPoster
   }
 }`;
 
@@ -120,8 +125,7 @@ const FEATURED_PROJECTS_QUERY = `*[_type == "project" && featuredOnHome == true]
   cardMediaType,
   cardImage,
   "cardVideoUrl": cardVideo.asset->url,
-  cardVideoPoster,
-  cardVariant
+  cardVideoPoster
 }`;
 
 export async function fetchFeaturedProjects(): Promise<ProjectCardData[]> {
@@ -149,7 +153,8 @@ const HERO_QUERY = `*[_type == "hero"][0]{
   mediaType,
   heroImage,
   "heroVideoUrl": heroVideo.asset->url,
-  videoPoster
+  videoPoster,
+  "reelVideoUrl": reelVideo.asset->url
 }`;
 
 export async function fetchHero(): Promise<HeroData | null> {
@@ -192,8 +197,11 @@ const ABOUT_QUERY = `*[_type == "about"][0]{
   introLabel,
   introLabelMuted,
   introHeading,
-  introImage,
-  introImageWide,
+  introImages[]{
+    _key,
+    "image": image{ ..., "asset": asset-> },
+    wide
+  },
   servicesLabel,
   servicesHeading,
   approachLabel,

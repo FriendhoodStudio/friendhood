@@ -89,6 +89,15 @@ export default defineType({
           return true;
         }),
     }),
+    defineField({
+      name: 'reelVideo',
+      title: 'Showreel video (full)',
+      description:
+        'The full showreel, played with sound when someone clicks "Watch our showreel". A separate file from the Hero video above on purpose — that one is a short, heavily-compressed loop optimised to autoplay muted on every page load; this one can be full length and full quality since it only loads when someone explicitly asks to watch it. The "Watch our showreel" button only appears once this is set.',
+      type: 'file',
+      options: { accept: 'video/*' },
+      hidden: ({ parent }) => parent?.mediaType !== 'video',
+    }),
   ],
   preview: {
     select: {

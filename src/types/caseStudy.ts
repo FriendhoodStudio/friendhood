@@ -1,16 +1,11 @@
 import type { Category, ProjectCardData } from './project';
+import type { CarouselImageItem } from './carousel';
 
-export type CaseStudyMediaItem = { type: 'image'; url: string } | { type: 'video'; url: string };
+export type CaseStudyMediaItem = { type: 'image'; url: string; alt: string } | { type: 'video'; url: string };
 
 export interface CaseStudyMediaBlock {
   type: 'media';
   items: CaseStudyMediaItem[];
-}
-
-export interface CaseStudyOverviewBlock {
-  type: 'overview';
-  label: string;
-  text: string;
 }
 
 export interface CaseStudyParagraphBlock {
@@ -19,7 +14,17 @@ export interface CaseStudyParagraphBlock {
   text: string;
 }
 
-export type CaseStudyBlock = CaseStudyMediaBlock | CaseStudyOverviewBlock | CaseStudyParagraphBlock;
+export interface CaseStudyCarouselBlock {
+  type: 'carousel';
+  images: CarouselImageItem[];
+}
+
+export type CaseStudyBlock = CaseStudyMediaBlock | CaseStudyParagraphBlock | CaseStudyCarouselBlock;
+
+export interface CaseStudyOverview {
+  label: string;
+  text: string;
+}
 
 export interface ImpactStat {
   value: string;
@@ -51,6 +56,8 @@ export interface CaseStudyData {
   slug: string;
   openingStatement: string;
   heroImageUrl: string;
+  heroImageAlt: string;
+  overview?: CaseStudyOverview;
   categories: Category[];
   body: CaseStudyBlock[];
   footer: CaseStudyFooter;

@@ -17,18 +17,21 @@ const { projects, showCaption = true, layout = 'scroll' } = Astro.props;
   <section class="overflow-x-auto overflow-y-hidden">
     <div
       data-reveal-group="project-gallery"
-      data-hover-shunt-row
-      class="flex w-max items-end gap-gutter px-[var(--page-margin)] pt-vertical-l pb-vertical-xl"
+      class="flex w-max items-end gap-horizontal-m px-[var(--page-margin)] pt-vertical-l pb-vertical-xl"
     >
-      {projects.map((project) => <ProjectCard project={project} showCaption={showCaption} layout={layout} />)}
+      {projects.map((project, index) => (
+        <ProjectCard project={project} showCaption={showCaption} layout={layout} index={index} />
+      ))}
     </div>
   </section>
 ) : (
   <div
     data-reveal-group="project-gallery"
-    class="project-grid col-grid gap-x-gutter gap-y-vertical-l px-[var(--page-margin)] pt-vertical-m pb-vertical-xl"
+    class="project-grid col-grid gap-x-gutter gap-y-vertical-l px-[var(--page-margin)] pt-vertical-m"
   >
-    {projects.map((project) => <ProjectCard project={project} showCaption={showCaption} layout={layout} />)}
+    {projects.map((project, index) => (
+      <ProjectCard project={project} showCaption={showCaption} layout={layout} index={index} />
+    ))}
   </div>
 )}
 
@@ -62,78 +65,56 @@ const { projects, showCaption = true, layout = 'scroll' } = Astro.props;
 
   initScrollRevealGroup('project-gallery');
 
-  // Home's horizontal strip: hovering a card widens it and shunts later
-  // siblings along — previously a CSS `transition: flex-basis`, which
-  // animates a layout property and forces the whole row to reflow on every
-  // single frame (visibly jerky). FLIP instead: apply the real flex-basis
-  // change instantly (one reflow, not one per frame), then animate only
-  // `transform` (translate + scale) from the old rects to the new ones,
-  // which is compositor-only — same technique as the Work page's filter
-  // transition.
-  // Widening (mouseenter) gets a springy pop — the overshoot reads as
-  // intentional there. Reversing that same overshoot on the way back out
-  // (mouseleave) instead looked like a double-bounce — snappy in, jerky
-  // out — so the leave direction uses a slower, plain ease-out with no
-  // overshoot.
-  const FLIP_DURATION_IN = 600;
-  const FLIP_EASING_IN = 'cubic-bezier(0.22, 1.36, 0.36, 1)';
-  const FLIP_DURATION_OUT = 750;
-  const FLIP_EASING_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  // Home's horizontal strip: each card tilts in 3D on hover — same
+  // perspective+rotateY treatment, angles, and overshoot-on-release as the
+  // nav pill's Menu button press (right edge back/down, left edge up),
+  // just triggered by pointerenter/pointerleave instead of
+  // pointerdown/pointerup. Replaces an earlier widen-and-shunt effect
+  // (hovering grew the card and pushed later siblings along via a real
+  // flex-basis change, FLIP-animated) that stayed visibly jerky on fast
+  // mouse-off even after fixing a measure-before-cancel bug in that FLIP
+  // code — any approach that moves a sibling's actual layout position is
+  // exposed to that whole class of bug. A tilt never touches layout at
+  // all: only the hovered card's own transform changes, so there's
+  // nothing for a reflow to jerk.
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  document.querySelectorAll<HTMLElement>('[data-hover-shunt-row]').forEach((row) => {
-    const cards = Array.from(
-      row.querySelectorAll<HTMLElement>('.project-card[data-layout="scroll"]:not([data-coming-soon])')
-    );
-    if (cards.length === 0) return;
+  if (!reduceMotion) {
+    document
+      .querySelectorAll<HTMLElement>('.project-card[data-layout="scroll"]:not([data-coming-soon])')
+      .forEach((card) => {
+        let settleAnim: Animation | null = null;
 
-    function setWidened(target: HTMLElement | null) {
-      if (reduceMotion) {
-        cards.forEach((card) => card.classList.toggle('is-widened', card === target));
-        return;
-      }
+        card.addEventListener('pointerenter', () => {
+          settleAnim?.cancel();
+          card.classList.remove('is-settling');
+          card.classList.add('is-tilted');
+        });
 
-      // Measure BEFORE cancelling any in-flight animation — while it's
-      // still running, getBoundingClientRect() reflects its current
-      // mid-transition (transformed) position. Cancelling first and then
-      // measuring was the bug: cancel() snaps the card straight to its
-      // resting layout position, so a quick re-hover mid-swing measured
-      // "before" == "after" for that card and it just teleported instead
-      // of continuing to animate — that's the jerk when flicking the mouse
-      // between adjacent cards.
-      const before = new Map<HTMLElement, DOMRect>();
-      cards.forEach((card) => before.set(card, card.getBoundingClientRect()));
+        card.addEventListener('pointerleave', () => {
+          if (!card.classList.contains('is-tilted')) return;
 
-      // Now safe to cancel — the new animation started below will override
-      // the snapped-back position before the browser ever paints it.
-      cards.forEach((card) => card.getAnimations().forEach((a) => a.cancel()));
+          settleAnim = card.animate(
+            [
+              { transform: 'perspective(900px) rotateY(7deg)' },
+              { transform: 'perspective(900px) rotateY(-2deg)', offset: 0.55 },
+              { transform: 'perspective(900px) rotateY(0.6deg)', offset: 0.8 },
+              { transform: 'rotateY(0deg)' },
+            ],
+            { duration: 420, easing: 'ease-out', fill: 'forwards' }
+          );
+          card.classList.add('is-settling');
+          card.classList.remove('is-tilted');
 
-      cards.forEach((card) => card.classList.toggle('is-widened', card === target));
-
-      const duration = target ? FLIP_DURATION_IN : FLIP_DURATION_OUT;
-      const easing = target ? FLIP_EASING_IN : FLIP_EASING_OUT;
-
-      cards.forEach((card) => {
-        const prev = before.get(card)!;
-        const next = card.getBoundingClientRect();
-        const dx = prev.left - next.left;
-        // Only the hovered card's own width actually changes; siblings just
-        // shift position, so this naturally comes out to 1 for them.
-        const scaleX = next.width ? prev.width / next.width : 1;
-        if (Math.abs(dx) < 1 && Math.abs(scaleX - 1) < 0.01) return;
-        card.animate(
-          [
-            { translate: `${dx}px 0`, scale: `${scaleX} 1` },
-            { translate: '0 0', scale: '1 1' },
-          ],
-          { duration, easing }
-        );
+          const anim = settleAnim;
+          anim.finished
+            .then(() => {
+              anim.cancel();
+              card.classList.remove('is-settling');
+              if (settleAnim === anim) settleAnim = null;
+            })
+            .catch(() => {});
+        });
       });
-    }
-
-    cards.forEach((card) => {
-      card.addEventListener('mouseenter', () => setWidened(card));
-      card.addEventListener('mouseleave', () => setWidened(null));
-    });
-  });
+  }
 </script>

@@ -1,5 +1,6 @@
 ---
 import { fetchAbout } from '../lib/sanity/queries';
+import ImageCarousel from './ImageCarousel.astro';
 
 const about = await fetchAbout();
 
@@ -8,8 +9,7 @@ const introLabelMuted = about?.introLabelMuted ?? 'Built to change your world.';
 const introHeading =
   about?.introHeading ??
   "We're a strategic branding studio built to help you understand now and make what's coming next. Creative expertise and guidance for people looking to build and change things, for good.";
-const introImageUrl = about?.introImageUrl;
-const introImageWideUrl = about?.introImageWideUrl;
+const introImages = about?.introImages ?? [];
 
 const approachLabel = about?.approachLabel ?? 'Our approach';
 const approachHeading = about?.approachHeading ?? 'Who you are, amplified by strategic craft.';
@@ -21,108 +21,31 @@ const clients = about?.clients ?? [];
 
 <section class="flex flex-col gap-vertical-l px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-intro">
   <div class="flex w-full flex-col items-start gap-vertical-s">
-    <p class="reveal-item font-tag text-detail text-front">
+    <p class="reveal-item font-tag text-detail text-grey-300">
       {introLabel} <span class="text-services">{introLabelMuted}</span>
     </p>
-    <p class="reveal-item font-display text-h2 text-front">{introHeading}</p>
+    <h1 class="reveal-item w-full font-display text-h2 text-front">{introHeading}</h1>
   </div>
 
-  <div class="intro-row full-bleed-scroll flex w-full items-start gap-gutter">
-    {introImageUrl && (
-      <div class="intro-image intro-image-narrow reveal-item shrink-0 overflow-hidden rounded-card">
-        <img src={introImageUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
-      </div>
-    )}
-    {introImageWideUrl && (
-      <div class="intro-image intro-image-wide reveal-item shrink-0 overflow-hidden rounded-card">
-        <img src={introImageWideUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
-      </div>
-    )}
-  </div>
+  <ImageCarousel images={introImages} />
 </section>
-
-<style>
-  /*
-   * Below desktop, the two intro images DON'T reshape or stack into a
-   * one-slide-at-a-time carousel — per Figma (768 and 390 frames) they keep
-   * their own fixed pixel dimensions and simply overflow the viewport,
-   * scrolling as a peeking pair (narrow + wide both partially visible at
-   * once). Full-bleed break-out + scroll-padding-inline scroll mechanics
-   * come from the shared .full-bleed-scroll class (see global.css) — this
-   * block only has the intro-row-specific sizing.
-   *
-   * Both images share the SAME fixed height per tier (rather than each
-   * having its own aspect ratio) — confirmed directly against Figma's pixel
-   * values at both breakpoints (390: 318x425 / 360x425: 768: 355x465 /
-   * 728x464.54, i.e. equal by explicit height, not by a shared ratio).
-   * col-4/col-8 only coincidentally match the 768 tier's widths (354/728) —
-   * the 390 tier's narrow width (318) doesn't correspond to any existing
-   * grid token, so these are one-off pixel pairs, not derived from the grid.
-   */
-  .intro-image {
-    height: 425px;
-  }
-  .intro-image-narrow {
-    width: 318px;
-  }
-  .intro-image-wide {
-    width: 360px;
-  }
-  @media (min-width: 768px) {
-    .intro-image {
-      height: 465px;
-    }
-    .intro-image-narrow {
-      width: var(--col-4);
-    }
-    .intro-image-wide {
-      width: var(--col-8);
-    }
-  }
-  @media (min-width: 1440px) {
-    /* At desktop the row goes back to a static, non-scrolling side-by-side
-       layout — the overflow scrolling is a tablet/mobile-only affordance.
-       The narrow image keeps a fixed WIDTH
-       (--col-4) with its own ratio giving it a height; the wide image has a
-       flexible width with NO ratio of its own, stretching (align-items:
-       stretch + object-cover) to match whatever height the narrow image
-       ends up with — aspect-ratio-locking the wide image independently
-       only matched by coincidence at exactly the reference viewport each
-       tier's tokens were tuned for, and visibly drifted apart elsewhere. */
-    .intro-row {
-      align-items: stretch;
-    }
-    .intro-image {
-      height: auto;
-    }
-    .intro-image-narrow {
-      width: var(--col-4);
-      aspect-ratio: 523 / 700;
-    }
-    .intro-image-wide {
-      width: auto;
-      min-width: 0;
-      flex: 1 1 0%;
-    }
-  }
-</style>
 
 <slot name="services" />
 
 <section class="flex flex-col gap-vertical-l px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-approach">
   <div class="flex w-full flex-col items-start gap-vertical-s">
-    <p class="reveal-item font-tag text-detail text-front">{approachLabel}</p>
-    <p class="reveal-item font-display text-h2 text-front">{approachHeading}</p>
+    <p class="reveal-item font-tag text-detail text-grey-300">{approachLabel}</p>
+    <h2 class="reveal-item w-full font-display text-h2 text-front">{approachHeading}</h2>
   </div>
 
   <div class="approach-row full-bleed-scroll w-full gap-gutter">
     {approachCards.map((card) => (
       <div class="approach-card reveal-item flex flex-col items-start gap-[16px]">
         <div class="aspect-[523/700] w-full overflow-hidden rounded-card">
-          <img src={card.imageUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
+          <img src={card.imageUrl} alt={card.imageAlt} class="h-full w-full object-cover" loading="lazy" />
         </div>
         <div class="approach-copy flex w-full items-start gap-gutter">
-          <p class="approach-title font-heading text-h3 text-accent-yellow">{card.title}</p>
+          <h3 class="approach-title font-heading text-h3 text-accent-yellow">{card.title}</h3>
           <p class="approach-text font-body text-body-3 text-front">{card.text}</p>
         </div>
       </div>
@@ -167,7 +90,7 @@ const clients = about?.clients ?? [];
     width: var(--col-4);
     scroll-snap-align: start;
   }
-  @media (min-width: 1440px) {
+  @media (min-width: 1200px) {
     .approach-row {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(var(--col-4), 1fr));
@@ -194,7 +117,7 @@ const clients = about?.clients ?? [];
   .approach-text {
     width: 100%;
   }
-  @media (min-width: 1440px) {
+  @media (min-width: 1200px) {
     .approach-copy {
       flex-direction: row;
     }
@@ -211,7 +134,7 @@ const clients = about?.clients ?? [];
 </style>
 
 <section class="flex flex-col gap-vertical-s px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-clients">
-  <p class="reveal-item font-tag text-detail text-front">{clientsLabel}</p>
+  <p class="reveal-item font-tag text-detail text-grey-300">{clientsLabel}</p>
   <p class="reveal-item w-full font-heading text-h3 text-[#5c5c5c]">{clients.join(' • ')}</p>
 </section>
 
@@ -220,5 +143,85 @@ const clients = about?.clients ?? [];
 
   for (const name of ['about-intro', 'about-approach', 'about-clients']) {
     initScrollRevealGroup(name);
+  }
+
+  // Intro image carousel controls — only rendered once a third image makes
+  // the row genuinely scrollable (see the markup's conditional). Each click
+  // pages by one image's-width-plus-gutter in that direction; disabled
+  // (rather than hidden) at either end so the row's actual scroll extent is
+  // always visible from the controls' state, not just guessed at.
+  const introRow = document.querySelector<HTMLElement>('[data-intro-carousel]');
+  const prevBtn = document.querySelector<HTMLButtonElement>('[data-intro-carousel-prev]');
+  const nextBtn = document.querySelector<HTMLButtonElement>('[data-intro-carousel-next]');
+
+  if (introRow && prevBtn && nextBtn) {
+    function step() {
+      // The narrow image's own width (first child) plus the row's current
+      // gutter — reads the actual layout rather than a guessed constant, so
+      // it stays correct across every breakpoint's different column/gutter
+      // tokens without needing its own copy of those values.
+      const first = introRow!.firstElementChild as HTMLElement | null;
+      const gap = parseFloat(getComputedStyle(introRow!).columnGap || '0');
+      return (first?.getBoundingClientRect().width ?? introRow!.clientWidth) + gap;
+    }
+
+    function updateDisabled() {
+      if (!introRow) return;
+      const maxScroll = introRow.scrollWidth - introRow.clientWidth;
+      prevBtn!.disabled = introRow.scrollLeft <= 1;
+      nextBtn!.disabled = introRow.scrollLeft >= maxScroll - 1;
+    }
+
+    prevBtn.addEventListener('click', () => {
+      introRow.scrollBy({ left: -step(), behavior: 'smooth' });
+    });
+    nextBtn.addEventListener('click', () => {
+      introRow.scrollBy({ left: step(), behavior: 'smooth' });
+    });
+
+    introRow.addEventListener('scroll', updateDisabled, { passive: true });
+    window.addEventListener('resize', updateDisabled);
+    updateDisabled();
+
+    // Press/release overshoot, same as the nav pill and every other button
+    // on the site — quick firm press-in via the CSS transition on
+    // .is-pressed, then a springy overshoot-past-rest on release driven by
+    // WAAPI so it can go past scale(1) before settling.
+    [prevBtn, nextBtn].forEach((btn) => {
+      let settleAnim: Animation | null = null;
+
+      btn.addEventListener('pointerdown', () => {
+        settleAnim?.cancel();
+        btn.classList.remove('is-settling');
+        btn.classList.add('is-pressed');
+      });
+
+      const releasePress = () => {
+        if (!btn.classList.contains('is-pressed')) return;
+        settleAnim = btn.animate(
+          [
+            { transform: 'scale(0.82)' },
+            { transform: 'scale(1.12)', offset: 0.55 },
+            { transform: 'scale(0.97)', offset: 0.8 },
+            { transform: 'scale(1)' },
+          ],
+          { duration: 380, easing: 'ease-out', fill: 'forwards' }
+        );
+        btn.classList.add('is-settling');
+        btn.classList.remove('is-pressed');
+
+        const anim = settleAnim;
+        anim.finished
+          .then(() => {
+            anim.cancel();
+            btn.classList.remove('is-settling');
+          })
+          .catch(() => {});
+      };
+
+      btn.addEventListener('pointerup', releasePress);
+      btn.addEventListener('pointerleave', releasePress);
+      btn.addEventListener('pointercancel', releasePress);
+    });
   }
 </script>

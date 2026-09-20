@@ -5,6 +5,7 @@ import { loadEnv } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@astrojs/react';
 import sanity from '@sanity/astro';
+import sitemap from '@astrojs/sitemap';
 
 // astro.config.mjs runs in plain Node before Astro's own .env loading applies
 // to app code, so process.env.PUBLIC_SANITY_PROJECT_ID is empty here unless we
@@ -17,6 +18,9 @@ const { PUBLIC_SANITY_PROJECT_ID, PUBLIC_SANITY_DATASET } = loadEnv(
 
 // https://astro.build/config
 export default defineConfig({
+  // Required for canonical URLs and sitemap generation — update if the
+  // production domain ends up different from the current live site.
+  site: 'https://friendhood.co.uk',
   vite: {
     plugins: [tailwindcss()]
   },
@@ -32,6 +36,9 @@ export default defineConfig({
             studioBasePath: '/studio'
           })
         ]
-      : [])
+      : []),
+    // Embedded Sanity Studio at /studio is admin tooling, not a real page —
+    // excluded so it never ends up in search results.
+    sitemap({ filter: (page) => !page.includes('/studio') })
   ]
 });

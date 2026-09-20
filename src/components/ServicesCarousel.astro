@@ -41,7 +41,7 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
   >
     {looped.map((service, i) => (
       <div
-        class="services-card flex shrink-0 flex-col items-center gap-[10px] rounded-card bg-accent-yellow/90 px-[10px] pt-[10px] pb-[20px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
+        class="services-card flex shrink-0 flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pt-[10px] pb-[75px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
         style={cardSizeStyle}
         data-service-card
         data-index={i}
@@ -53,8 +53,8 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
           data-services-close
           aria-label="Close"
         />
-        <div class="flex w-full flex-col items-start gap-[14px]">
-          <div class="relative h-[275px] w-full overflow-hidden rounded-card">
+        <div class="flex w-full flex-col items-start gap-[20px]">
+          <div class="relative h-[325px] w-full overflow-hidden">
             <img src={service.imageUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
             <div class="absolute inset-x-0 top-0 flex items-start justify-end px-[15px] pt-[10px]">
               <div class="group relative">
@@ -73,7 +73,7 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
                 </button>
                 <span
                   data-copy-email-status
-                  class="pointer-events-none absolute right-0 top-full mt-2 whitespace-nowrap rounded-card border border-front/15 bg-grey-600 px-3 py-1 opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out group-hover:opacity-100"
+                  class="pointer-events-none absolute right-0 top-full mt-2 whitespace-nowrap rounded-m border border-front/15 bg-grey-600 px-3 py-1 opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out group-hover:opacity-100"
                 >
                   <span class="relative block h-[18px] overflow-hidden">
                     <span
@@ -88,15 +88,19 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
               </div>
             </div>
           </div>
-          <div class="flex w-full flex-col gap-[12px] px-[20px]">
-            <p class="font-heading text-h3 text-back">{service.cardTitle}</p>
-            <div class="h-px w-full bg-back/30"></div>
-            <p class="font-tag text-detail text-back">{service.overview}</p>
-            <div class="h-px w-full bg-back/30"></div>
-            <div class="flex w-full flex-col items-start gap-[10px]">
-              <p class="font-tag text-categories text-[#5c5c5c]">Example Modules</p>
-              <div class="flex flex-wrap gap-1">
-                {service.modules.map((moduleName) => <ModuleTag label={moduleName} />)}
+          {/* Dividers between title/overview/modules are gone — per the
+              latest Figma pass (node 7382:2286), this now reads as one
+              continuous block with title→overview at 20px and
+              overview→modules at 36px, rather than ruled-off sections. */}
+          <div class="flex w-full flex-col items-start gap-[20px] px-[20px]">
+            <h3 class="font-heading text-h3 text-back">{service.cardTitle}</h3>
+            <div class="flex w-full flex-col items-start gap-[36px]">
+              <p class="font-tag text-detail text-back">{service.overview}</p>
+              <div class="flex w-full flex-col items-start gap-[10px]">
+                <p class="font-tag text-categories text-[#5c5c5c]">Example Modules</p>
+                <div class="flex flex-wrap gap-1">
+                  {service.modules.map((moduleName) => <ModuleTag label={moduleName} />)}
+                </div>
               </div>
             </div>
           </div>
@@ -111,9 +115,17 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
      count both vary per service, which left cards with visibly uneven
      bottoms since several sit partially visible side-by-side in the
      carousel at once. Internal gaps/padding were tightened alongside this
-     specifically so real content still fits without clipping. */
+     specifically so real content still fits without clipping.
+
+     740 (matching Figma's own reference example — node 7382:2286 — which
+     has 9 module tags across 3 rows) badly overshot every REAL service's
+     actual content: measured directly, the tallest real card's content
+     (tags included) bottoms out around 592px, not anywhere near Figma's
+     reference length. 670 = that ~592px plus Figma's own 75px bottom
+     padding, plus a small buffer — snug against real content rather than
+     the much longer placeholder text Figma's example happened to use. */
   .services-card {
-    height: 620px;
+    height: 670px;
   }
 
   /* Press/release feel for the copy-email button, matching the nav pill's

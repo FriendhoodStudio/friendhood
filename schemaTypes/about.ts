@@ -27,18 +27,13 @@ export default defineType({
       validation: (rule) => rule.required(),
     }),
     defineField({
-      name: 'introImage',
-      title: 'Intro image (narrow)',
-      type: 'image',
-      options: { hotspot: true },
-      validation: (rule) => rule.required(),
-    }),
-    defineField({
-      name: 'introImageWide',
-      title: 'Intro image (wide)',
-      type: 'image',
-      options: { hotspot: true },
-      validation: (rule) => rule.required(),
+      name: 'introImages',
+      title: 'Intro images',
+      description:
+        'Shown as a carousel — drag to reorder, and toggle "Wide" per image for the alternating narrow/wide sizing. Any number of images.',
+      type: 'array',
+      of: [{ type: 'carouselImage' }],
+      validation: (rule) => rule.required().min(1),
     }),
     defineField({
       name: 'servicesLabel',
@@ -96,6 +91,7 @@ export default defineType({
               title: 'Image',
               type: 'image',
               options: { hotspot: true },
+              fields: [defineField({ name: 'alt', title: 'Alt text', type: 'string' })],
               validation: (rule) => rule.required(),
             }),
           ],

@@ -35,13 +35,13 @@ const serviceList: ServiceItem[] =
 ---
 
 <section class="flex flex-col gap-vertical-l px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="services">
-  <div class={`flex w-full flex-col items-start gap-vertical-s ${headingVariant === 'display' ? '' : 'max-w-[var(--col-6)]'}`}>
-    <p class="reveal-item font-tag text-detail text-front">{descriptor}</p>
-    <p
-      class={`reveal-item text-front ${headingVariant === 'display' ? 'font-display text-h2' : 'font-body text-body-1'}`}
+  <div class={`flex w-full flex-col items-start gap-vertical-s ${headingVariant === 'display' ? '' : 'paragraph-span max-w-[var(--col-8)]'}`}>
+    <p class="reveal-item font-tag text-detail text-grey-300">{descriptor}</p>
+    <h2
+      class={`reveal-item w-full text-front ${headingVariant === 'display' ? 'display-heading font-display text-h2' : 'font-body text-body-1'}`}
     >
       {paragraph}
-    </p>
+    </h2>
   </div>
 
   <div class="col-grid w-full gap-gutter">
@@ -78,6 +78,26 @@ const serviceList: ServiceItem[] =
 <ServicesCarousel services={serviceList} />
 
 <style>
+  /* The display-variant heading's narrow-width band-aid (50%/75%/none per
+     breakpoint) is gone — same root cause and same fix as About's own
+     intro heading: it sits in a `flex-col items-start` container, which
+     shrink-wraps children to their own content width instead of filling
+     it. `w-full` on the element (see markup) fixes that directly, so it's
+     reliably full width with no text-balance snapping. Doesn't affect the
+     Home page's paragraph variant, which already has its own
+     max-w-[var(--col-8)] on the wrapper. */
+
+  /* Narrower still at desktop — 6 columns rather than 8, once there's
+     enough width that 8 columns of Body 1 text reads as too wide a
+     measure to read comfortably. Matches the same 1200px threshold as the
+     rest of the "L" tier (see global.css) so this doesn't have its own
+     separate cliff. */
+  @media (min-width: 1200px) {
+    .paragraph-span {
+      max-width: var(--col-6);
+    }
+  }
+
   /* Tile grid: 1/2/3 columns per row across the breakpoints, per Figma —
      see .col-grid in global.css for why this is explicit breakpoint-gated
      columns rather than an auto-fill/minmax formula. */

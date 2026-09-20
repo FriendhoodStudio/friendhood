@@ -87,10 +87,11 @@
   --font-tag: "Pitch Sans", sans-serif;
 
   /* Colors (Figma: Core/Front, Core/Back, Core/Accent-Yello, Services) */
-  --color-front: #eeeee9;
+  --color-front: #f3faf0;
   --color-back: #0d0d0d;
   --color-accent-yellow: #e7fe54;
   --color-services: #848484;
+  --color-grey-300: #9c9c9c;
   --color-grey-600: #29282db2;
 
   /*
@@ -114,35 +115,45 @@
     them vary by size. Confirmed directly against Figma's variable defs (not
     assumed) across every component that uses each style.
   */
-  --text-h1: 2.5rem; /* 40px */
+  /* PREVIEW: every --text-* size below is temporarily -8.2% (-10%, then
+     +2%) to show what a global type-scale reduction would look like — H1
+     specifically has an extra +8% on top of that (net -0.86% vs original).
+     Original base values: h1 2.5rem/40px, h2 2.3125rem/37px, h3 2rem/32px,
+     body-1 1.5625rem/25px, body-2 1.3125rem/21px, body-3 1rem/16px,
+     detail 0.875rem/14px, categories 0.8125rem/13px. */
+  --text-h1: 2.4786rem; /* 39.66px (was 40px) */
   --text-h1--line-height: 1;
   --text-h1--letter-spacing: -0.02em;
 
-  --text-h2: 2.3125rem; /* 37px */
+  --text-h2: 2.122875rem; /* 33.97px (was 37px) */
   --text-h2--line-height: 1;
   --text-h2--letter-spacing: -0.02em;
 
-  --text-h3: 2rem; /* 32px */
+  --text-h3: 1.836rem; /* 29.38px (was 32px) */
   --text-h3--line-height: 1;
   --text-h3--letter-spacing: 0em;
 
-  --text-body-1: 1.5625rem; /* 25px */
+  /* Mobile-only override, well below the -8.2% preview level — the smaller
+     -3% step still read as too big at real mobile widths, so this cuts
+     further to a size proportionate to mobile body copy (was 25px
+     originally; tablet/desktop/wide body-1 unaffected). */
+  --text-body-1: 1.125rem; /* 18px (was 25px) */
   --text-body-1--line-height: 1.15;
   --text-body-1--letter-spacing: 0em;
 
-  --text-body-2: 1.3125rem; /* 21px */
+  --text-body-2: 1.204875rem; /* 19.28px (was 21px) */
   --text-body-2--line-height: 1.15;
   --text-body-2--letter-spacing: -0.02em;
 
-  --text-body-3: 1rem; /* 16px */
+  --text-body-3: 0.918rem; /* 14.69px (was 16px) */
   --text-body-3--line-height: 1.15;
   --text-body-3--letter-spacing: 0em;
 
-  --text-detail: 0.875rem; /* 14px */
+  --text-detail: 0.80325rem; /* 12.85px (was 14px) */
   --text-detail--line-height: 0.96;
   --text-detail--letter-spacing: -0.02em;
 
-  --text-categories: 0.8125rem; /* 13px */
+  --text-categories: 0.745875rem; /* 11.93px (was 13px) */
   --text-categories--line-height: 0.96;
   --text-categories--letter-spacing: 0em;
 
@@ -156,13 +167,19 @@
   --spacing-vertical-l: 2.5rem; /* 40px */
   --spacing-vertical-xl: 6.25rem; /* 100px */
   --spacing-horizontal-xs: 0.25rem; /* 4px, constant across breakpoints */
+  --spacing-horizontal-m: 0.5rem; /* 8px — half of --spacing-gutter at this tier */
   --spacing-gutter: 0.9375rem; /* 15px */
   --spacing-btn-x: 0.9375rem; /* 15px */
-  --spacing-btn-y: 0.625rem; /* 10px */
+  --spacing-btn-y: 0.9375rem; /* 15px — matches btn-x, per Button-L spec */
   --spacing-btn-y-nav: 0.75rem; /* 12px */
 
-  /* Radius (Figma: CornerRadius, constant 10px at every breakpoint) */
-  --radius-card: 10px;
+  /* Radius (Figma: CornerRadius-L/M/S, constant at every breakpoint).
+     "small" spelled out, not `--radius-s` — Tailwind reserves the bare `s`
+     suffix on `rounded-*` for its own logical "start side" corner utility,
+     which silently collided with this and only rounded 2 of 4 corners. */
+  --radius-card: 30px;
+  --radius-m: 20px;
+  --radius-small: 10px;
 }
 
 /*
@@ -199,7 +216,7 @@
 .full-bleed-scroll::-webkit-scrollbar {
   display: none;
 }
-@media (min-width: 1440px) {
+@media (min-width: 1200px) {
   .full-bleed-scroll {
     overflow-x: visible;
     width: 100%;
@@ -229,7 +246,7 @@
   changes exactly where --col-4 itself does.
 
   (Approach cards' desktop-only grid uses a literal repeat(3, 1fr) directly
-  rather than this class — it's scoped to exactly the 1440px+ range where 3
+  rather than this class — it's scoped to exactly the 1200px+ range where 3
   columns are guaranteed to fit throughout, so it was never exposed to this
   failure mode and didn't need fixing.)
 */
@@ -248,7 +265,7 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
-@media (min-width: 1440px) {
+@media (min-width: 1200px) {
   .col-grid {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -266,7 +283,7 @@
   landscape is the narrowest common case, at 667px) while staying well
   above any real PORTRAIT phone width (the widest common case, iPhone Pro
   Max portrait, is ~430px), so this can't misfire on a portrait device.
-  No upper bound needed — 1440px+ already resolves to 3 columns via its own
+  No upper bound needed — 1200px+ already resolves to 3 columns via its own
   rule regardless of orientation, so this simply agrees with it there.
 */
 @media (orientation: landscape) and (min-width: 640px) {
@@ -293,48 +310,66 @@
     --label-width: 167px;
     --nav-menu-height: 68px;
 
-    --text-h1: 3.75rem; /* 60px */
-    --text-h2: 2.625rem; /* 42px */
-    --text-h3: 2.25rem; /* 36px */
-    --text-body-1: 1.5625rem; /* 25px */
-    --text-body-2: 1.375rem; /* 22px */
-    --text-body-3: 1.125rem; /* 18px */
-    --text-detail: 1rem; /* 16px */
+    /* PREVIEW: -8.2% on top of the already-manual tablet H1 override. */
+    --text-h1: 3.346110rem; /* 53.54px (was 54px) */
+    --text-h2: 2.409750rem; /* 38.56px (was 42px) */
+    --text-h3: 2.0655rem; /* 33.05px (was 36px) */
+    --text-body-1: 1.434375rem; /* 22.95px (was 25px) */
+    --text-body-2: 1.262250rem; /* 20.20px (was 22px) */
+    --text-body-3: 1.032750rem; /* 16.52px (was 18px) */
+    --text-detail: 0.918rem; /* 14.69px (was 16px) */
 
     --spacing-vertical-s: 0.9375rem; /* 15px */
     --spacing-vertical-m: 1.875rem; /* 30px */
     --spacing-vertical-l: 3.125rem; /* 50px */
     --spacing-vertical-xl: 7.5rem; /* 120px */
+    --spacing-horizontal-m: 0.625rem; /* 10px — half of --spacing-gutter at this tier */
     --spacing-gutter: 1.25rem; /* 20px */
     --spacing-btn-x: 1.25rem; /* 20px */
-    --spacing-btn-y: 0.9375rem; /* 15px */
+    --spacing-btn-y: 1.25rem; /* 20px — matches btn-x, per Button-L spec */
     --spacing-btn-y-nav: 1.25rem; /* 20px */
   }
 }
 
-@media (min-width: 1440px) {
+/* This is the "L" (desktop) tier's token set — its VALUES are unchanged
+   from Figma's 1440px reference frame, but it now ACTIVATES starting at
+   1200px instead of 1440px. Real people often run a desktop-class browser
+   window well short of maximized on a large monitor, and the old cliff at
+   1440px meant that whole 1200-1439px range fell all the way back to the
+   tablet ("M") tier's much narrower columns and smaller type — a jarring,
+   easy-to-hit jump for a very common window size, not just an edge case.
+   Widening where L applies (rather than inventing new in-between values
+   with no Figma reference) closes that gap with zero new design decisions. */
+@media (min-width: 1200px) {
   :root {
-    --page-margin: 3.75rem; /* 60px */
+    /* Deviates from Figma's 1440px-frame value (60px) — felt too tight
+       once this tier's own range widened down to 1200px (see comment
+       above), especially for full-bleed aspect-ratio-locked blocks like
+       the Hero media. Bumped to 85px; every other L-tier value is still
+       the unmodified Figma number. */
+    --page-margin: 5.3125rem; /* 85px (was 60px) */
     --col-4: 413px;
     --col-6: 640px;
     --col-8: 867px;
     --label-width: 187px;
 
-    --text-h1: 4.875rem; /* 78px */
-    --text-h2: 3.125rem; /* 50px */
-    --text-h3: 2.25rem; /* 36px */
-    --text-body-1: 1.625rem; /* 26px */
-    --text-body-2: 1.5625rem; /* 25px */
-    --text-body-3: 1.125rem; /* 18px */
-    --text-detail: 1.125rem; /* 18px */
-    --text-categories: 0.9375rem; /* 15px */
+    /* PREVIEW: -8.2% on top of the already-manual desktop H1 override. */
+    --text-h1: 4.33755rem; /* 69.40px (was 70px) */
+    --text-h2: 2.868750rem; /* 45.90px (was 50px) */
+    --text-h3: 2.0655rem; /* 33.05px (was 36px) */
+    --text-body-1: 1.491750rem; /* 23.87px (was 26px) */
+    --text-body-2: 1.434375rem; /* 22.95px (was 25px) */
+    --text-body-3: 1.032750rem; /* 16.52px (was 18px) */
+    --text-detail: 1.032750rem; /* 16.52px (was 18px) */
+    --text-categories: 0.860625rem; /* 13.77px (was 15px) */
 
     --spacing-vertical-s: 1.25rem; /* 20px */
     --spacing-vertical-l: 4.375rem; /* 70px */
     --spacing-vertical-xl: 11.875rem; /* 190px */
+    --spacing-horizontal-m: 1.25rem; /* 20px — half of --spacing-gutter at this tier */
     --spacing-gutter: 2.5rem; /* 40px */
     --spacing-btn-x: 1.5625rem; /* 25px */
-    --spacing-btn-y: 1.25rem; /* 20px */
+    --spacing-btn-y: 1.5625rem; /* 25px — matches btn-x, per Button-L spec */
     --spacing-btn-y-nav: 1.5625rem; /* 25px */
   }
 }
@@ -347,16 +382,18 @@
     --col-8: 1097px;
     --label-width: 237px;
 
-    --text-h1: 5.1875rem; /* 83px */
-    --text-h2: 3.5rem; /* 56px */
-    --text-h3: 2.375rem; /* 38px */
-    --text-body-1: 2rem; /* 32px */
-    --text-body-2: 1.8125rem; /* 29px */
-    --text-body-3: 1.125rem; /* 18px */
+    /* PREVIEW: -8.2% on top of the already-manual wide-desktop H1 override. */
+    --text-h1: 4.647375rem; /* 74.36px (was 75px) */
+    --text-h2: 3.213rem; /* 51.41px (was 56px) */
+    --text-h3: 2.180250rem; /* 34.88px (was 38px) */
+    --text-body-1: 1.836rem; /* 29.38px (was 32px) */
+    --text-body-2: 1.663875rem; /* 26.62px (was 29px) */
+    --text-body-3: 1.032750rem; /* 16.52px (was 18px) */
 
     --spacing-vertical-m: 2.25rem; /* 36px */
     --spacing-vertical-l: 4.6875rem; /* 75px */
     --spacing-vertical-xl: 12.5rem; /* 200px */
+    --spacing-horizontal-m: 1.5625rem; /* 25px — half of --spacing-gutter at this tier */
     --spacing-gutter: 3.125rem; /* 50px */
     --spacing-btn-y-nav: 1.875rem; /* 30px */
   }

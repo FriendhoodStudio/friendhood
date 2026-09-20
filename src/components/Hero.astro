@@ -8,6 +8,11 @@ const headlineSwapWord = hero?.headlineSwapWord ?? 'people';
 const headlineHoverWords = hero?.headlineHoverWords ?? ['places', 'brands', 'orgs'];
 const tagline = hero?.tagline ?? 'Create your neighbourhood';
 const media = hero?.media;
+// Separate from `media` above (a short muted loop) on purpose — see the
+// reelVideo field description in the Sanity schema. The trigger/modal only
+// render once this is actually set, rather than falling back to replaying
+// the tiny background loop unmuted.
+const reelVideoUrl = hero?.reelVideoUrl;
 
 // Cycled by position (not matched by word text), so any word added in
 // Sanity automatically picks up the next colour in sequence — wrapping back
@@ -42,10 +47,10 @@ const loopColors = hoverWordColors.length > 0 ? [...hoverWordColors, hoverWordCo
 // artwork, so the "1 29" hotspot in the style attribute below lands on it.
 const pencilCursorSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 225.79 225.53" fill="none">
 <path d="M76.93 215L5.84 219.69L13.13 151.21L161.54 2.81L225.33 66.6L76.93 215Z" fill="#0D0D0D"/>
-<path d="M221.01 52.69L173.1 4.78C166.72 -1.6 156.34 -1.6 149.97 4.78L140.1 14.65C139.93 14.82 139.78 15.01 139.65 15.21L130.02 24.84C129.85 25.01 129.7 25.19 129.57 25.39L16.98 137.99C14.07 140.9 11.99 144.54 10.95 148.52C10.92 148.64 10.89 148.76 10.87 148.89L0.04 221.51C-0.12 222.6 0.24 223.71 1.02 224.49C1.8 225.28 2.9 225.64 3.99 225.49L76.92 215C77.04 214.98 77.17 214.96 77.29 214.93C81.32 213.9 85.01 211.81 87.95 208.87L201.01 95.81C201.18 95.64 201.33 95.45 201.46 95.26L210.59 86.13C210.79 86 210.98 85.85 211.15 85.68L221.02 75.81C227.4 69.43 227.4 59.06 221.02 52.68L221.01 52.69ZM28.78 160.51C27.41 161.88 27.41 164.09 28.78 165.46C30.15 166.83 32.36 166.83 33.73 165.46C36.92 162.27 41.95 162.11 44.95 165.11C47.95 168.11 47.79 173.14 44.6 176.33C43.23 177.7 43.23 179.91 44.6 181.28C45.97 182.65 48.18 182.65 49.55 181.28C52.74 178.09 57.77 177.93 60.77 180.93C63.51 183.67 63.61 188.12 61.16 191.3C60.88 191.54 60.6 191.79 60.33 192.05C58.96 193.42 58.96 195.63 60.33 197C60.35 197.02 60.37 197.03 60.38 197.04C60.4 197.06 60.41 197.08 60.42 197.09C61.79 198.46 64 198.46 65.37 197.09C65.64 196.82 65.88 196.54 66.12 196.26C69.3 193.81 73.75 193.9 76.49 196.65C79.49 199.65 79.33 204.68 76.14 207.87C76.1 207.91 76.08 207.95 76.04 207.99C75.93 208.02 75.82 208.06 75.72 208.09L34.44 214.03C34.44 214.03 34.36 213.93 34.32 213.88L11.63 191.19L17.76 150.1C17.8 149.94 17.86 149.77 17.91 149.61C21.1 146.43 26.13 146.28 29.12 149.27C32.11 152.26 31.96 157.3 28.77 160.49L28.78 160.51ZM10.35 199.81L25.82 215.28L7.65 217.89L10.35 199.81ZM85.62 201.29C85.47 197.78 84.09 194.35 81.45 191.71C78.31 188.57 74.04 187.21 69.84 187.59C70.22 183.4 68.86 179.13 65.72 175.98C62.58 172.83 58.24 171.45 54.01 171.86C54.42 167.63 53.06 163.32 49.89 160.15C46.72 156.98 42.41 155.62 38.18 156.03C38.59 151.8 37.23 147.49 34.06 144.32C31.47 141.73 28.12 140.36 24.67 140.16L132.53 32.3L163.02 62.79L193.56 93.33L85.6 201.29H85.62ZM198.48 88.34L137.45 27.31L142.63 22.13L203.66 83.16L198.48 88.34ZM216.21 71.02L208.82 78.41L147.38 16.97L154.77 9.58C158.5 5.85 164.58 5.85 168.31 9.58L216.21 57.48C219.94 61.21 219.94 67.29 216.21 71.02Z" fill="#EEEEE9"/>
-<path d="M154.93 70.59C153.6 69.26 151.45 69.26 150.12 70.59L65.58 155.13C64.25 156.46 64.25 158.61 65.58 159.94C66.91 161.27 69.06 161.27 70.39 159.94L154.93 75.4C156.26 74.07 156.26 71.92 154.93 70.59Z" fill="#EEEEE9"/>
-<path d="M81.59 171.13C80.26 172.46 80.26 174.61 81.59 175.94C82.92 177.27 85.07 177.27 86.4 175.94L170.94 91.4C172.27 90.07 172.27 87.92 170.94 86.59C169.61 85.26 167.46 85.26 166.13 86.59L81.59 171.13Z" fill="#EEEEE9"/>
-<path d="M139.29 54.95C137.96 53.62 135.81 53.62 134.48 54.95L49.94 139.49C48.61 140.82 48.61 142.97 49.94 144.3C51.27 145.63 53.42 145.63 54.75 144.3L139.29 59.76C140.62 58.43 140.62 56.28 139.29 54.95Z" fill="#EEEEE9"/>
+<path d="M221.01 52.69L173.1 4.78C166.72 -1.6 156.34 -1.6 149.97 4.78L140.1 14.65C139.93 14.82 139.78 15.01 139.65 15.21L130.02 24.84C129.85 25.01 129.7 25.19 129.57 25.39L16.98 137.99C14.07 140.9 11.99 144.54 10.95 148.52C10.92 148.64 10.89 148.76 10.87 148.89L0.04 221.51C-0.12 222.6 0.24 223.71 1.02 224.49C1.8 225.28 2.9 225.64 3.99 225.49L76.92 215C77.04 214.98 77.17 214.96 77.29 214.93C81.32 213.9 85.01 211.81 87.95 208.87L201.01 95.81C201.18 95.64 201.33 95.45 201.46 95.26L210.59 86.13C210.79 86 210.98 85.85 211.15 85.68L221.02 75.81C227.4 69.43 227.4 59.06 221.02 52.68L221.01 52.69ZM28.78 160.51C27.41 161.88 27.41 164.09 28.78 165.46C30.15 166.83 32.36 166.83 33.73 165.46C36.92 162.27 41.95 162.11 44.95 165.11C47.95 168.11 47.79 173.14 44.6 176.33C43.23 177.7 43.23 179.91 44.6 181.28C45.97 182.65 48.18 182.65 49.55 181.28C52.74 178.09 57.77 177.93 60.77 180.93C63.51 183.67 63.61 188.12 61.16 191.3C60.88 191.54 60.6 191.79 60.33 192.05C58.96 193.42 58.96 195.63 60.33 197C60.35 197.02 60.37 197.03 60.38 197.04C60.4 197.06 60.41 197.08 60.42 197.09C61.79 198.46 64 198.46 65.37 197.09C65.64 196.82 65.88 196.54 66.12 196.26C69.3 193.81 73.75 193.9 76.49 196.65C79.49 199.65 79.33 204.68 76.14 207.87C76.1 207.91 76.08 207.95 76.04 207.99C75.93 208.02 75.82 208.06 75.72 208.09L34.44 214.03C34.44 214.03 34.36 213.93 34.32 213.88L11.63 191.19L17.76 150.1C17.8 149.94 17.86 149.77 17.91 149.61C21.1 146.43 26.13 146.28 29.12 149.27C32.11 152.26 31.96 157.3 28.77 160.49L28.78 160.51ZM10.35 199.81L25.82 215.28L7.65 217.89L10.35 199.81ZM85.62 201.29C85.47 197.78 84.09 194.35 81.45 191.71C78.31 188.57 74.04 187.21 69.84 187.59C70.22 183.4 68.86 179.13 65.72 175.98C62.58 172.83 58.24 171.45 54.01 171.86C54.42 167.63 53.06 163.32 49.89 160.15C46.72 156.98 42.41 155.62 38.18 156.03C38.59 151.8 37.23 147.49 34.06 144.32C31.47 141.73 28.12 140.36 24.67 140.16L132.53 32.3L163.02 62.79L193.56 93.33L85.6 201.29H85.62ZM198.48 88.34L137.45 27.31L142.63 22.13L203.66 83.16L198.48 88.34ZM216.21 71.02L208.82 78.41L147.38 16.97L154.77 9.58C158.5 5.85 164.58 5.85 168.31 9.58L216.21 57.48C219.94 61.21 219.94 67.29 216.21 71.02Z" fill="#F3FAF0"/>
+<path d="M154.93 70.59C153.6 69.26 151.45 69.26 150.12 70.59L65.58 155.13C64.25 156.46 64.25 158.61 65.58 159.94C66.91 161.27 69.06 161.27 70.39 159.94L154.93 75.4C156.26 74.07 156.26 71.92 154.93 70.59Z" fill="#F3FAF0"/>
+<path d="M81.59 171.13C80.26 172.46 80.26 174.61 81.59 175.94C82.92 177.27 85.07 177.27 86.4 175.94L170.94 91.4C172.27 90.07 172.27 87.92 170.94 86.59C169.61 85.26 167.46 85.26 166.13 86.59L81.59 171.13Z" fill="#F3FAF0"/>
+<path d="M139.29 54.95C137.96 53.62 135.81 53.62 134.48 54.95L49.94 139.49C48.61 140.82 48.61 142.97 49.94 144.3C51.27 145.63 53.42 145.63 54.75 144.3L139.29 59.76C140.62 58.43 140.62 56.28 139.29 54.95Z" fill="#F3FAF0"/>
 </svg>`;
 const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).toString('base64')}`;
 ---
@@ -55,15 +60,27 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
   style="padding-top:calc(var(--spacing-vertical-xl) * 1.4); gap:calc(var(--spacing-vertical-xl) * 1.4)"
   data-hero-section
 >
-  <p
-    class="relative z-20 max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front pointer-events-none [text-shadow:0_3px_20px_rgba(0,0,0,0.75)]"
+  {/* Backdrop: the gradient's own colour stops are lifted directly from the
+      reference gradient (Figma node 7718:19099) — deep maroon at the top,
+      through a dark purple-indigo, down to the page's actual --color-back
+      token (not a hardcoded hex) by the bottom of the section, so it blends
+      into whatever's below with no visible seam regardless of what that
+      token's value is. (A feTurbulence grain layer was tried here too —
+      removed after it stayed visibly noticeable while scrolling rather
+      than reading as a subtle static texture.) */}
+  <div class="hero-backdrop pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+    <div class="hero-gradient absolute inset-0"></div>
+  </div>
+
+  <h1
+    class="hero-fade-in hero-headline-shadow relative z-20 max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front pointer-events-none"
   >
     {loopWords.length > 0 ? (
       <Fragment>
         {headlineBefore}<span
-          class="relative inline-block h-[1em] align-bottom overflow-hidden transition-[width] duration-500 ease-in-out"
+          class="relative inline-block h-[1em] align-bottom overflow-hidden"
           data-hero-word-window
-        ><span class="flex flex-col items-start transition-transform duration-500 ease-in-out" data-hero-word-track>
+        ><span class="flex flex-col items-start" data-hero-word-track>
           {loopWords.map((word, i) => (
             <span
               class="block h-[1em] whitespace-nowrap leading-none"
@@ -76,20 +93,20 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     ) : (
       headline
     )}
-  </p>
+  </h1>
 
   <div class="flex w-full flex-col items-start gap-vertical-s">
     <p class="w-full text-center font-tag text-detail text-front" data-hero-tagline>
-      <span class="relative z-20 inline-flex items-baseline pointer-events-none [text-shadow:0_1px_8px_rgba(0,0,0,0.55)]">
+      <span class="hero-tagline-shadow relative z-20 inline-flex items-baseline pointer-events-none">
         {tagline}
         <span class="mb-[0.08em] ml-[0.25em] h-px w-[1.1em] self-end bg-front" aria-hidden="true"></span>
-        <img src={pencilCursor} alt="" class="h-[1em] w-auto drop-shadow-[0_1px_8px_rgba(0,0,0,0.55)]" />
+        <img src={pencilCursor} alt="" class="h-[1em] w-auto drop-shadow-[0_1px_8px_rgba(0,0,0,0.7)]" />
         {/* First-visit nudge toward the drawable canvas — shown once (see
             script below, gated on localStorage) rather than every visit,
             since a returning visitor already knows it's there. */}
         <span
           data-hero-draw-hint
-          class="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-card border border-front/15 bg-grey-600 px-3 py-1 font-tag text-detail text-front opacity-0 backdrop-blur-[14px] transition-opacity duration-500 ease-out"
+          class="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-m border border-front/15 bg-grey-600 px-3 py-1 font-tag text-detail text-front opacity-0 backdrop-blur-[14px] transition-opacity duration-500 ease-out"
         >
           Click &amp; drag the pencil
         </span>
@@ -114,6 +131,22 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
         ) : (
           <img src={media.url} alt={media.alt} class="h-full w-full object-cover" loading="eager" />
         )}
+
+        {/* Deliberately a separate file from the muted loop above (see the
+            reelVideo schema field) — wearecollins.com's own reel section
+            does the same: a lightweight preview loop plus a distinct
+            full-quality asset for the modal, confirmed by inspecting their
+            two different Mux playback IDs. Only rendered once that second
+            file is actually set. */}
+        {reelVideoUrl && (
+          <button
+            type="button"
+            data-reel-trigger
+            class="reel-trigger-btn absolute bottom-[var(--page-margin)] left-[var(--page-margin)] cursor-pointer rounded-full border border-front/15 bg-grey-600 px-btn-x py-btn-y font-body text-body-3 text-front backdrop-blur-[14px] transition-colors duration-300 ease-out hover:text-accent-yellow"
+          >
+            Watch our showreel
+          </button>
+        )}
       </div>
     )}
   </div>
@@ -135,7 +168,182 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
   ></canvas>
 </section>
 
+{reelVideoUrl && (
+  <div
+    data-reel-overlay
+    data-open="false"
+    inert
+    class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/95 p-[var(--page-margin)] opacity-0 backdrop-blur-[10px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100"
+  >
+    <button
+      type="button"
+      data-reel-close
+      aria-label="Close video"
+      class="reel-close-btn absolute right-[var(--page-margin)] top-[var(--page-margin)] flex h-[52px] w-[52px] cursor-pointer items-center justify-center rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px] transition-[scale] duration-300 ease-out hover:scale-110"
+    >
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <path d="M1 1L17 17M17 1L1 17" stroke="#F3FAF0" stroke-width="1.5" stroke-linecap="round" />
+      </svg>
+    </button>
+    <video
+      data-reel-video
+      src={reelVideoUrl}
+      class="max-h-full max-w-full rounded-card"
+      controls
+      playsinline
+      preload="none"
+    />
+  </div>
+)}
+
 <style>
+  /* Colour stops derived from the reference gradient (Figma node
+     7718:19099) but dialled back ~25% toward black — the literal Figma
+     values (#310a10 / #15072c) read as more saturated/present than wanted
+     once seen live against real page content, not just in isolation.
+     Fully transparent into --color-back by 100%, spanning the section's own
+     full height so the transition to solid --color-back genuinely finishes
+     by the bottom edge, not just visually trailing off.
+
+     The middle stop's POSITION is a custom property (not a literal `62.5%`
+     in the gradient()) so it can be animated — plain custom properties
+     can't be interpolated by keyframes, only @property-registered ones
+     with a concrete syntax can (same technique as the services glow's
+     --glow-angle). Originally animated the gradient's ANGLE instead,
+     wobbling it a few degrees either side of straight-down — technically
+     running (confirmed via getAnimations()) but practically invisible: a
+     small rotation near-vertical barely shifts anything on a section this
+     much wider than it is tall. Animating the stop position instead moves
+     the actual maroon/purple boundary up and down the section, which is
+     visible regardless of aspect ratio since it's a shift along the axis
+     the gradient is already running on, not a rotation across it. */
+  @property --hero-gradient-stop {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 62.5%;
+  }
+  /* The radial patch's centre position, orbiting slowly (see
+     hero-radial-orbit) — two separately-registered properties rather than
+     one, since @property syntax has to describe a single interpolatable
+     value and a gradient position is really two independent percentages. */
+  @property --hero-radial-x {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 20%;
+  }
+  @property --hero-radial-y {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 8%;
+  }
+  .hero-gradient {
+    /* A single top-to-bottom band read as flat/uniform across the width —
+       more like a two-tone stripe than an actual gradient MAP. Layering a
+       dark radial patch anchored near the top-left (painted first, so it
+       sits on top of the linear band beneath it) breaks that up with a
+       second tonal zone that varies horizontally too, not just vertically
+       — fading to transparent past its own radius so it blends into
+       whatever the linear gradient is doing underneath rather than reading
+       as a hard-edged shape. */
+    background:
+      radial-gradient(45% 40% at var(--hero-radial-x) var(--hero-radial-y), var(--color-back) 0%, transparent 65%),
+      linear-gradient(to bottom, #25080c 0%, #100521 var(--hero-gradient-stop), var(--color-back) 100%);
+    animation:
+      hero-gradient-drift 26s ease-in-out infinite alternate,
+      hero-radial-orbit 60s linear infinite;
+  }
+  @keyframes hero-gradient-drift {
+    from {
+      --hero-gradient-stop: 50%;
+    }
+    to {
+      --hero-gradient-stop: 78%;
+    }
+  }
+  /* A slow orbit, not a back-and-forth drift like the stop-position
+     animation above — `linear` easing and no `alternate`, so it keeps
+     circling the same direction rather than reversing. 8 keyframe stops
+     approximating a circle (~8%/6% radius, centred around the patch's
+     resting position) rather than a true parametric path, since keyframes
+     can't compute sin/cos — close enough at this size and speed that the
+     faceting isn't visible. */
+  @keyframes hero-radial-orbit {
+    0% {
+      --hero-radial-x: 20%;
+      --hero-radial-y: 8%;
+    }
+    12.5% {
+      --hero-radial-x: 17.7%;
+      --hero-radial-y: 12.2%;
+    }
+    25% {
+      --hero-radial-x: 12%;
+      --hero-radial-y: 14%;
+    }
+    37.5% {
+      --hero-radial-x: 6.3%;
+      --hero-radial-y: 12.2%;
+    }
+    50% {
+      --hero-radial-x: 4%;
+      --hero-radial-y: 8%;
+    }
+    62.5% {
+      --hero-radial-x: 6.3%;
+      --hero-radial-y: 3.8%;
+    }
+    75% {
+      --hero-radial-x: 12%;
+      --hero-radial-y: 2%;
+    }
+    87.5% {
+      --hero-radial-x: 17.7%;
+      --hero-radial-y: 3.8%;
+    }
+    100% {
+      --hero-radial-x: 20%;
+      --hero-radial-y: 8%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-gradient {
+      animation: none;
+    }
+  }
+
+  /* Off by default — a permanently-on shadow read as a stray dark halo
+     around the headline/tagline against the plain gradient backdrop before
+     anyone's actually drawn anything with the spray canvas. Faded in/out via
+     WAAPI (see the canvas script below), not a CSS transition — confirmed
+     directly that Chrome cannot reliably transition text-shadow's alpha via
+     a class toggle here: it computes the correct target value the instant
+     the transition is disabled, but with the transition active the change
+     just never visibly applies at all, permanently stuck at the start
+     value. WAAPI doesn't have that problem, and it's already the pattern
+     every other non-trivial animation on this site uses. */
+  .hero-headline-shadow {
+    text-shadow: 0 3px 20px rgba(0, 0, 0, 0);
+  }
+  .hero-tagline-shadow {
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0);
+    /* Responds to whatever's directly behind it — the gradient, the grain,
+       any spray particles drawn under it — instead of sitting as a flat
+       static colour on top. `difference` inverts against the backdrop,
+       which (unlike `overlay`) stays legible against our mostly near-black
+       background without needing a brighter base colour first; `exclusion`
+       is the same idea with a softer, lower-contrast result if this reads
+       as too harsh — a one-word swap to try. */
+    mix-blend-mode: difference;
+  }
+
+  /* Exempted from the tagline's mix-blend-mode above via its own stacking
+     context — without this the hint tooltip (which has its own solid-ish
+     background/border) would inherit the same colour-inverting blend
+     against whatever's behind IT specifically, instead of just reading as
+     a normal UI tooltip. */
+  [data-hero-draw-hint] {
+    isolation: isolate;
+  }
   /*
    * Different hover/auto-advance words have different natural widths
    * ("people" vs "orgs"), which on mobile is enough to shift where the
@@ -152,6 +360,52 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     .hero-mobile-break {
       display: block;
     }
+  }
+
+  /* Fades the headline in on page load — separate from the scroll-scrubbed
+     reveal used everywhere else on the site (scrollReveal.ts), since that's
+     calibrated for content scrolling INTO view from below and the Hero is
+     already in view at load, so it'd just compute progress=1 immediately
+     with no visible animation. A plain load-triggered CSS animation
+     instead. Opacity only — animating translate alongside it read as
+     jerky, likely fighting the word-cycle span's own width/transform
+     animation running inside the same element every frame. */
+  .hero-fade-in {
+    animation: hero-fade-in 900ms ease-out both;
+  }
+  @keyframes hero-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-fade-in {
+      animation: none;
+    }
+  }
+
+  /* Press/release feel matching the nav pill and every other button on the
+     site — quick firm press-in via this CSS transition, then a springy
+     overshoot-past-rest on release driven by WAAPI (see script). The
+     trigger is a wide text pill (shallower scale, matching the footer
+     buttons); the close button is a small round icon button (deeper scale,
+     matching the copy-email button's treatment). */
+  .reel-trigger-btn.is-pressed {
+    transform: scale(0.95);
+    transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .reel-trigger-btn.is-settling {
+    transition: none;
+  }
+  .reel-close-btn.is-pressed {
+    transform: scale(0.82);
+    transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .reel-close-btn.is-settling {
+    transition: none;
   }
 </style>
 
@@ -245,34 +499,129 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     if (frameWidths[0]) win.style.width = `${frameWidths[0]}px`;
     if (frames[0]) currentColor = getComputedStyle(frames[0]).color;
 
+    // Roll overshoot-and-settle — replaces an earlier motion-blur treatment
+    // on the same roll (tried, then swapped for this instead). WAAPI rather
+    // than the CSS `transition-transform` this replaced, so it can swing
+    // past the target position before settling, same overshoot-and-settle
+    // language as the nav pill/footer buttons and the width change below.
+    // The step size between frames is always exactly one framePercent (an
+    // `advance()` call only ever moves the index by 1), so — unlike the
+    // width change, where the delta varies per word pair and has to be
+    // measured — the overshoot/settle amounts here are just a fixed
+    // fraction of that one constant step.
+    let rollAnim: Animation | null = null;
+    function playWordRoll(targetPercent: number) {
+      const startPercent = -(index - 1) * framePercent;
+      rollAnim?.cancel();
+      const delta = targetPercent - startPercent;
+      // Overshooting the roll at all means, for a moment, scrolling PAST
+      // the target frame within the window's clipped view — which peeks a
+      // sliver of the NEXT frame's text into view from the other side
+      // ("show-through"). 0.18 was enough overshoot for that peek to
+      // actually be visible; 0.06 keeps the same spring quality while
+      // staying small enough that the clip hides it.
+      const overshoot = targetPercent + delta * 0.06;
+      const settle = targetPercent - delta * 0.02;
+      rollAnim = track.animate(
+        [
+          { transform: `translateY(${startPercent}%)` },
+          { transform: `translateY(${overshoot}%)`, offset: 0.6 },
+          { transform: `translateY(${settle}%)`, offset: 0.85 },
+          { transform: `translateY(${targetPercent}%)` },
+        ],
+        { duration: 650, easing: 'ease-out', fill: 'forwards' }
+      );
+      const anim = rollAnim;
+      anim.finished
+        .then(() => {
+          anim.cancel();
+          track.style.transform = `translateY(${targetPercent}%)`;
+          if (rollAnim === anim) rollAnim = null;
+          // Once the roll into the final looping-duplicate frame actually
+          // completes, reset immediately rather than waiting for the next
+          // advance() call — this is what makes the loop look seamless.
+          // advance()'s own index self-correction is the fallback for when
+          // this doesn't fire (e.g. a backgrounded tab never resolving the
+          // finished promise).
+          if (index === frameCount - 1) resetToFirstFrame();
+        })
+        .catch(() => {});
+    }
+
+    // Width overshoot-and-settle when the window resizes to fit the new
+    // word — same overshoot-and-settle language as the nav pill/footer
+    // buttons elsewhere, WAAPI-driven rather than the plain CSS
+    // `transition: width` this replaced, so it can express the overshoot at
+    // all (a CSS transition can only ease toward the target, never past it).
+    // The overshoot/settle amounts scale with the actual width DELTA for
+    // this particular word change, not a fixed px offset — a one-letter
+    // difference (e.g. "brand" → "orgs") gets a proportionally small
+    // overshoot, a much longer/shorter word gets a bigger one, so it always
+    // reads as "slightly too far for how far it moved" rather than a fixed
+    // wobble that'd look oversized on a small change.
+    let widthAnim: Animation | null = null;
+    function animateWordWidth(targetWidth: number) {
+      // Measure the ACTUAL current width before cancelling any in-flight
+      // animation — cancelling first would snap it straight to its old
+      // resting width, so a rapid word-to-word change mid-swing would
+      // measure "start" as if nothing was moving and jump instead of
+      // continuing smoothly. Same bug class fixed elsewhere on this site.
+      const startWidth = win.getBoundingClientRect().width;
+      widthAnim?.cancel();
+      const delta = targetWidth - startWidth;
+      // Dialled down alongside the roll's own overshoot (see playWordRoll)
+      // — kept paired so the two still read as one coordinated motion
+      // rather than the width visibly out-springing the roll.
+      const overshoot = targetWidth + delta * 0.06;
+      const settle = targetWidth - delta * 0.02;
+      widthAnim = win.animate(
+        [
+          { width: `${startWidth}px` },
+          { width: `${overshoot}px`, offset: 0.6 },
+          { width: `${settle}px`, offset: 0.85 },
+          { width: `${targetWidth}px` },
+        ],
+        { duration: 650, easing: 'ease-out', fill: 'forwards' }
+      );
+      const anim = widthAnim;
+      anim.finished
+        .then(() => {
+          anim.cancel();
+          win.style.width = `${targetWidth}px`;
+          if (widthAnim === anim) widthAnim = null;
+        })
+        .catch(() => {});
+    }
+
     function resetToFirstFrame() {
       index = 0;
-      track.style.transitionDuration = '0ms';
+      // No reflow-forcing dance needed here any more — that was only ever
+      // working around the CSS transition this component used to have
+      // (zeroing transition-duration so the "instant" jump wasn't itself
+      // animated). A plain style assignment with no WAAPI animation
+      // targeting it is already instant.
+      rollAnim?.cancel();
+      rollAnim = null;
       track.style.transform = `translateY(0)`;
-      // Force a synchronous reflow so the 0ms jump is actually committed
-      // before restoring the real duration below — otherwise the browser can
-      // coalesce both style changes into the same frame and animate the
-      // "instant" reset over the full duration, rolling visibly backwards.
-      void track.offsetHeight;
-      track.style.transitionDuration = '';
     }
 
     function advance() {
       if (frameCount <= 1) return;
-      // Self-correcting rather than relying on a prior transitionend to have
-      // reset the index: once we're sitting on (or, from a burst of rapid
-      // triggers, ever managed to reach) the final looping-duplicate frame,
-      // snap back to the real first frame before continuing. Waiting on
-      // transitionend alone was fragile — an interrupted transition (rapid
-      // re-triggers, or a backgrounded tab throttling/coalescing the
-      // touch-device auto-advance timer so several ticks fire back-to-back
-      // once it's foregrounded again) never fires that event, which left
-      // index permanently stuck at the last frame with nothing to recover it.
+      // Self-correcting rather than relying solely on playWordRoll's own
+      // finished-promise reset: once we're sitting on (or, from a burst of
+      // rapid triggers, ever managed to reach) the final looping-duplicate
+      // frame, snap back to the real first frame before continuing. Relying
+      // only on that promise resolving was fragile — an interrupted
+      // animation (rapid re-triggers, or a backgrounded tab throttling/
+      // coalescing the touch-device auto-advance timer so several ticks
+      // fire back-to-back once it's foregrounded again) can leave it never
+      // resolving, which left index permanently stuck at the last frame
+      // with nothing to recover it.
       if (index >= frameCount - 1) resetToFirstFrame();
       index++;
-      track.style.transform = `translateY(-${index * framePercent}%)`;
+      playWordRoll(-index * framePercent);
       const width = frameWidths[index];
-      if (width) win.style.width = `${width}px`;
+      if (width) animateWordWidth(width);
       const frame = frames[index];
       if (frame) currentColor = getComputedStyle(frame).color;
     }
@@ -295,24 +644,16 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
         const width = frameWidths[index];
         if (!width) return;
         // Instant, not animated — this is a layout correction for the new
-        // viewport/font-size, not a user-triggered roll.
-        win.style.transitionDuration = '0ms';
+        // viewport/font-size, not a user-triggered roll. Cancels any
+        // in-flight overshoot from animateWordWidth first, since that's a
+        // WAAPI animation now rather than a CSS transition this could
+        // previously suspend by zeroing the transition-duration.
+        widthAnim?.cancel();
+        widthAnim = null;
         win.style.width = `${width}px`;
-        void win.offsetHeight;
-        win.style.transitionDuration = '';
       });
     });
 
-    // Normal (uninterrupted) case: once the transition into the final
-    // looping-duplicate frame actually completes, reset immediately rather
-    // than waiting for the next advance() call — this is what makes the
-    // loop look seamless. advance()'s own self-correction above is the
-    // fallback for when this event doesn't fire.
-    track.addEventListener('transitionend', (e) => {
-      if (e.target !== track || e.propertyName !== 'transform') return;
-      if (index !== frameCount - 1) return;
-      resetToFirstFrame();
-    });
   }
 
   // Generative spray-paint backdrop, sitting behind the headline/tagline
@@ -330,6 +671,36 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
   const ctx = canvas?.getContext('2d') ?? null;
 
   if (canvas && heroSection && ctx) {
+    // Headline/tagline shadow fade — WAAPI-driven rather than a CSS
+    // transition (see the CSS comment above .hero-headline-shadow for why).
+    // Both elements animate independently since animate() only ever
+    // targets one element per call.
+    const headlineShadowEl = document.querySelector<HTMLElement>('.hero-headline-shadow');
+    const taglineShadowEl = document.querySelector<HTMLElement>('.hero-tagline-shadow');
+    const HEADLINE_SHADOW_OFF = '0 3px 20px rgba(0, 0, 0, 0)';
+    const HEADLINE_SHADOW_ON = '0 3px 20px rgba(0, 0, 0, 0.9)';
+    const TAGLINE_SHADOW_OFF = '0 1px 8px rgba(0, 0, 0, 0)';
+    const TAGLINE_SHADOW_ON = '0 1px 8px rgba(0, 0, 0, 0.7)';
+
+    let heroTextShadowActive = false;
+
+    function setHeroTextShadow(active: boolean) {
+      if (active === heroTextShadowActive) return;
+      heroTextShadowActive = active;
+      [
+        { el: headlineShadowEl, off: HEADLINE_SHADOW_OFF, on: HEADLINE_SHADOW_ON },
+        { el: taglineShadowEl, off: TAGLINE_SHADOW_OFF, on: TAGLINE_SHADOW_ON },
+      ].forEach(({ el, off, on }) => {
+        if (!el) return;
+        el.getAnimations().forEach((a) => a.cancel());
+        el.animate([{ textShadow: active ? off : on }, { textShadow: active ? on : off }], {
+          duration: 400,
+          easing: 'ease-out',
+          fill: 'forwards',
+        });
+      });
+    }
+
     // First-visit nudge toward the drawable canvas — shown once per
     // browser (localStorage, not sessionStorage), since a returning
     // visitor already knows it's there and re-showing it every visit
@@ -421,6 +792,17 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     let renderRafId = 0;
     const MIN_CLUSTER_RADIUS = 140;
     const MAX_CLUSTER_RADIUS = 260;
+    // Both radii above are sized for a desktop-width canvas — on a narrow
+    // mobile canvas a single 140-260px burst can span most of the screen.
+    // Scaled down by the canvas's actual width relative to that desktop
+    // reference (1670px, the same content-width reference used elsewhere
+    // on the site), floored so it never shrinks to near-invisible dust.
+    const CLUSTER_SCALE_REFERENCE_WIDTH = 1670;
+    const MIN_CLUSTER_SCALE = 0.45;
+    function clusterScale() {
+      if (!canvas) return 1;
+      return Math.min(1, Math.max(MIN_CLUSTER_SCALE, canvas.clientWidth / CLUSTER_SCALE_REFERENCE_WIDTH));
+    }
     // Fewer, size-varied particles read as scattered star-dust; the old
     // 180-at-fairly-even-size was what made it look like an even coat of
     // spray rather than something organic.
@@ -487,8 +869,12 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     }
 
     function spawnCluster(x: number, y: number, color: string) {
+      // Text shadow on the headline/tagline is only useful once there's
+      // actually spray content behind them to separate from — see the
+      // matching fade-out below.
+      setHeroTextShadow(true);
       const { r, g, b } = parseColor(color);
-      const radius = MIN_CLUSTER_RADIUS + Math.random() * (MAX_CLUSTER_RADIUS - MIN_CLUSTER_RADIUS);
+      const radius = (MIN_CLUSTER_RADIUS + Math.random() * (MAX_CLUSTER_RADIUS - MIN_CLUSTER_RADIUS)) * clusterScale();
       const spawnTime = performance.now();
       clusters.push({ x, y, radius, texture: buildSprayTexture(radius, r, g, b), spawnTime });
       if (clusters.length > MAX_LIVE_CLUSTERS) {
@@ -591,7 +977,10 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
         renderRafId = requestAnimationFrame(renderLoop);
       } else {
         // Nothing left to animate — stop rather than looping forever on a
-        // page nobody's actually touched.
+        // page nobody's actually touched. Also the moment every last spray
+        // has faded, so the headline/tagline shadow (see spawnCluster) goes
+        // with it rather than lingering with nothing left to justify it.
+        setHeroTextShadow(false);
         renderRafId = 0;
       }
     }
@@ -643,5 +1032,86 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     canvas.addEventListener('pointermove', keepSpawning);
     canvas.addEventListener('pointerup', stopSpawning);
     canvas.addEventListener('pointercancel', stopSpawning);
+  }
+
+  // Reel modal — the background hero video is already the showreel (muted,
+  // looping); this opens the same file full-size, unmuted, with native
+  // controls. A separate <video> element rather than relocating the
+  // existing one, so the background loop keeps playing behind it untouched
+  // and there's nothing to move back afterwards.
+  const reelTrigger = document.querySelector<HTMLButtonElement>('[data-reel-trigger]');
+  const reelOverlay = document.querySelector<HTMLElement>('[data-reel-overlay]');
+  const reelClose = document.querySelector<HTMLButtonElement>('[data-reel-close]');
+  const reelVideo = document.querySelector<HTMLVideoElement>('[data-reel-video]');
+
+  if (reelTrigger && reelOverlay && reelClose && reelVideo) {
+    function openReel() {
+      reelOverlay!.dataset.open = 'true';
+      reelOverlay!.removeAttribute('inert');
+      reelVideo!.muted = false;
+      reelVideo!.currentTime = 0;
+      reelVideo!.play().catch(() => {});
+    }
+
+    function closeReel() {
+      reelOverlay!.dataset.open = 'false';
+      reelOverlay!.setAttribute('inert', '');
+      reelVideo!.pause();
+    }
+
+    reelTrigger.addEventListener('click', openReel);
+    reelClose.addEventListener('click', closeReel);
+    reelOverlay.addEventListener('click', (e) => {
+      // Only the backdrop itself, not the video or close button, both of
+      // which are also technically within the overlay's own click target.
+      if (e.target === reelOverlay) closeReel();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && reelOverlay.dataset.open === 'true') closeReel();
+    });
+
+    // Same press/release overshoot as the nav pill, footer buttons, and the
+    // services card's copy-email button — quick press-in via the CSS
+    // transition on .is-pressed, then a springy overshoot-past-rest on
+    // release driven by WAAPI so it can go past scale(1) before settling.
+    function applyPressOvershoot(el: HTMLElement, pressScale: number, overshootScale: number, settleScale: number) {
+      let settleAnim: Animation | null = null;
+
+      el.addEventListener('pointerdown', () => {
+        settleAnim?.cancel();
+        el.classList.remove('is-settling');
+        el.classList.add('is-pressed');
+      });
+
+      const releasePress = () => {
+        if (!el.classList.contains('is-pressed')) return;
+        settleAnim = el.animate(
+          [
+            { transform: `scale(${pressScale})` },
+            { transform: `scale(${overshootScale})`, offset: 0.55 },
+            { transform: `scale(${settleScale})`, offset: 0.8 },
+            { transform: 'scale(1)' },
+          ],
+          { duration: 380, easing: 'ease-out', fill: 'forwards' }
+        );
+        el.classList.add('is-settling');
+        el.classList.remove('is-pressed');
+
+        const anim = settleAnim;
+        anim.finished
+          .then(() => {
+            anim.cancel();
+            el.classList.remove('is-settling');
+          })
+          .catch(() => {});
+      };
+
+      el.addEventListener('pointerup', releasePress);
+      el.addEventListener('pointerleave', releasePress);
+      el.addEventListener('pointercancel', releasePress);
+    }
+
+    applyPressOvershoot(reelTrigger, 0.95, 1.04, 0.99);
+    applyPressOvershoot(reelClose, 0.82, 1.12, 0.97);
   }
 </script>
