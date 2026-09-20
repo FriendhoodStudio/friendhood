@@ -92,7 +92,7 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
               latest Figma pass (node 7382:2286), this now reads as one
               continuous block with title→overview at 20px and
               overview→modules at 36px, rather than ruled-off sections. */}
-          <div class="flex w-full flex-col items-start gap-[20px] px-[30px]">
+          <div class="flex w-full flex-col items-start gap-[20px] px-[var(--spacing-horizontal-m)]">
             <h3 class="font-heading text-h3 text-back">{service.cardTitle}</h3>
             <div class="flex w-full flex-col items-start gap-[36px]">
               <p class="font-tag text-detail text-back">{service.overview}</p>
