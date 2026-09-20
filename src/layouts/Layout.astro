@@ -61,8 +61,14 @@ const absoluteImage = image ? new URL(image, Astro.site).toString() : undefined;
     {absoluteImage && <meta name="twitter:image" content={absoluteImage} />}
   </head>
   <body class="bg-back">
-    <NavBar />
-    {isLocked ? <BackSoon /> : <slot />}
-    <Footer />
+    {isLocked ? (
+      <BackSoon />
+    ) : (
+      <Fragment>
+        <NavBar />
+        <slot />
+        <Footer />
+      </Fragment>
+    )}
   </body>
 </html>

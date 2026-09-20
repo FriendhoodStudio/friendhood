@@ -1,10 +1,182 @@
 ---
+import logo from '../assets/nav/friendhood-logo.svg';
 ---
 
-<section
-  class="flex min-h-[60vh] w-full flex-col items-center justify-center px-[var(--page-margin)] pt-vertical-xl pb-vertical-xl text-center"
->
-  <h1 class="max-w-[var(--col-8)] text-balance font-display text-h1 text-front">
-    We&rsquo;re working on something, back soon&hellip;
-  </h1>
+{/* Standalone gate page — no NavBar/Footer (see Layout.astro), since there's
+    nowhere else on the site to navigate to yet. Backdrop is the same cosmic
+    gradient treatment as the Home hero (own copy of the animation here
+    rather than sharing a component, since this page's needs are simpler:
+    no pointer-driven spray, just a few ambient twinkling points as a subtle
+    hint of the interactive canvas visitors will find once the real site is
+    live). */}
+<section class="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden px-[var(--page-margin)] text-center">
+  <div class="backsoon-gradient pointer-events-none absolute inset-0 z-0" aria-hidden="true"></div>
+
+  <canvas class="pointer-events-none absolute inset-0 z-10 h-full w-full" data-backsoon-canvas aria-hidden="true"
+  ></canvas>
+
+  <div class="relative z-20 flex flex-col items-center gap-vertical-l">
+    <h1 class="max-w-[var(--col-8)] text-balance font-display text-h1 text-front">
+      We&rsquo;re working on something, back soon&hellip;
+    </h1>
+    <img src={logo.src} alt="Friendhood" class="h-[40px] w-auto" />
+  </div>
 </section>
+
+<style>
+  /* Same colour stops/motion language as the Home hero's gradient (see
+     Hero.astro for the full reasoning) — kept as a separate copy rather than
+     a shared component since this page's version is simpler (no radial
+     orbit patch, just the drifting linear band) and the two are unlikely to
+     change in lockstep. */
+  @property --backsoon-gradient-stop {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 62.5%;
+  }
+  .backsoon-gradient {
+    background: linear-gradient(to bottom, #25080c 0%, #100521 var(--backsoon-gradient-stop), var(--color-back) 100%);
+    animation: backsoon-gradient-drift 26s ease-in-out infinite alternate;
+  }
+  @keyframes backsoon-gradient-drift {
+    from {
+      --backsoon-gradient-stop: 50%;
+    }
+    to {
+      --backsoon-gradient-stop: 78%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .backsoon-gradient {
+      animation: none;
+    }
+  }
+</style>
+
+<script>
+  // A sparse, ambient starfield — a quiet nod to the Home hero's drawable
+  // spray canvas rather than a recreation of it (no pointer interaction,
+  // no dust clusters, just a handful of twinkling points that drift and
+  // fade/respawn on their own). Deliberately understated: this is a holding
+  // page, not the real homepage, so the hint should read as "there's more
+  // coming" rather than compete with the headline for attention.
+  const canvas = document.querySelector<HTMLCanvasElement>('[data-backsoon-canvas]');
+  const ctx = canvas?.getContext('2d') ?? null;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (canvas && ctx && !reduceMotion) {
+    const COLORS = [
+      { r: 235, g: 143, b: 181 }, // #EB8FB5
+      { r: 228, g: 85, b: 46 }, // #E4552E
+      { r: 177, g: 183, b: 235 }, // #B1B7EB
+      { r: 231, g: 254, b: 84 }, // #E7FE54
+    ];
+    const STAR_COUNT = 16;
+    const DRIFT_RADIUS = 9;
+    const DRIFT_PERIOD_MS = 6000;
+    const FADE_MS = 2200;
+    const HOLD_MS = 6000 + Math.random() * 6000;
+
+    interface Star {
+      x: number;
+      y: number;
+      radius: number;
+      color: (typeof COLORS)[number];
+      phase: number;
+      twinkleSpeed: number;
+      driftPhase: number;
+      spawnTime: number;
+      holdMs: number;
+    }
+
+    let stars: Star[] = [];
+    const dpr = () => window.devicePixelRatio || 1;
+
+    function resizeCanvas() {
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const scale = dpr();
+      canvas.width = Math.round(rect.width * scale);
+      canvas.height = Math.round(rect.height * scale);
+    }
+    resizeCanvas();
+    let resizeRafId = 0;
+    window.addEventListener('resize', () => {
+      if (resizeRafId) return;
+      resizeRafId = requestAnimationFrame(() => {
+        resizeRafId = 0;
+        resizeCanvas();
+      });
+    });
+
+    function spawnStar(now: number): Star {
+      return {
+        x: Math.random() * canvas!.clientWidth,
+        y: Math.random() * canvas!.clientHeight,
+        radius: 1.5 + Math.random() * 2.25,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        phase: Math.random() * Math.PI * 2,
+        twinkleSpeed: 0.0007 + Math.random() * 0.001,
+        driftPhase: Math.random() * Math.PI * 2,
+        spawnTime: now,
+        holdMs: HOLD_MS,
+      };
+    }
+
+    const start = performance.now();
+    for (let i = 0; i < STAR_COUNT; i++) {
+      // Staggered spawn times (rather than all born at once) so the
+      // fade-in/fade-out cycle never reads as one synchronised pulse.
+      stars.push({ ...spawnStar(start), spawnTime: start - Math.random() * (HOLD_MS + FADE_MS) });
+    }
+
+    function renderLoop() {
+      if (!ctx || !canvas) return;
+      const now = performance.now();
+      const scale = dpr();
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      stars = stars.map((s) => {
+        const age = now - s.spawnTime;
+        if (age > s.holdMs + FADE_MS) return spawnStar(now);
+        return s;
+      });
+
+      for (const s of stars) {
+        const age = now - s.spawnTime;
+        let opacity = 1;
+        if (age < FADE_MS) opacity = age / FADE_MS;
+        else if (age > s.holdMs) opacity = Math.max(0, 1 - (age - s.holdMs) / FADE_MS);
+        if (opacity <= 0) continue;
+
+        const twinkle = 0.35 + 0.65 * Math.pow(Math.sin(now * s.twinkleSpeed + s.phase), 2);
+        const driftAngle = (now / DRIFT_PERIOD_MS) * Math.PI * 2 + s.driftPhase;
+        const px = (s.x + Math.cos(driftAngle) * DRIFT_RADIUS) * scale;
+        const py = (s.y + Math.sin(driftAngle) * DRIFT_RADIUS) * scale;
+        const { r, g, b } = s.color;
+
+        const glowAlpha = 0.14 * opacity * twinkle;
+        const glowRadius = s.radius * 3 * scale;
+        const glow = ctx.createRadialGradient(px, py, 0, px, py, glowRadius);
+        glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${glowAlpha})`);
+        glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = opacity * twinkle;
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.beginPath();
+        ctx.arc(px, py, s.radius * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    requestAnimationFrame(renderLoop);
+  }
+</script>
