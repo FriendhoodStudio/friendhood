@@ -8,6 +8,12 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+## Git
+
+Commit and push to `main` automatically once a change is working/verified — don't wait to be asked, and don't let local work pile up uncommitted. Skip this for genuinely experimental/in-progress work the user hasn't confirmed yet. Never commit `.env`/`.env.local`/`.env.production` or any other secret-bearing file.
+
+This matters here specifically because a Sanity webhook triggers a Vercel production rebuild from GitHub's `main` branch on every Studio publish — if `main` falls behind local work, that automation silently rebuilds stale code.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build
