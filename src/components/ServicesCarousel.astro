@@ -213,10 +213,26 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
     return { scale: 1 - t * 0.15, opacity: 1 - t * 0.45 };
   }
 
+  // Rewriting transform/opacity on all 30 card copies (6 services x
+  // REPEAT_COUNT 5, for the infinite loop) every single scroll frame is most
+  // of what was making this feel stuttery — the vast majority of those are
+  // off-screen copies already sitting at cardVisualState's t=1 floor, whose
+  // computed scale/opacity hasn't actually changed frame to frame. Every
+  // card also carries a 25px backdrop-blur (see .services-card), which is
+  // expensive to recomposite — so this was forcing a GPU-costly re-blur on
+  // ~24 invisible cards every frame for zero visual difference. Skipping
+  // cards already well past the falloff distance (double the distance where
+  // cardVisualState clamps to its floor, as safety margin so a card is
+  // always left in its correct final floored state before we stop touching
+  // it) cuts real per-frame work from 30 elements down to the handful
+  // actually near the visible center.
   function updateCardAppearance() {
     if (!track) return;
     const center = track.scrollLeft + track.clientWidth / 2;
+    const skipDistance = track.clientWidth;
     cards.forEach((card) => {
+      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+      if (Math.abs(cardCenter - center) > skipDistance) return;
       const { scale, opacity } = cardVisualState(card, center);
       card.style.transform = `scale(${scale})`;
       card.style.opacity = String(opacity);
