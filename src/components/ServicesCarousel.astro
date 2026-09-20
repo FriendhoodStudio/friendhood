@@ -60,7 +60,15 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
         />
         <div class="flex w-full flex-col items-start gap-[20px]">
           <div class="relative h-[325px] w-full overflow-hidden">
-            <img src={service.imageUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
+            {/* Eager, not lazy — this carousel is hidden until opened, so
+                lazy-loading buys nothing on initial page load, and it was
+                actively harmful here: 30 card copies exist for the infinite
+                loop (6 services x 5 repeats), so scrolling constantly
+                crossed new copies into the lazy-load threshold, each
+                triggering a fetch/decode/paint right in the middle of the
+                scroll gesture — a much better fit for the reported
+                stuttering than anything else investigated so far. */}
+            <img src={service.imageUrl} alt="" class="h-full w-full object-cover" loading="eager" />
             <div class="absolute inset-x-0 top-0 flex items-start justify-end px-[15px] pt-[10px]">
               <div class="group relative">
                 <button
