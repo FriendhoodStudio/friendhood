@@ -15,12 +15,15 @@ import logo from '../assets/nav/friendhood-logo.svg';
   <canvas class="pointer-events-none absolute inset-0 z-10 h-full w-full" data-backsoon-canvas aria-hidden="true"
   ></canvas>
 
-  <div class="relative z-20 flex flex-col items-center gap-vertical-l">
-    <h1 class="max-w-[var(--col-8)] text-balance font-display text-h1 text-front">
-      We&rsquo;re working on something, back soon&hellip;
-    </h1>
-    <img src={logo.src} alt="Friendhood" class="h-[40px] w-auto" />
-  </div>
+  <h1 class="relative z-20 max-w-[var(--col-8)] text-balance font-display text-h1 text-front">
+    We&rsquo;re working on something, back soon&hellip;
+  </h1>
+
+  <img
+    src={logo.src}
+    alt="Friendhood"
+    class="absolute bottom-[var(--spacing-vertical-m)] left-1/2 z-20 h-[32px] w-auto -translate-x-1/2"
+  />
 </section>
 
 <style>
