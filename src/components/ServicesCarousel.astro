@@ -235,13 +235,25 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
   }
 
   let rafId = 0;
+  // handleLoop's scrollLeft jump used to run on every scroll frame — visually
+  // seamless in theory (the repeated content is identical either side of the
+  // jump), but in practice, reassigning scrollLeft WHILE the browser is
+  // mid-way through native momentum/inertial scrolling interrupts its
+  // deceleration curve, which reads as a visible stutter even though nothing
+  // actually looks different. Debouncing it to only run once scrolling has
+  // genuinely settled avoids fighting that momentum — the 1.5-copy-wide dead
+  // zone (see handleLoop) already exists specifically to give room for a
+  // fast swipe to keep coasting past the true edge before this ever needs to
+  // fire, so a short delay here doesn't risk it running too late.
+  let loopTimeoutId = 0;
   function onScroll() {
     if (rafId) return;
     rafId = requestAnimationFrame(() => {
       updateCardAppearance();
-      handleLoop();
       rafId = 0;
     });
+    window.clearTimeout(loopTimeoutId);
+    loopTimeoutId = window.setTimeout(handleLoop, 120);
   }
 
   // Per the Figma annotation, the carousel "emerges from bottom of page" — driven
