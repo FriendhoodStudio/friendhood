@@ -34,10 +34,15 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
   data-open="false"
   class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/50 opacity-0 backdrop-blur-[25px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100"
 >
+  {/* `mandatory` scroll-snap fights continuous trackpad/wheel scrolling — it
+      tries to snap after essentially every small scroll delta rather than
+      waiting for the gesture to actually finish, which is what read as
+      jerky. `proximity` only snaps once scrolling naturally comes to rest
+      near a snap point, so an active gesture isn't fighting it mid-scroll. */}
   <div
     data-services-track
     class="flex w-full items-center gap-6 overflow-x-auto px-[10vw] py-[10px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    style="scroll-snap-type: x mandatory;"
+    style="scroll-snap-type: x proximity;"
   >
     {looped.map((service, i) => (
       <div
@@ -430,7 +435,7 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
 
   function endDrag() {
     dragging = false;
-    if (track && dragMoved) track.style.scrollSnapType = 'x mandatory';
+    if (track && dragMoved) track.style.scrollSnapType = 'x proximity';
     dragMoved = false;
   }
 
