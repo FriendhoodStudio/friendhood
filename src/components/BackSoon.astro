@@ -22,7 +22,7 @@ import logo from '../assets/nav/friendhood-logo.svg';
   <img
     src={logo.src}
     alt="Friendhood"
-    class="absolute bottom-[var(--spacing-vertical-m)] left-1/2 z-20 h-[32px] w-auto -translate-x-1/2"
+    class="backsoon-logo absolute bottom-[var(--spacing-vertical-m)] left-1/2 z-20 w-auto -translate-x-1/2"
   />
 </section>
 
@@ -52,6 +52,28 @@ import logo from '../assets/nav/friendhood-logo.svg';
   @media (prefers-reduced-motion: reduce) {
     .backsoon-gradient {
       animation: none;
+    }
+  }
+
+  /* Same 4-tier breakpoint scale as the rest of the site (0/768/1200/1920) —
+     smaller on mobile so it doesn't crowd the headline on a short viewport,
+     scaling back up to the 32px it was sized at on desktop. */
+  .backsoon-logo {
+    height: 22px;
+  }
+  @media (min-width: 768px) {
+    .backsoon-logo {
+      height: 28px;
+    }
+  }
+  @media (min-width: 1200px) {
+    .backsoon-logo {
+      height: 32px;
+    }
+  }
+  @media (min-width: 1920px) {
+    .backsoon-logo {
+      height: 36px;
     }
   }
 </style>
