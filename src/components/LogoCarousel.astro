@@ -11,13 +11,21 @@ const looped = [...logos, ...logos];
 
 {logos.length > 0 && (
   <section class="reveal-item overflow-hidden pb-vertical-xl" data-logo-carousel>
+    {/* Eager, not lazy — same class of bug as ServicesCarousel.astro
+        (flagged by a DevTools lazy-loading audit for this component
+        specifically): this marquee runs a continuous 40s loop the moment
+        it's revealed, so every logo is seen within seconds regardless of
+        lazy-loading, and the looped set re-crossing the lazy threshold on
+        every cycle was ongoing background main-thread cost for as long as
+        the section stays mounted — competing with whatever else is
+        happening on the page at the same time. */}
     <div class="flex w-max items-center gap-[var(--logo-gap)]" data-logo-track>
       {looped.map((logo) => (
         <img
           src={logo.logoUrl}
           alt={logo.name}
           class="h-[var(--logo-height)] w-auto shrink-0 object-contain opacity-75"
-          loading="lazy"
+          loading="eager"
         />
       ))}
     </div>
