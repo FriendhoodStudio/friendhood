@@ -828,7 +828,7 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     // spray rather than something organic.
     const PARTICLES_PER_CLUSTER = 110;
     const STARS_PER_CLUSTER = 4;
-    const STAR_DRIFT_RADIUS = 1.5;
+    const STAR_DRIFT_RADIUS = 2.5;
     const FADE_IN_MS = 250;
     const HOLD_MS = 20000;
     const FADE_MS = 5000;
@@ -926,13 +926,13 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
           // flickers land at genuinely different, unpredictable intervals
           // per star rather than a narrow band that still reads as one
           // shared rhythm once enough stars are on screen together.
-          twinkleSpeed: 0.0002 + Math.random() * 0.0009,
+          twinkleSpeed: 0.0004 + Math.random() * 0.0014,
           // X and Y intentionally NOT the same speed (0.6-1.6x apart) — two
           // independent sine waves at different frequencies trace an
           // irregular wandering path rather than a clean circle or ellipse.
-          driftSpeedX: 0.00008 + Math.random() * 0.00007,
+          driftSpeedX: 0.00015 + Math.random() * 0.00012,
           driftPhaseX: Math.random() * Math.PI * 2,
-          driftSpeedY: 0.00008 + Math.random() * 0.00007 * (0.6 + Math.random()),
+          driftSpeedY: 0.00015 + Math.random() * 0.00012 * (0.6 + Math.random()),
           driftPhaseY: Math.random() * Math.PI * 2,
           spawnTime,
         });
