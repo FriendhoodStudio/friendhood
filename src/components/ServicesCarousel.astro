@@ -105,7 +105,7 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
               latest Figma pass (node 7382:2286), this now reads as one
               continuous block with title→overview at 20px and
               overview→modules at 36px, rather than ruled-off sections. */}
-          <div class="flex w-full flex-col items-start gap-[20px] px-[calc(var(--spacing-horizontal-m)*1.25)]">
+          <div class="services-card-text flex w-full flex-col items-start gap-[20px]">
             <h3 class="font-heading text-h3 text-back">{service.cardTitle}</h3>
             <div class="flex w-full flex-col items-start gap-[36px]">
               <p class="font-tag text-detail text-back">{service.overview}</p>
@@ -139,6 +139,20 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
      the much longer placeholder text Figma's example happened to use. */
   .services-card {
     height: 670px;
+  }
+
+  /* Doubled on mobile specifically (20px vs the 10px the *1.25 formula
+     alone would give at this tier) — read as too tight at real mobile
+     widths even though the same formula reads fine from 768px up, so this
+     overrides just the base tier rather than changing the shared formula
+     everywhere. */
+  .services-card-text {
+    padding-inline: calc(var(--spacing-horizontal-m) * 2.5);
+  }
+  @media (min-width: 768px) {
+    .services-card-text {
+      padding-inline: calc(var(--spacing-horizontal-m) * 1.25);
+    }
   }
 
   /* Press/release feel for the copy-email button, matching the nav pill's
