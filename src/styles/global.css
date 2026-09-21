@@ -345,14 +345,18 @@
     --col-8: 867px;
     --label-width: 187px;
 
-    --text-h1: 4.375rem; /* 70px */
-    --text-h2: 3.125rem; /* 50px */
-    --text-h3: 2.25rem; /* 36px */
-    --text-body-1: 1.625rem; /* 26px */
-    --text-body-2: 1.5625rem; /* 25px */
-    --text-body-3: 1.125rem; /* 18px */
-    --text-detail: 1.125rem; /* 18px */
-    --text-categories: 0.9375rem; /* 15px */
+    /* Deliberately 10% below the Figma reference (was h1 70px, h2 50px, h3
+       36px, body-1 26px, body-2 25px, body-3/detail 18px, categories 15px)
+       — a permanent reduction for this tier and the 1920px tier above it,
+       not the earlier unlabeled "preview" experiment this replaced. */
+    --text-h1: 3.9375rem; /* 63px */
+    --text-h2: 2.8125rem; /* 45px */
+    --text-h3: 2.025rem; /* 32.4px */
+    --text-body-1: 1.4625rem; /* 23.4px */
+    --text-body-2: 1.40625rem; /* 22.5px */
+    --text-body-3: 1.0125rem; /* 16.2px */
+    --text-detail: 1.0125rem; /* 16.2px */
+    --text-categories: 0.84375rem; /* 13.5px */
 
     --spacing-vertical-s: 1.25rem; /* 20px */
     --spacing-vertical-l: 4.375rem; /* 70px */
@@ -373,12 +377,15 @@
     --col-8: 1097px;
     --label-width: 237px;
 
-    --text-h1: 4.6875rem; /* 75px */
-    --text-h2: 3.5rem; /* 56px */
-    --text-h3: 2.375rem; /* 38px */
-    --text-body-1: 2rem; /* 32px */
-    --text-body-2: 1.8125rem; /* 29px */
-    --text-body-3: 1.125rem; /* 18px */
+    /* Deliberately 10% below the Figma reference (was h1 75px, h2 56px, h3
+       38px, body-1 32px, body-2 29px, body-3 18px) — same permanent
+       reduction as the 1200px tier below. */
+    --text-h1: 4.21875rem; /* 67.5px */
+    --text-h2: 3.15rem; /* 50.4px */
+    --text-h3: 2.1375rem; /* 34.2px */
+    --text-body-1: 1.8rem; /* 28.8px */
+    --text-body-2: 1.63125rem; /* 26.1px */
+    --text-body-3: 1.0125rem; /* 16.2px */
 
     --spacing-vertical-m: 2.25rem; /* 36px */
     --spacing-vertical-l: 4.6875rem; /* 75px */
