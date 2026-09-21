@@ -799,6 +799,13 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
       twinkleSpeed: number;
       driftPhase: number;
       spawnTime: number;
+      // Shooting-star variant — very low odds per star (see STREAK_CHANCE).
+      // Travels in a straight line with a fading trail instead of the small
+      // circular drift/pulse, over a much shorter life than a normal star.
+      streak: boolean;
+      streakAngle: number;
+      streakSpeed: number;
+      lifeMs: number;
     }
     let clusters: SprayCluster[] = [];
     let stars: TwinkleStar[] = [];
@@ -821,8 +828,14 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     // spray rather than something organic.
     const PARTICLES_PER_CLUSTER = 110;
     const STARS_PER_CLUSTER = 4;
-    const STAR_DRIFT_RADIUS = 7;
-    const STAR_DRIFT_PERIOD_MS = 5000;
+    // Very low odds per star, not per cluster/spawn — with 4 stars per
+    // cluster this is roughly a 1-in-50 chance of any given spray producing
+    // one, rare enough to read as a genuine surprise rather than a repeating
+    // pattern you start to expect. (Confirmed by testing at 100% first —
+    // even 5x this rate read as "far too many".)
+    const STREAK_CHANCE = 0.005;
+    const STAR_DRIFT_RADIUS = 3;
+    const STAR_DRIFT_PERIOD_MS = 9000;
     const MAX_LIVE_STARS = 500;
     const FADE_IN_MS = 250;
     const HOLD_MS = 20000;
@@ -871,7 +884,7 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
         // Squaring random() skews toward small values with occasional
         // bigger ones — mostly fine dust, not an even coat of same-sized
         // dots, which is what read as "spray can" rather than star-dust.
-        const particleRadius = (0.75 + Math.pow(Math.random(), 2) * 4) * scale;
+        const particleRadius = (0.5 + Math.pow(Math.random(), 2) * 2.5) * scale;
         const alpha = 0.12 + Math.random() * 0.28;
         tctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
         tctx.beginPath();
@@ -897,10 +910,11 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
       for (let i = 0; i < STARS_PER_CLUSTER; i++) {
         const angle = Math.random() * Math.PI * 2;
         const dist = radius * Math.sqrt(Math.random());
+        const isStreak = Math.random() < STREAK_CHANCE;
         stars.push({
           x: x + Math.cos(angle) * dist,
           y: y + Math.sin(angle) * dist,
-          radius: 2.5 + Math.random() * 3.5,
+          radius: 1.5 + Math.random() * 2,
           r,
           g,
           b,
@@ -911,6 +925,13 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
           twinkleSpeed: 0.0009 + Math.random() * 0.0012,
           driftPhase: Math.random() * Math.PI * 2,
           spawnTime,
+          streak: isStreak,
+          streakAngle: Math.random() * Math.PI * 2,
+          streakSpeed: 0.25 + Math.random() * 0.2,
+          // A shooting star crosses and is gone in under a second and a
+          // half — much shorter than a normal star's full hold-then-fade
+          // lifespan, which would look wrong sustained that long.
+          lifeMs: isStreak ? 700 + Math.random() * 700 : HOLD_MS + FADE_MS,
         });
       }
       if (stars.length > MAX_LIVE_STARS) {
@@ -925,7 +946,7 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
       const now = performance.now();
       const scale = dpr();
       clusters = clusters.filter((c) => now - c.spawnTime < HOLD_MS + FADE_MS);
-      stars = stars.filter((s) => now - s.spawnTime < HOLD_MS + FADE_MS);
+      stars = stars.filter((s) => now - s.spawnTime < s.lifeMs);
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       // Plain alpha compositing, not additive ("lighter") blending — layers
@@ -952,11 +973,52 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
       for (const s of stars) {
         const age = now - s.spawnTime;
         let opacity = 1;
-        if (age < FADE_IN_MS) opacity = age / FADE_IN_MS;
-        else if (age > HOLD_MS) opacity = Math.max(0, 1 - (age - HOLD_MS) / FADE_MS);
+        if (s.streak) {
+          // Quick fade in, hold briefly, fade out over the back half of its
+          // short life — distinct from a normal star's slow hold-then-fade,
+          // which would look wrong compressed into under two seconds.
+          const fadeOutStart = s.lifeMs * 0.5;
+          if (age < 60) opacity = age / 60;
+          else if (age > fadeOutStart) opacity = Math.max(0, 1 - (age - fadeOutStart) / (s.lifeMs - fadeOutStart));
+        } else {
+          if (age < FADE_IN_MS) opacity = age / FADE_IN_MS;
+          else if (age > HOLD_MS) opacity = Math.max(0, 1 - (age - HOLD_MS) / FADE_MS);
+        }
         if (opacity <= 0) continue;
 
-        const twinkle = 0.35 + 0.65 * Math.pow(Math.sin(now * s.twinkleSpeed + s.phase), 2);
+        if (s.streak) {
+          // Straight-line travel with a fading trail behind it, rather than
+          // the small circular drift every other star does — reads as a
+          // genuine shooting star crossing the sky, not just a fast-moving
+          // dot.
+          const traveled = age * s.streakSpeed * scale;
+          const headX = s.x * scale + Math.cos(s.streakAngle) * traveled;
+          const headY = s.y * scale + Math.sin(s.streakAngle) * traveled;
+          const trailLength = 60 * scale;
+          const tailX = headX - Math.cos(s.streakAngle) * trailLength;
+          const tailY = headY - Math.sin(s.streakAngle) * trailLength;
+
+          const trail = ctx.createLinearGradient(tailX, tailY, headX, headY);
+          trail.addColorStop(0, `rgba(${s.r}, ${s.g}, ${s.b}, 0)`);
+          trail.addColorStop(1, `rgba(${s.r}, ${s.g}, ${s.b}, ${opacity})`);
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = trail;
+          ctx.lineWidth = s.radius * scale;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(tailX, tailY);
+          ctx.lineTo(headX, headY);
+          ctx.stroke();
+
+          ctx.globalAlpha = opacity;
+          ctx.fillStyle = `rgb(${s.r}, ${s.g}, ${s.b})`;
+          ctx.beginPath();
+          ctx.arc(headX, headY, s.radius * scale * 0.8, 0, Math.PI * 2);
+          ctx.fill();
+          continue;
+        }
+
+        const twinkle = 0.55 + 0.45 * Math.pow(Math.sin(now * s.twinkleSpeed + s.phase), 2);
         const driftAngle = (now / STAR_DRIFT_PERIOD_MS) * Math.PI * 2 + s.driftPhase;
         const px = (s.x + Math.cos(driftAngle) * STAR_DRIFT_RADIUS) * scale;
         const py = (s.y + Math.sin(driftAngle) * STAR_DRIFT_RADIUS) * scale;
