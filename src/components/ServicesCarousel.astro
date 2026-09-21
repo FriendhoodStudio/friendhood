@@ -41,7 +41,7 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
       near a snap point, so an active gesture isn't fighting it mid-scroll. */}
   <div
     data-services-track
-    class="flex w-full items-center gap-6 overflow-x-auto px-[10vw] py-[10px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    class="flex w-full items-center gap-[var(--spacing-gutter)] overflow-x-auto px-[10vw] py-[10px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     style="scroll-snap-type: x proximity;"
   >
     {looped.map((service, i) => (
