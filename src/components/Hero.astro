@@ -198,12 +198,15 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
 
 <style>
   /* Colour stops derived from the reference gradient (Figma node
-     7718:19099) but dialled back ~25% toward black — the literal Figma
-     values (#310a10 / #15072c) read as more saturated/present than wanted
-     once seen live against real page content, not just in isolation.
-     Fully transparent into --color-back by 100%, spanning the section's own
-     full height so the transition to solid --color-back genuinely finishes
-     by the bottom edge, not just visually trailing off.
+     7718:19099) but dialled back well past the original ~25% toward black
+     (was #25080c/#100521) — even that read as too present/saturated
+     against the rest of the site's much darker, near-black tone. Now
+     roughly 60% blended toward --color-back's own #0d0d0d rather than 25%,
+     so the maroon/purple reads as a hint of colour low in the mix instead
+     of its own distinct band. Fully transparent into --color-back by 100%,
+     spanning the section's own full height so the transition to solid
+     --color-back genuinely finishes by the bottom edge, not just visually
+     trailing off.
 
      The middle stop's POSITION is a custom property (not a literal `62.5%`
      in the gradient()) so it can be animated — plain custom properties
@@ -247,7 +250,7 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
        as a hard-edged shape. */
     background:
       radial-gradient(45% 40% at var(--hero-radial-x) var(--hero-radial-y), var(--color-back) 0%, transparent 65%),
-      linear-gradient(to bottom, #25080c 0%, #100521 var(--hero-gradient-stop), var(--color-back) 100%);
+      linear-gradient(to bottom, #170b0d 0%, #0e0a15 var(--hero-gradient-stop), var(--color-back) 100%);
     animation:
       hero-gradient-drift 26s ease-in-out infinite alternate,
       hero-radial-orbit 60s linear infinite;
