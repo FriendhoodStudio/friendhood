@@ -833,18 +833,29 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     // one, rare enough to read as a genuine surprise rather than a repeating
     // pattern you start to expect. (Confirmed by testing at 100% first —
     // even 5x this rate read as "far too many".)
-    const STREAK_CHANCE = 0.005;
+    const STREAK_CHANCE = 0.0025;
     const STAR_DRIFT_RADIUS = 3;
     const STAR_DRIFT_PERIOD_MS = 9000;
-    const MAX_LIVE_STARS = 500;
     const FADE_IN_MS = 250;
     const HOLD_MS = 20000;
     const FADE_MS = 5000;
     // Spawning on every pointermove would be excessive — one cluster every
     // ~130ms while the pointer's down reads as a steady build-up without
-    // turning to mud. MAX_LIVE_CLUSTERS is a hard backstop on top of that.
+    // turning to mud.
     const SPAWN_INTERVAL_MS = 130;
-    const MAX_LIVE_CLUSTERS = 220;
+    // MAX_LIVE_CLUSTERS/MAX_LIVE_STARS are hard backstops against unbounded
+    // memory growth (e.g. a pointer held down for minutes), not limits
+    // expected to trigger in normal use — they splice the array instantly
+    // with no fade, so hitting one mid-fade reads as a genuine bug (items
+    // "just disappearing") rather than a graceful cutoff. Sustained
+    // painting has a real steady-state population — spawn rate x how long
+    // each item stays alive — that both caps need comfortable headroom
+    // over: ~192 clusters (1000/130 spawns/sec x 25s cluster life) and
+    // ~770 stars (4x that rate x 25s star life). The old caps (220/500)
+    // sat right at or BELOW that steady state, so a normal ~15-20s painting
+    // session was enough to start truncating live items — that was the bug.
+    const MAX_LIVE_CLUSTERS = 600;
+    const MAX_LIVE_STARS = 1500;
 
     // `currentColor` starts as a hardcoded hex default but gets overwritten
     // with `getComputedStyle(...).color` as soon as the headline word first
