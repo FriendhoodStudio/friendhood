@@ -115,45 +115,38 @@
     them vary by size. Confirmed directly against Figma's variable defs (not
     assumed) across every component that uses each style.
   */
-  /* PREVIEW: every --text-* size below is temporarily -8.2% (-10%, then
-     +2%) to show what a global type-scale reduction would look like — H1
-     specifically has an extra +8% on top of that (net -0.86% vs original).
-     Original base values: h1 2.5rem/40px, h2 2.3125rem/37px, h3 2rem/32px,
-     body-1 1.5625rem/25px, body-2 1.3125rem/21px, body-3 1rem/16px,
-     detail 0.875rem/14px, categories 0.8125rem/13px. */
-  --text-h1: 2.4786rem; /* 39.66px (was 40px) */
+  --text-h1: 2.5rem; /* 40px */
   --text-h1--line-height: 1;
   --text-h1--letter-spacing: -0.02em;
 
-  --text-h2: 2.122875rem; /* 33.97px (was 37px) */
+  --text-h2: 2.3125rem; /* 37px */
   --text-h2--line-height: 1;
   --text-h2--letter-spacing: -0.02em;
 
-  --text-h3: 1.836rem; /* 29.38px (was 32px) */
+  --text-h3: 2rem; /* 32px */
   --text-h3--line-height: 1;
   --text-h3--letter-spacing: 0em;
 
-  /* Mobile-only override, well below the -8.2% preview level — the smaller
-     -3% step still read as too big at real mobile widths, so this cuts
-     further to a size proportionate to mobile body copy (was 25px
-     originally; tablet/desktop/wide body-1 unaffected). */
+  /* Mobile-only override — real mobile widths read the full 25px body copy
+     as too big, so this cuts down to a size proportionate to the rest of
+     the mobile type scale (tablet/desktop/wide body-1 unaffected). */
   --text-body-1: 1.125rem; /* 18px (was 25px) */
   --text-body-1--line-height: 1.15;
   --text-body-1--letter-spacing: 0em;
 
-  --text-body-2: 1.204875rem; /* 19.28px (was 21px) */
+  --text-body-2: 1.3125rem; /* 21px */
   --text-body-2--line-height: 1.15;
   --text-body-2--letter-spacing: -0.02em;
 
-  --text-body-3: 0.918rem; /* 14.69px (was 16px) */
+  --text-body-3: 1rem; /* 16px */
   --text-body-3--line-height: 1.15;
   --text-body-3--letter-spacing: 0em;
 
-  --text-detail: 0.80325rem; /* 12.85px (was 14px) */
+  --text-detail: 0.875rem; /* 14px */
   --text-detail--line-height: 0.96;
   --text-detail--letter-spacing: -0.02em;
 
-  --text-categories: 0.745875rem; /* 11.93px (was 13px) */
+  --text-categories: 0.8125rem; /* 13px */
   --text-categories--line-height: 0.96;
   --text-categories--letter-spacing: 0em;
 
@@ -310,14 +303,13 @@
     --label-width: 167px;
     --nav-menu-height: 68px;
 
-    /* PREVIEW: -8.2% on top of the already-manual tablet H1 override. */
-    --text-h1: 3.346110rem; /* 53.54px (was 54px) */
-    --text-h2: 2.409750rem; /* 38.56px (was 42px) */
-    --text-h3: 2.0655rem; /* 33.05px (was 36px) */
-    --text-body-1: 1.434375rem; /* 22.95px (was 25px) */
-    --text-body-2: 1.262250rem; /* 20.20px (was 22px) */
-    --text-body-3: 1.032750rem; /* 16.52px (was 18px) */
-    --text-detail: 0.918rem; /* 14.69px (was 16px) */
+    --text-h1: 3.375rem; /* 54px */
+    --text-h2: 2.625rem; /* 42px */
+    --text-h3: 2.25rem; /* 36px */
+    --text-body-1: 1.5625rem; /* 25px */
+    --text-body-2: 1.375rem; /* 22px */
+    --text-body-3: 1.125rem; /* 18px */
+    --text-detail: 1rem; /* 16px */
 
     --spacing-vertical-s: 0.9375rem; /* 15px */
     --spacing-vertical-m: 1.875rem; /* 30px */
@@ -353,15 +345,14 @@
     --col-8: 867px;
     --label-width: 187px;
 
-    /* PREVIEW: -8.2% on top of the already-manual desktop H1 override. */
-    --text-h1: 4.33755rem; /* 69.40px (was 70px) */
-    --text-h2: 2.868750rem; /* 45.90px (was 50px) */
-    --text-h3: 2.0655rem; /* 33.05px (was 36px) */
-    --text-body-1: 1.491750rem; /* 23.87px (was 26px) */
-    --text-body-2: 1.434375rem; /* 22.95px (was 25px) */
-    --text-body-3: 1.032750rem; /* 16.52px (was 18px) */
-    --text-detail: 1.032750rem; /* 16.52px (was 18px) */
-    --text-categories: 0.860625rem; /* 13.77px (was 15px) */
+    --text-h1: 4.375rem; /* 70px */
+    --text-h2: 3.125rem; /* 50px */
+    --text-h3: 2.25rem; /* 36px */
+    --text-body-1: 1.625rem; /* 26px */
+    --text-body-2: 1.5625rem; /* 25px */
+    --text-body-3: 1.125rem; /* 18px */
+    --text-detail: 1.125rem; /* 18px */
+    --text-categories: 0.9375rem; /* 15px */
 
     --spacing-vertical-s: 1.25rem; /* 20px */
     --spacing-vertical-l: 4.375rem; /* 70px */
@@ -382,13 +373,12 @@
     --col-8: 1097px;
     --label-width: 237px;
 
-    /* PREVIEW: -8.2% on top of the already-manual wide-desktop H1 override. */
-    --text-h1: 4.647375rem; /* 74.36px (was 75px) */
-    --text-h2: 3.213rem; /* 51.41px (was 56px) */
-    --text-h3: 2.180250rem; /* 34.88px (was 38px) */
-    --text-body-1: 1.836rem; /* 29.38px (was 32px) */
-    --text-body-2: 1.663875rem; /* 26.62px (was 29px) */
-    --text-body-3: 1.032750rem; /* 16.52px (was 18px) */
+    --text-h1: 4.6875rem; /* 75px */
+    --text-h2: 3.5rem; /* 56px */
+    --text-h3: 2.375rem; /* 38px */
+    --text-body-1: 2rem; /* 32px */
+    --text-body-2: 1.8125rem; /* 29px */
+    --text-body-3: 1.125rem; /* 18px */
 
     --spacing-vertical-m: 2.25rem; /* 36px */
     --spacing-vertical-l: 4.6875rem; /* 75px */
