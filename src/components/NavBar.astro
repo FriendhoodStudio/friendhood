@@ -34,8 +34,16 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
             data-nav-toggle-track
             class="flex flex-col leading-none transition-transform duration-400 ease-in-out"
           >
-            <span data-nav-toggle-label="menu" class="block h-[21px]">Menu</span>
-            <span data-nav-toggle-label="close" class="block h-[21px]">Close</span>
+            {/* leading-[21px] (not the inherited leading-none/line-height:1)
+                — height alone doesn't vertically center a single line of
+                text within a taller box in block layout; it just leaves the
+                extra space at the bottom while the font's own ascent can
+                still slightly overflow the top. Setting line-height to
+                exactly match the box height centers it correctly via CSS's
+                own half-leading distribution, while keeping the h-[21px]
+                box size the roll animation's translateY math depends on. */}
+            <span data-nav-toggle-label="menu" class="block h-[21px] leading-[21px]">Menu</span>
+            <span data-nav-toggle-label="close" class="block h-[21px] leading-[21px]">Close</span>
           </span>
         </span>
       </button>
