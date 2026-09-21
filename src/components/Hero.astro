@@ -160,8 +160,11 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
       homepage" tool would be. Spray colour tracks whichever hero-word
       colour is currently showing (see script below), so the palette keeps
       shifting the same way the headline does. */}
+  {/* No touch-action override — the draw interaction is mouse/pen-only
+      (see startSpawning below), so touch needs its default scroll/pan
+      behaviour left completely alone here. */}
   <canvas
-    class="absolute inset-0 z-10 h-full w-full touch-none"
+    class="absolute inset-0 z-10 h-full w-full"
     style={`cursor: url("${pencilCursor}") 1 29, crosshair;`}
     data-hero-canvas
     aria-label="Add colour to your neighbourhood"
@@ -1049,16 +1052,75 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     let pointerDown = false;
     let lastSpawnTime = 0;
 
+    // Touch specifically needs to tell a scroll swipe apart from a draw
+    // gesture — both are the same single-finger drag, so a browser can't
+    // distinguish them in advance the way it can for mouse (scroll there
+    // is a distinct wheel/trackpad gesture, not a mouse drag). Resolved by
+    // reading intent from TIME instead of direction: a normal swipe (the
+    // vast majority of touch interaction with this page) always scrolls,
+    // completely untouched by any of this, because nothing below ever
+    // calls preventDefault or claims the pointer until AFTER a deliberate
+    // hold. Only a touch that stays still for a beat commits to drawing —
+    // the same long-press-before-drag pattern other canvas/drawing apps
+    // use to resolve this exact conflict. By the time the hold timer
+    // fires, the touch has been stationary long enough that the browser's
+    // own gesture recognizer won't have started a scroll from it, so
+    // claiming the pointer at that point is uncontested.
+    const TOUCH_HOLD_MS = 400;
+    const TOUCH_HOLD_MOVE_TOLERANCE = 10;
+    let touchHoldTimer = 0;
+    let touchHoldStart = { x: 0, y: 0 };
+    let touchDrawing = false;
+
+    function beginDrawing(x: number, y: number, timeStamp: number, pointerId: number) {
+      pointerDown = true;
+      spawnCluster(x, y, currentColor);
+      lastSpawnTime = timeStamp;
+      // Delayed (fired from the hold timer, not directly inside the event
+      // handler for touch) — by that point some engines no longer consider
+      // the pointer "active" for capture purposes even though the finger
+      // is still down. Non-fatal either way: capture is a nice-to-have for
+      // keeping the gesture tracked past the canvas's own bounds, not a
+      // requirement for spawnCluster/keepSpawning to keep working.
+      try {
+        canvas!.setPointerCapture(pointerId);
+      } catch {}
+    }
+
     function startSpawning(e: PointerEvent) {
       if (isOverMedia(e.clientX, e.clientY)) return;
-      pointerDown = true;
+      if (e.pointerType === 'touch') {
+        touchHoldStart = { x: e.clientX, y: e.clientY };
+        window.clearTimeout(touchHoldTimer);
+        touchHoldTimer = window.setTimeout(() => {
+          touchDrawing = true;
+          const { x, y } = pointerPos(e);
+          beginDrawing(x, y, performance.now(), e.pointerId);
+        }, TOUCH_HOLD_MS);
+        return;
+      }
       const { x, y } = pointerPos(e);
-      spawnCluster(x, y, currentColor);
-      lastSpawnTime = e.timeStamp;
-      canvas!.setPointerCapture(e.pointerId);
+      beginDrawing(x, y, e.timeStamp, e.pointerId);
     }
 
     function keepSpawning(e: PointerEvent) {
+      if (e.pointerType === 'touch') {
+        if (!touchDrawing) {
+          // Moved more than a few px before the hold timer fired — this
+          // was a normal scroll swipe, not a hold-then-draw gesture.
+          // Cancel the pending timer and do nothing else; native scrolling
+          // was never interrupted in the first place.
+          const dx = e.clientX - touchHoldStart.x;
+          const dy = e.clientY - touchHoldStart.y;
+          if (Math.hypot(dx, dy) > TOUCH_HOLD_MOVE_TOLERANCE) {
+            window.clearTimeout(touchHoldTimer);
+          }
+          return;
+        }
+        // Now committed to drawing — stop the browser from also trying to
+        // scroll from the same gesture.
+        e.preventDefault();
+      }
       if (!pointerDown) return;
       if (isOverMedia(e.clientX, e.clientY)) return;
       if (e.timeStamp - lastSpawnTime < SPAWN_INTERVAL_MS) return;
@@ -1068,6 +1130,8 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     }
 
     function stopSpawning() {
+      window.clearTimeout(touchHoldTimer);
+      touchDrawing = false;
       pointerDown = false;
     }
 
