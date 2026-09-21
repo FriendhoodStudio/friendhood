@@ -23,19 +23,19 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
 
       <button
         type="button"
-        class="nav-toggle font-tag pointer-events-auto flex cursor-pointer items-center justify-center border-l border-front/15 px-[var(--spacing-btn-x)] py-[var(--spacing-btn-y)] text-detail text-front transition-[background-color] duration-300 ease-out hover:bg-[#29282d]"
+        class="nav-toggle font-tag pointer-events-auto flex cursor-pointer items-center justify-center border-l border-front/15 px-[var(--spacing-btn-x)] py-[var(--spacing-btn-y)] text-detail text-[length:calc(var(--text-detail)*1.12)] text-front transition-[background-color] duration-300 ease-out hover:bg-[#29282d]"
         style="height:var(--nav-menu-height)"
         data-nav-toggle
         aria-expanded="false"
         aria-controls="nav-menu-overlay"
       >
-        <span class="relative block h-[18px] overflow-hidden">
+        <span class="relative block h-[21px] overflow-hidden">
           <span
             data-nav-toggle-track
             class="flex flex-col leading-none transition-transform duration-400 ease-in-out"
           >
-            <span data-nav-toggle-label="menu" class="block h-[18px]">Menu</span>
-            <span data-nav-toggle-label="close" class="block h-[18px]">Close</span>
+            <span data-nav-toggle-label="menu" class="block h-[21px]">Menu</span>
+            <span data-nav-toggle-label="close" class="block h-[21px]">Close</span>
           </span>
         </span>
       </button>
