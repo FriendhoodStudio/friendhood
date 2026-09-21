@@ -437,6 +437,139 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
 
   track?.addEventListener('scroll', onScroll, { passive: true });
 
+  // Swipe-down-to-close, mobile/tablet only (below the desktop breakpoint) —
+  // a standard bottom-sheet dismiss gesture, using the same drag-handle pill
+  // (data-services-close) already rendered as a visual affordance for it.
+  // Touch-only (mouse already has its own horizontal drag-to-scroll below,
+  // explicitly gated to pointerType 'mouse') so the two never compete for
+  // the same pointer. Stays completely hands-off — no preventDefault, no
+  // pointer capture — until the gesture is clearly vertical-dominant (a few
+  // px of movement with |dy| > |dx|), so a real horizontal swipe between
+  // cards is never intercepted or made to feel laggy.
+  const SWIPE_CLOSE_THRESHOLD_PX = 100;
+  const SWIPE_CLOSE_VELOCITY_PX_MS = 0.5;
+
+  function isMobileOrTablet() {
+    return window.innerWidth < 1200;
+  }
+
+  let swipeCard: HTMLElement | null = null;
+  let swipeScale = 1;
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeStartTime = 0;
+  let swipeDeltaY = 0;
+  let swipeDirection: 'vertical' | 'horizontal' | null = null;
+  let swipePointerId: number | null = null;
+
+  // Distinct from close() (used by the pill button/Escape/backdrop click):
+  // that path always animates cards from a resting translateY(0), which
+  // would visibly snap the dragged card back to 0 before playing — jarring
+  // right after a swipe that's already partway through that same motion.
+  // This continues the drag's own motion off-screen instead of restarting it.
+  function closeViaSwipe(card: HTMLElement, fromY: number, scale: number) {
+    setOpen(false);
+    cards.forEach((c) => {
+      if (c === card) return;
+      c.getAnimations().forEach((a) => a.cancel());
+      c.animate([{ opacity: getComputedStyle(c).opacity }, { opacity: 0 }], {
+        duration: 250,
+        easing: 'ease-out',
+        fill: 'forwards',
+      });
+    });
+    card.getAnimations().forEach((a) => a.cancel());
+    const anim = card.animate(
+      [
+        { transform: `scale(${scale}) translateY(${fromY}px)`, opacity: getComputedStyle(card).opacity },
+        { transform: `scale(${scale}) translateY(${fromY + SLIDE_DISTANCE}px)`, opacity: 0 },
+      ],
+      { duration: 350, easing: 'ease-in', fill: 'forwards' }
+    );
+    anim.finished.then(() => anim.cancel()).catch(() => {});
+  }
+
+  track?.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' || !isMobileOrTablet() || !track) return;
+    const card = (e.target as HTMLElement).closest<HTMLElement>('[data-service-card]');
+    if (!card) return;
+    swipeCard = card;
+    swipeScale = cardVisualState(card, track.scrollLeft + track.clientWidth / 2).scale;
+    swipeStartX = e.clientX;
+    swipeStartY = e.clientY;
+    swipeStartTime = e.timeStamp;
+    swipeDeltaY = 0;
+    swipeDirection = null;
+    swipePointerId = e.pointerId;
+  });
+
+  track?.addEventListener('pointermove', (e) => {
+    if (!swipeCard || e.pointerId !== swipePointerId || !track) return;
+    const dx = e.clientX - swipeStartX;
+    const dy = e.clientY - swipeStartY;
+
+    if (!swipeDirection) {
+      // Wait for enough movement to confidently read the gesture's
+      // direction — locking on the first pixel of jitter would misclassify
+      // real horizontal swipes.
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      swipeDirection = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal';
+      if (swipeDirection === 'vertical') {
+        track.style.scrollSnapType = 'none';
+        swipeCard.setPointerCapture(swipePointerId);
+      } else {
+        // A real horizontal swipe — hand this pointer back to native scroll
+        // entirely, nothing left for this handler to do.
+        swipeCard = null;
+        return;
+      }
+    }
+
+    if (swipeDirection !== 'vertical') return;
+    e.preventDefault();
+    swipeDeltaY = Math.max(0, dy); // downward only — an upward drag is a no-op
+    swipeCard.style.transform = `scale(${swipeScale}) translateY(${swipeDeltaY}px)`;
+    swipeCard.style.opacity = String(Math.max(0.4, 1 - swipeDeltaY / 400));
+  });
+
+  function endSwipe(e: PointerEvent) {
+    if (!swipeCard || e.pointerId !== swipePointerId || !track) return;
+    const card = swipeCard;
+    const wasVertical = swipeDirection === 'vertical';
+    swipeCard = null;
+    swipeDirection = null;
+    track.style.scrollSnapType = 'x proximity';
+    if (!wasVertical) return;
+
+    const elapsed = e.timeStamp - swipeStartTime;
+    const velocity = swipeDeltaY / Math.max(elapsed, 1);
+    if (swipeDeltaY > SWIPE_CLOSE_THRESHOLD_PX || velocity > SWIPE_CLOSE_VELOCITY_PX_MS) {
+      closeViaSwipe(card, swipeDeltaY, swipeScale);
+    } else {
+      // Under threshold — spring back, same overshoot-and-settle language
+      // as every other press/release interaction on the site.
+      card.getAnimations().forEach((a) => a.cancel());
+      const settle = card.animate(
+        [
+          { transform: `scale(${swipeScale}) translateY(${swipeDeltaY}px)`, opacity: card.style.opacity },
+          { transform: `scale(${swipeScale}) translateY(-8px)`, opacity: 1, offset: 0.7 },
+          { transform: `scale(${swipeScale}) translateY(0)`, opacity: 1 },
+        ],
+        { duration: 380, easing: 'ease-out', fill: 'forwards' }
+      );
+      settle.finished
+        .then(() => {
+          settle.cancel();
+          card.style.transform = '';
+          card.style.opacity = '';
+        })
+        .catch(() => {});
+    }
+  }
+
+  track?.addEventListener('pointerup', endSwipe);
+  track?.addEventListener('pointercancel', endSwipe);
+
   // Mouse drag-to-scroll (touch/trackpad already scroll the track natively).
   let dragging = false;
   let dragMoved = false;
