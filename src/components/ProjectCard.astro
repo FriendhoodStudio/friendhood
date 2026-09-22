@@ -17,7 +17,7 @@ interface Props {
    * in slightly on hover instead (see mediaClass below).
    */
   layout?: 'scroll' | 'grid';
-  /** Position within the row — drives the automatic Tall/Short alternation below. */
+  /** Position within the row — drives the automatic 4:5/7:8 alternation below. */
   index?: number;
 }
 
@@ -36,14 +36,17 @@ const { project, showCaption = true, layout = 'scroll', index = 0 } = Astro.prop
 // what's wanted there instead (grid cards never widen on hover, so there's
 // no "grows taller mid-hover" risk to avoid).
 //
-// Tall/Short alternation is a Home-only device for visual rhythm in the bare-image
-// row — driven automatically by position (odd index = Short) rather than a manual
-// per-project field, so editors don't have to think about it and the rhythm can't
-// drift out of alternation as projects get added/reordered/featured. The Work grid
-// (showCaption) always uses CaseStudy-Card's fixed 700/523 "Tall" image ratio,
-// confirmed directly against Figma — position never affects Work sizing, so every
-// card there lines up in a clean grid.
-const heightRatio = showCaption ? 610 / 523 : index % 2 === 1 ? 610 / 523 : 700 / 523;
+// Portrait/Portrait alternation is a Home-only device for visual rhythm in
+// the bare-image row — driven automatically by position (odd index = the
+// shorter 7:8) rather than a manual per-project field, so editors don't have
+// to think about it and the rhythm can't drift out of alternation as
+// projects get added/reordered/featured. 7:8 sits between square and 4:5 —
+// enough contrast to read as a deliberate rhythm without the starker square
+// crop tried first. The Work grid (showCaption) always uses the taller 4:5
+// ratio — position never affects Work sizing, so every card there lines up
+// in a clean grid. (Previously exact Figma pixel ratios — 523/700 and
+// 523/610 — rounded to clean 4:5/7:8 fractions instead.)
+const heightRatio = showCaption ? 5 / 4 : index % 2 === 1 ? 8 / 7 : 5 / 4;
 const mediaStyle = layout === 'grid' ? `aspect-ratio:${1 / heightRatio}` : `height:calc(var(--col-4) * ${heightRatio})`;
 // 'scroll' (Home) cards get the 3D tilt instead (see ProjectGallery.astro's
 // script) — the inner image zoom stacked awkwardly on top of that (two

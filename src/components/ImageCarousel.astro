@@ -104,10 +104,10 @@ const { images } = Astro.props;
        flex-filling whatever space was left), which doesn't generalise to
        an editor-controlled, unlimited-length list. Re-enables the scroll
        the shared .full-bleed-scroll class turns off at this tier (see
-       global.css). Narrow images keep a fixed width (--col-4) with their
-       own 523/700 ratio; wide images get a fixed width (--col-6) instead
-       of flex-fill; both stretch to a shared row height via align-items:
-       stretch + object-cover. */
+       global.css). Narrow images keep a fixed width (--col-4) with a 4:5
+       ratio (matches the project card's own portrait ratio); wide images
+       get a fixed width (--col-6) instead of flex-fill; both stretch to a
+       shared row height via align-items: stretch + object-cover. */
     .carousel-row {
       overflow-x: auto;
       width: calc(100% + 2 * var(--page-margin));
@@ -121,7 +121,7 @@ const { images } = Astro.props;
     }
     .carousel-image[data-wide='false'] {
       width: var(--col-4);
-      aspect-ratio: 523 / 700;
+      aspect-ratio: 4 / 5;
     }
     .carousel-image[data-wide='true'] {
       width: var(--col-6);

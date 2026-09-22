@@ -35,7 +35,7 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
         <p class="w-full font-display text-h1 text-front">{caseStudy.openingStatement}</p>
       </div>
 
-      <div class="reveal-item aspect-[1670/940] w-full overflow-hidden rounded-card">
+      <div class="reveal-item aspect-[16/9] w-full overflow-hidden rounded-card">
         <img src={caseStudy.heroImageUrl} alt={caseStudy.heroImageAlt} class="h-full w-full object-cover" loading="eager" />
       </div>
 
@@ -63,7 +63,7 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
           <div class="reveal-item flex w-full items-start gap-gutter">
             {block.items.map((item) => (
               <div
-                class={`overflow-hidden rounded-card ${block.items.length === 2 ? 'aspect-[810/940] flex-1' : 'aspect-[1670/940] w-full'}`}
+                class={`overflow-hidden rounded-card ${block.items.length === 2 ? 'aspect-[4/5] flex-1' : 'aspect-[16/9] w-full'}`}
               >
                 {item.type === 'video' ? (
                   <video src={item.url} class="h-full w-full object-cover" autoplay muted loop playsinline />
