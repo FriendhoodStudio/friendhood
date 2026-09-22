@@ -22,6 +22,32 @@ function urlFor(source: SanityImageSource) {
   return builder.image(source).auto('format');
 }
 
+// A shared width scale rather than each call site picking its own ad-hoc
+// number (previously: 900, 1100, 1200, 1670, 2200 — five near-arbitrary
+// values across nine call sites, several of them within ~10% of each other
+// for no real reason). Every image request below maps to the nearest of
+// these four:
+//   sm — small tiles/avatars (Services' 63px circle + its own bigger detail
+//        card reuse the same source, sm covers both)
+//   md — the common portrait card/thumbnail size (project cards, About's
+//        approach cards, link cards, carousel narrow, hero preview media)
+//   lg — case study body media (full-width and the 2-up side-by-side slot
+//        share one code path, so this covers both; already 2x+ the 2-up
+//        slot's real display width)
+//   xl — slots with the most headroom to fill: carousel wide images, and
+//        the case study hero specifically (unlike body media, its full-width
+//        slot has no page max-width, so it's the one place a very wide
+//        desktop monitor can render past what `lg` would deliver)
+// Consolidating onto four shared values also means Sanity's CDN can reuse
+// the same cached derivative across different images/components requesting
+// the same bucket, instead of generating a distinct one per ad-hoc number.
+const IMAGE_WIDTH = {
+  sm: 900,
+  md: 1200,
+  lg: 1700,
+  xl: 2400,
+} as const;
+
 export interface RawMedia {
   mediaType: 'image' | 'video';
   heroImage?: SanityImageSource;
@@ -34,13 +60,13 @@ function toMedia(raw: RawMedia, alt: string): Media {
     return {
       type: 'video',
       url: raw.heroVideoUrl,
-      posterUrl: raw.videoPoster ? urlFor(raw.videoPoster).width(1200).fit('max').url() : undefined,
+      posterUrl: raw.videoPoster ? urlFor(raw.videoPoster).width(IMAGE_WIDTH.md).fit('max').url() : undefined,
       alt,
     };
   }
   return {
     type: 'image',
-    url: urlFor(raw.heroImage!).width(1200).fit('max').url(),
+    url: urlFor(raw.heroImage!).width(IMAGE_WIDTH.md).fit('max').url(),
     alt,
   };
 }
@@ -138,7 +164,10 @@ export function toCaseStudyData(raw: RawCaseStudy): CaseStudyData {
     title: raw.title,
     slug: raw.slug,
     openingStatement: raw.openingStatement,
-    heroImageUrl: urlFor(raw.heroImage).width(1670).fit('max').url(),
+    // xl, not lg — unlike the body media below, this full-width slot has no
+    // page max-width, so it's the one place a very wide desktop monitor can
+    // render past what lg would deliver without the browser upscaling.
+    heroImageUrl: urlFor(raw.heroImage).width(IMAGE_WIDTH.xl).fit('max').url(),
     // Falls back to a generic-but-non-empty description when an editor
     // hasn't filled in the Alt text field yet (e.g. every case study
     // created before that field existed) — never render an empty alt on
@@ -163,7 +192,7 @@ export function toCaseStudyData(raw: RawCaseStudy): CaseStudyData {
                   ? { type: 'video', url: item.videoUrl! }
                   : {
                       type: 'image',
-                      url: urlFor(item.asset!).width(1670).fit('max').url(),
+                      url: urlFor(item.asset!).width(IMAGE_WIDTH.lg).fit('max').url(),
                       alt: item.alt || `${raw.title} project image`,
                     }
             );
@@ -243,7 +272,7 @@ export function toServicesData(raw: RawServices): ServicesData {
       (item): ServiceItem => ({
         name: item.name,
         cardTitle: item.cardTitle,
-        imageUrl: urlFor(item.image).width(900).fit('max').url(),
+        imageUrl: urlFor(item.image).width(IMAGE_WIDTH.sm).fit('max').url(),
         overview: item.overview,
         modules: item.modules,
       })
@@ -265,6 +294,9 @@ export function toLogoCarouselData(raw: RawLogoCarousel): LogoCarouselData {
     logos: raw.logos.map(
       (item): LogoItem => ({
         name: item.name,
+        // Height-constrained, not width — logos sit in a fixed-height strip
+        // at varying natural widths, the opposite of every other image here,
+        // so it doesn't belong in the IMAGE_WIDTH scale above.
         logoUrl: urlFor(item.logo).height(220).fit('max').url(),
       })
     ),
@@ -286,7 +318,7 @@ export function toLinkCardsData(raw: RawLinkCards): LinkCardsData {
     cards: raw.cards.map(
       (item): LinkCardItem => ({
         label: item.label,
-        imageUrl: urlFor(item.image).width(1100).fit('max').url(),
+        imageUrl: urlFor(item.image).width(IMAGE_WIDTH.md).fit('max').url(),
         href: item.href,
       })
     ),
@@ -335,7 +367,10 @@ export function toAboutData(raw: RawAbout): AboutData {
       .filter((item) => !!item.image?.asset)
       .map(
         (item): CarouselImageItem => ({
-          url: urlFor(item.image).width(item.wide ? 2200 : 1200).fit('max').url(),
+          url: urlFor(item.image)
+            .width(item.wide ? IMAGE_WIDTH.xl : IMAGE_WIDTH.md)
+            .fit('max')
+            .url(),
           alt: item.image.asset?.altText || 'Friendhood',
           wide: item.wide,
         })
@@ -348,7 +383,7 @@ export function toAboutData(raw: RawAbout): AboutData {
       (card): ApproachCard => ({
         title: card.title,
         text: card.text,
-        imageUrl: urlFor(card.image).width(1200).fit('max').url(),
+        imageUrl: urlFor(card.image).width(IMAGE_WIDTH.md).fit('max').url(),
         imageAlt: card.image.alt || card.title,
       })
     ),
