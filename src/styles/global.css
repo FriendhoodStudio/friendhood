@@ -157,15 +157,21 @@
      as too big, so this cuts down to a size proportionate to the rest of
      the mobile type scale (tablet/desktop/wide body-1 unaffected). */
   --text-body-1: 1.125rem; /* 18px (was 25px) */
-  --text-body-1--line-height: 1.15;
+  /* Also mobile-only, deliberately looser than Figma's 115% spec (1.15,
+     restored at the 768px tier below): confirmed the 115% value WAS wired
+     through correctly everywhere (computed styles matched exactly), but it
+     still read as too tight on real mobile widths, where lines wrap much
+     shorter and tight leading is more noticeable than on a wide desktop
+     measure. 1.3 is a deliberate deviation, not a bug fix. */
+  --text-body-1--line-height: 1.3;
   --text-body-1--letter-spacing: 0em;
 
   --text-body-2: 1.3125rem; /* 21px */
-  --text-body-2--line-height: 1.15;
+  --text-body-2--line-height: 1.3;
   --text-body-2--letter-spacing: -0.02em;
 
   --text-body-3: 1rem; /* 16px */
-  --text-body-3--line-height: 1.15;
+  --text-body-3--line-height: 1.3;
   --text-body-3--letter-spacing: 0em;
 
   --text-detail: 0.875rem; /* 14px */
@@ -333,8 +339,13 @@
     --text-h2: 2.625rem; /* 42px */
     --text-h3: 2.25rem; /* 36px */
     --text-body-1: 1.5625rem; /* 25px */
+    /* Back to Figma's own 115% from here up — the looser 1.3 in the base
+       tier is a mobile-only deviation (see the comment there). */
+    --text-body-1--line-height: 1.15;
     --text-body-2: 1.375rem; /* 22px */
+    --text-body-2--line-height: 1.15;
     --text-body-3: 1.125rem; /* 18px */
+    --text-body-3--line-height: 1.15;
     --text-detail: 1rem; /* 16px */
 
     --spacing-vertical-s: 0.9375rem; /* 15px */
