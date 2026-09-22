@@ -14,11 +14,6 @@ const media = hero?.media;
 // the tiny background loop unmuted.
 const reelVideoUrl = hero?.reelVideoUrl;
 
-// Cycled by position (not matched by word text), so any word added in
-// Sanity automatically picks up the next colour in sequence — wrapping back
-// to the start if there are more words than colours.
-const colorSequence = ['#EB8FB5', '#E4552E', '#B1B7EB', '#889C3C', '#E7FE54'];
-
 // Splits the headline around the one literal word that rolls on hover, so
 // the rest of the sentence stays put — e.g. "For people thinking about
 // tomorrow." with swap word "people" becomes "For " + [people/places/...] +
@@ -33,31 +28,10 @@ const headlineAfter = swapIndex >= 0 ? headline.slice(swapIndex + headlineSwapWo
 const hoverWords =
   swapIndex >= 0 && headlineHoverWords.length > 0 ? [headlineSwapWord, ...headlineHoverWords] : [];
 const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
-// Colours for each hover word, built the same way loopWords duplicates the
-// first word at the end — so the looping duplicate frame gets the same
-// colour as the real first frame rather than the next one in sequence.
-const hoverWordColors = hoverWords.map((_, i) => colorSequence[i % colorSequence.length]);
-const loopColors = hoverWordColors.length > 0 ? [...hoverWordColors, hoverWordColors[0]] : [];
-
-// Pencil cursor for the doodle canvas — the "Pencil Cursor FIll" component
-// from the Figma library (node 7648:18454, the solid-body variant), inlined
-// as a base64 data URI at build time so there's no extra asset request.
-// Rendered at 30x30 (viewBox left as Figma's native 225.79x225.53 so it
-// scales down cleanly); the tip sits at the bottom-left corner of the
-// artwork, so the "1 29" hotspot in the style attribute below lands on it.
-const pencilCursorSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 225.79 225.53" fill="none">
-<path d="M76.93 215L5.84 219.69L13.13 151.21L161.54 2.81L225.33 66.6L76.93 215Z" fill="#0D0D0D"/>
-<path d="M221.01 52.69L173.1 4.78C166.72 -1.6 156.34 -1.6 149.97 4.78L140.1 14.65C139.93 14.82 139.78 15.01 139.65 15.21L130.02 24.84C129.85 25.01 129.7 25.19 129.57 25.39L16.98 137.99C14.07 140.9 11.99 144.54 10.95 148.52C10.92 148.64 10.89 148.76 10.87 148.89L0.04 221.51C-0.12 222.6 0.24 223.71 1.02 224.49C1.8 225.28 2.9 225.64 3.99 225.49L76.92 215C77.04 214.98 77.17 214.96 77.29 214.93C81.32 213.9 85.01 211.81 87.95 208.87L201.01 95.81C201.18 95.64 201.33 95.45 201.46 95.26L210.59 86.13C210.79 86 210.98 85.85 211.15 85.68L221.02 75.81C227.4 69.43 227.4 59.06 221.02 52.68L221.01 52.69ZM28.78 160.51C27.41 161.88 27.41 164.09 28.78 165.46C30.15 166.83 32.36 166.83 33.73 165.46C36.92 162.27 41.95 162.11 44.95 165.11C47.95 168.11 47.79 173.14 44.6 176.33C43.23 177.7 43.23 179.91 44.6 181.28C45.97 182.65 48.18 182.65 49.55 181.28C52.74 178.09 57.77 177.93 60.77 180.93C63.51 183.67 63.61 188.12 61.16 191.3C60.88 191.54 60.6 191.79 60.33 192.05C58.96 193.42 58.96 195.63 60.33 197C60.35 197.02 60.37 197.03 60.38 197.04C60.4 197.06 60.41 197.08 60.42 197.09C61.79 198.46 64 198.46 65.37 197.09C65.64 196.82 65.88 196.54 66.12 196.26C69.3 193.81 73.75 193.9 76.49 196.65C79.49 199.65 79.33 204.68 76.14 207.87C76.1 207.91 76.08 207.95 76.04 207.99C75.93 208.02 75.82 208.06 75.72 208.09L34.44 214.03C34.44 214.03 34.36 213.93 34.32 213.88L11.63 191.19L17.76 150.1C17.8 149.94 17.86 149.77 17.91 149.61C21.1 146.43 26.13 146.28 29.12 149.27C32.11 152.26 31.96 157.3 28.77 160.49L28.78 160.51ZM10.35 199.81L25.82 215.28L7.65 217.89L10.35 199.81ZM85.62 201.29C85.47 197.78 84.09 194.35 81.45 191.71C78.31 188.57 74.04 187.21 69.84 187.59C70.22 183.4 68.86 179.13 65.72 175.98C62.58 172.83 58.24 171.45 54.01 171.86C54.42 167.63 53.06 163.32 49.89 160.15C46.72 156.98 42.41 155.62 38.18 156.03C38.59 151.8 37.23 147.49 34.06 144.32C31.47 141.73 28.12 140.36 24.67 140.16L132.53 32.3L163.02 62.79L193.56 93.33L85.6 201.29H85.62ZM198.48 88.34L137.45 27.31L142.63 22.13L203.66 83.16L198.48 88.34ZM216.21 71.02L208.82 78.41L147.38 16.97L154.77 9.58C158.5 5.85 164.58 5.85 168.31 9.58L216.21 57.48C219.94 61.21 219.94 67.29 216.21 71.02Z" fill="#F3FAF0"/>
-<path d="M154.93 70.59C153.6 69.26 151.45 69.26 150.12 70.59L65.58 155.13C64.25 156.46 64.25 158.61 65.58 159.94C66.91 161.27 69.06 161.27 70.39 159.94L154.93 75.4C156.26 74.07 156.26 71.92 154.93 70.59Z" fill="#F3FAF0"/>
-<path d="M81.59 171.13C80.26 172.46 80.26 174.61 81.59 175.94C82.92 177.27 85.07 177.27 86.4 175.94L170.94 91.4C172.27 90.07 172.27 87.92 170.94 86.59C169.61 85.26 167.46 85.26 166.13 86.59L81.59 171.13Z" fill="#F3FAF0"/>
-<path d="M139.29 54.95C137.96 53.62 135.81 53.62 134.48 54.95L49.94 139.49C48.61 140.82 48.61 142.97 49.94 144.3C51.27 145.63 53.42 145.63 54.75 144.3L139.29 59.76C140.62 58.43 140.62 56.28 139.29 54.95Z" fill="#F3FAF0"/>
-</svg>`;
-const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).toString('base64')}`;
 ---
 
 <section
   class="relative flex flex-col items-center px-[var(--page-margin)]"
-  style="padding-top:calc(var(--spacing-vertical-xl) * 1.4); gap:calc(var(--spacing-vertical-xl) * 1.4)"
   data-hero-section
 >
   {/* Backdrop: the gradient's own colour stops are lifted directly from the
@@ -70,46 +44,89 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
       than reading as a subtle static texture.) */}
   <div class="hero-backdrop pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
     <div class="hero-gradient absolute inset-0"></div>
+    {/* Experimental — starts fully opaque (a light --color-front cover
+        over the normal dark gradient) and fades out as you scroll, see
+        the invert script below; sits above the gradient so it hides it
+        completely at scroll position 0. */}
+    <div class="absolute inset-0 bg-front" data-hero-invert-overlay></div>
   </div>
 
-  <h1
-    class="hero-fade-in hero-headline-shadow relative z-20 max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front pointer-events-none"
-  >
-    {loopWords.length > 0 ? (
-      <Fragment>
-        {headlineBefore}<span
-          class="relative inline-block h-[1em] align-bottom overflow-hidden"
-          data-hero-word-window
-        ><span class="flex flex-col items-start" data-hero-word-track>
-          {loopWords.map((word, i) => (
-            <span
-              class="block h-[1em] whitespace-nowrap leading-none"
-              data-hero-word
-              style={loopColors[i] ? `color:${loopColors[i]}` : undefined}
-            >{word}</span>
-          ))}
-        </span></span><br class="hero-mobile-break" />{headlineAfter}
-      </Fragment>
-    ) : (
-      headline
-    )}
-  </h1>
+  {/* Keeps the headline roughly vertically centred in the space below the
+      nav — min-h-[76dvh] (a fixed fraction of the viewport, not tied to
+      the actual height of the tagline/media below) plus flex centring.
+      A flex-1-based version that stretched this block to exactly fill the
+      gap up to the tagline's real position was tried first and tuned to
+      dead-centre — but the showreel is much taller than one viewport
+      (~830px), so "the remaining space before the tagline" collapsed to
+      almost nothing and jammed the headline against the nav. Percentage-
+      of-viewport sizing is deliberately independent of what's below so it
+      can't collapse like that, at the cost of being an approximation
+      rather than an exact centre between two measured points. margin-top
+      nudges it down slightly for nav clearance. */}
+  <div class="flex min-h-[76dvh] w-full items-center justify-center" style="margin-top:var(--nav-menu-height)">
+    <h1
+      class="hero-fade-in hero-headline-shadow hero-headline-trial-font relative z-20 max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front pointer-events-none"
+    >
+      {loopWords.length > 0 ? (
+        <Fragment>
+          {/* The cycling word sits inside a plain h-[1em] window, same as
+              the static headline text's own line box — the Heavy trial
+              weight's top/bottom clipping and the next-word show-through
+              both traced back to the font FILE's own declared ascent/
+              descent metrics running well past its actual ink, and are
+              fixed at the font-face level (see the ascent-override/
+              descent-override comment in global.css), not here.
+              That fix is vertical-only, though: it doesn't touch the
+              window's WIDTH, which is set to the exact measured advance-
+              width of the current word (see the script below) — and this
+              font's rounded terminals paint slightly past that advance
+              width on the right regardless (confirmed live: a Range over
+              the text node measures flush with the window's edge, "govs"/
+              "orgs"/etc.'s trailing "s" is still visibly clipped there).
+              .hero-word-window-clip's clip-path expands the paint region a
+              few px past the window's right edge to cover exactly that —
+              deliberately NOT done by padding the window's actual WIDTH
+              (tried first): that adds dead space only on the right, making
+              the gap to "thinking" visibly bigger than the gap from "For"
+              on the left. clip-path is paint-only, so it can't do that. */}
+          {headlineBefore}<span
+            class="hero-word-window-clip relative inline-block h-[1em] align-bottom overflow-visible"
+            data-hero-word-window
+          ><span class="flex flex-col items-start" data-hero-word-track>
+            {loopWords.map((word, i) => (
+              <span
+                class="block h-[1em] whitespace-nowrap leading-none"
+                data-hero-word
+              >{word}</span>
+            ))}
+          </span></span><br class="hero-mobile-break" />{headlineAfter}
+        </Fragment>
+      ) : (
+        headline
+      )}
+    </h1>
+  </div>
 
-  <div class="flex w-full flex-col items-start gap-vertical-s">
+  {/* gap reduced from gap-vertical-s to gap-vertical-xs — brings the
+      tagline right up close to the showreel below it. */}
+  <div class="flex w-full flex-col items-start gap-vertical-xs">
     <p class="w-full text-center font-tag text-detail text-front" data-hero-tagline>
       <span class="hero-tagline-shadow relative z-20 inline-flex items-baseline pointer-events-none">
         {tagline}
-        <span class="mb-[0.08em] ml-[0.25em] h-px w-[1.1em] self-end bg-front" aria-hidden="true"></span>
-        <img src={pencilCursor} alt="" class="h-[1em] w-auto drop-shadow-[0_1px_8px_rgba(0,0,0,0.7)]" />
-        {/* First-visit nudge toward the drawable canvas — shown once (see
-            script below, gated on localStorage) rather than every visit,
-            since a returning visitor already knows it's there. */}
-        <span
-          data-hero-draw-hint
-          class="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-m border border-front/15 bg-grey-600 px-3 py-1 font-tag text-detail text-front opacity-0 backdrop-blur-[14px] transition-opacity duration-500 ease-out"
+        <svg
+          class="ml-[0.25em] h-[0.7em] w-auto drop-shadow-[0_1px_8px_rgba(0,0,0,0.7)]"
+          viewBox="0 0 18 18"
+          fill="none"
+          aria-hidden="true"
         >
-          Click &amp; drag the pencil
-        </span>
+          <path
+            d="M9 2.5V15.5M9 15.5L3.5 10M9 15.5L14.5 10"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
       </span>
     </p>
 
@@ -150,25 +167,6 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
       </div>
     )}
   </div>
-
-  {/* Generative spray-paint backdrop, sitting below the headline/tagline
-      (z-20) but above the media — visitors interact with it to build up an
-      abstract painted backdrop behind the text, not to draw literal marks
-      on top of it. Deliberately not a freehand pencil trace: big grainy
-      sprayed clusters can't spell anything out, which sidesteps the
-      moderation problem a literal "write anything you like on our
-      homepage" tool would be. Spray colour tracks whichever hero-word
-      colour is currently showing (see script below), so the palette keeps
-      shifting the same way the headline does. */}
-  {/* No touch-action override — the draw interaction is mouse/pen-only
-      (see startSpawning below), so touch needs its default scroll/pan
-      behaviour left completely alone here. */}
-  <canvas
-    class="absolute inset-0 z-10 h-full w-full"
-    style={`cursor: url("${pencilCursor}") 1 29, crosshair;`}
-    data-hero-canvas
-    aria-label="Add colour to your neighbourhood"
-  ></canvas>
 </section>
 
 {reelVideoUrl && (
@@ -200,6 +198,28 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
 )}
 
 <style>
+  /* Experimental — trying Greed Extended's Heavy trial weight for just
+     this headline, not the rest of the site (see the @font-face comment
+     in global.css for why it's a separate family name rather than a
+     font-weight on the existing one). Falls back to the licensed Regular
+     weight, then sans-serif, if the trial file fails to load. */
+  .hero-headline-trial-font {
+    font-family: "Greed Extended Heavy Trial", "Greed Extended", sans-serif;
+  }
+
+  /* See the markup comment by data-hero-word-window for why this exists —
+     expands the window's paint region a few px past its right edge so the
+     Heavy trial weight's rounded terminals aren't clipped there, without
+     padding the window's actual layout width (which would visibly unbalance
+     the "For [word] thinking" spacing either side). `overflow-visible` on
+     the window (see markup) is what gives clip-path room to paint past the
+     border box at all — with overflow-hidden the border box clips first
+     regardless of what clip-path says. Top/bottom stay flush (0) — that
+     axis is already handled by the font-face's ascent/descent-override. */
+  .hero-word-window-clip {
+    clip-path: inset(0 -8px 0 0);
+  }
+
   /* Colour stops derived from the reference gradient (Figma node
      7718:19099) but dialled back well past the original ~25% toward black
      (was #25080c/#100521) — even that read as too present/saturated
@@ -317,38 +337,15 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     }
   }
 
-  /* Off by default — a permanently-on shadow read as a stray dark halo
-     around the headline/tagline against the plain gradient backdrop before
-     anyone's actually drawn anything with the spray canvas. Faded in/out via
-     WAAPI (see the canvas script below), not a CSS transition — confirmed
-     directly that Chrome cannot reliably transition text-shadow's alpha via
-     a class toggle here: it computes the correct target value the instant
-     the transition is disabled, but with the transition active the change
-     just never visibly applies at all, permanently stuck at the start
-     value. WAAPI doesn't have that problem, and it's already the pattern
-     every other non-trivial animation on this site uses. */
-  .hero-headline-shadow {
-    text-shadow: 0 3px 20px rgba(0, 0, 0, 0);
-  }
   .hero-tagline-shadow {
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0);
-    /* Responds to whatever's directly behind it — the gradient, the grain,
-       any spray particles drawn under it — instead of sitting as a flat
-       static colour on top. `difference` inverts against the backdrop,
-       which (unlike `overlay`) stays legible against our mostly near-black
-       background without needing a brighter base colour first; `exclusion`
-       is the same idea with a softer, lower-contrast result if this reads
-       as too harsh — a one-word swap to try. */
+    /* Responds to whatever's directly behind it — the gradient, the grain —
+       instead of sitting as a flat static colour on top. `difference`
+       inverts against the backdrop, which (unlike `overlay`) stays legible
+       against our mostly near-black background without needing a brighter
+       base colour first; `exclusion` is the same idea with a softer,
+       lower-contrast result if this reads as too harsh — a one-word swap
+       to try. */
     mix-blend-mode: difference;
-  }
-
-  /* Exempted from the tagline's mix-blend-mode above via its own stacking
-     context — without this the hint tooltip (which has its own solid-ish
-     background/border) would inherit the same colour-inverting blend
-     against whatever's behind IT specifically, instead of just reading as
-     a normal UI tooltip. */
-  [data-hero-draw-hint] {
-    isolation: isolate;
   }
   /*
    * Different hover/auto-advance words have different natural widths
@@ -423,27 +420,39 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
   const tagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Shared with the doodle canvas below: whatever colour the headline word
-  // is currently showing is also the pen colour, so the two features read
-  // as one system rather than two unrelated animations. Matches the first
-  // hero-word colour by default (the resting state before any word swap).
-  let currentColor = '#EB8FB5';
-
   function clamp(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value));
   }
+
+  // Captured once, before any scroll listener runs — the media's own
+  // on-load position, whatever that happens to be given the current
+  // layout (previously this assumed it always started at the bottom of
+  // the viewport via `start = vh`, which broke once the hero was
+  // compacted enough that the video is already visible on load: progress
+  // was landing partway through instead of at 0, so the tagline showed up
+  // already partly scrolled-away — translateY'd up and faded — before any
+  // actual scrolling had happened). Using the real starting position keeps
+  // this self-calibrating regardless of how the layout above it changes.
+  let mediaStartTop = 0;
 
   function update() {
     if (!media) return;
     const rect = media.getBoundingClientRect();
     const vh = window.innerHeight;
-    // progress: 0 while the media's top is still at the bottom of the viewport,
-    // 1 once it has scrolled up to ~35% from the top — i.e. fully "arrived".
-    const start = vh;
+    // progress: 0 at the media's actual on-load position, 1 once it has
+    // scrolled up to ~35% from the top of the viewport — i.e. fully
+    // "arrived".
+    const start = mediaStartTop;
     const end = vh * 0.35;
     const progress = clamp((start - rect.top) / (start - end), 0, 1);
 
-    const scale = 0.88 + 0.12 * progress;
+    // Base raised from 0.88 — scale() shrinks around the element's own
+    // centre, so the more it starts scaled down, the more its visual top
+    // edge (not just its layout box, which doesn't move) drifts down from
+    // the tagline above it. 0.88 was creating a ~45px gap on top of the
+    // actual CSS gap between them once the video sits this close to the
+    // tagline in the current layout.
+    const scale = 0.96 + 0.04 * progress;
     media.style.transform = `scale(${scale})`;
 
     if (tagline) {
@@ -457,6 +466,7 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
   }
 
   if (!reduceMotion && media) {
+    mediaStartTop = media.getBoundingClientRect().top;
     let rafId = 0;
     const onScroll = () => {
       if (rafId) return;
@@ -468,6 +478,58 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     update();
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
+  }
+
+  // Experimental — the hero starts inverted (light --color-front backdrop,
+  // dark --color-back headline/tagline) rather than matching the rest of
+  // the site, then reverses back to the normal dark theme as you scroll
+  // through it. Scroll-scrubbed like the media/tagline effect above (tied
+  // to how far you've scrolled, not a timer), and kept as its own
+  // independent scroll listener rather than folded into update() above
+  // since that one's gated on media existing and this shouldn't be.
+  {
+    const invertSection = document.querySelector<HTMLElement>('[data-hero-section]');
+    const invertOverlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
+    const invertHeadline = document.querySelector<HTMLElement>('.hero-headline-shadow');
+    const invertTagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
+
+    const COLOR_BACK = { r: 0x0d, g: 0x0d, b: 0x0d };
+    const COLOR_FRONT = { r: 0xf3, g: 0xfa, b: 0xf0 };
+    function lerpColor(a: typeof COLOR_BACK, b: typeof COLOR_BACK, t: number) {
+      const r = Math.round(a.r + (b.r - a.r) * t);
+      const g = Math.round(a.g + (b.g - a.g) * t);
+      const bl = Math.round(a.b + (b.b - a.b) * t);
+      return `rgb(${r}, ${g}, ${bl})`;
+    }
+
+    function updateInvert() {
+      if (!invertSection) return;
+      const rect = invertSection.getBoundingClientRect();
+      // Fully inverted at the very top, fully back to normal once scrolled
+      // one viewport height (times 0.6, so it doesn't take a full screen's
+      // worth of scrolling to finish) past the section's own top.
+      const distance = window.innerHeight * 0.6;
+      const progress = clamp(-rect.top / distance, 0, 1);
+
+      if (invertOverlay) invertOverlay.style.opacity = String(1 - progress);
+      const textColor = lerpColor(COLOR_BACK, COLOR_FRONT, progress);
+      if (invertHeadline) invertHeadline.style.color = textColor;
+      if (invertTagline) invertTagline.style.color = textColor;
+    }
+
+    if (!reduceMotion && invertSection) {
+      let invertRafId = 0;
+      const onInvertScroll = () => {
+        if (invertRafId) return;
+        invertRafId = requestAnimationFrame(() => {
+          updateInvert();
+          invertRafId = 0;
+        });
+      };
+      updateInvert();
+      window.addEventListener('scroll', onInvertScroll, { passive: true });
+      window.addEventListener('resize', onInvertScroll);
+    }
   }
 
   // Headline hover word: each mouseenter rolls the track up by one word
@@ -500,10 +562,19 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
     // breakpoint, so they're re-measured on resize (see below) rather than
     // captured once — otherwise the box keeps its stale desktop/mobile size
     // after the viewport crosses a breakpoint.
+    //
+    // Deliberately NOT padded to cover the Heavy trial weight's rounded
+    // terminals painting slightly past their own advance-width box on the
+    // right (confirmed live: a Range over the text node measures flush with
+    // the window's edge, but the "s" in "orgs" was still visibly clipped
+    // there). Padding the WIDTH to fix that adds dead space only on the
+    // right, which throws off the "For [word] thinking" spacing on either
+    // side — the browser reports this measurement correctly, the ink just
+    // overshoots it, so the fix belongs on the clip-path (paint-only, see
+    // .hero-word-window-clip) rather than here on layout.
     const frames = Array.from(track.children) as HTMLElement[];
     let frameWidths = frames.map((frame) => frame.getBoundingClientRect().width);
     if (frameWidths[0]) win.style.width = `${frameWidths[0]}px`;
-    if (frames[0]) currentColor = getComputedStyle(frames[0]).color;
 
     // On a cold cache, this script can run (and take the measurement above)
     // before Greed Extended has finished loading — the window gets sized
@@ -641,17 +712,10 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
       playWordRoll(-index * framePercent);
       const width = frameWidths[index];
       if (width) animateWordWidth(width);
-      const frame = frames[index];
-      if (frame) currentColor = getComputedStyle(frame).color;
     }
 
-    // Auto-advances on a timer on every screen (not just touch/no-hover
-    // devices) — the doodle canvas's pen colour rides on this same tick, so
-    // the palette needs to keep shifting even on desktop where a visitor
-    // never hovers the word. This also means the canvas overlay sitting on
-    // top of the hero (capturing pointer events for drawing) no longer
-    // blocks a hover-to-advance interaction that a mouseenter listener would
-    // otherwise depend on.
+    // Auto-advances on a timer on every screen, not just touch/no-hover
+    // devices — desktop visitors who never hover the word still see it cycle.
     window.setInterval(advance, 2200);
 
     let resizeRafId = 0;
@@ -673,472 +737,6 @@ const pencilCursor = `data:image/svg+xml;base64,${Buffer.from(pencilCursorSvg).t
       });
     });
 
-  }
-
-  // Generative spray-paint backdrop, sitting behind the headline/tagline
-  // (see the z-index note on the canvas markup) — deliberately NOT a
-  // freehand pencil trace any more. Letting visitors draw literal legible
-  // lines/text on a public marketing page is a moderation risk (nothing
-  // stops someone writing something you don't want on your homepage);
-  // big grainy sprayed clusters can't spell anything out, so there's no
-  // content to moderate. Colour is `currentColor`, kept live by the
-  // word-cycle block above — the two features share one variable rather
-  // than the canvas re-deriving the colour itself.
-  const canvas = document.querySelector<HTMLCanvasElement>('[data-hero-canvas]');
-  const heroSection = document.querySelector<HTMLElement>('[data-hero-section]');
-  const mediaEl = document.querySelector<HTMLElement>('[data-hero-media]');
-  const ctx = canvas?.getContext('2d') ?? null;
-
-  if (canvas && heroSection && ctx) {
-    // Headline/tagline shadow fade — WAAPI-driven rather than a CSS
-    // transition (see the CSS comment above .hero-headline-shadow for why).
-    // Both elements animate independently since animate() only ever
-    // targets one element per call.
-    const headlineShadowEl = document.querySelector<HTMLElement>('.hero-headline-shadow');
-    const taglineShadowEl = document.querySelector<HTMLElement>('.hero-tagline-shadow');
-    const HEADLINE_SHADOW_OFF = '0 3px 20px rgba(0, 0, 0, 0)';
-    const HEADLINE_SHADOW_ON = '0 3px 20px rgba(0, 0, 0, 0.9)';
-    const TAGLINE_SHADOW_OFF = '0 1px 8px rgba(0, 0, 0, 0)';
-    const TAGLINE_SHADOW_ON = '0 1px 8px rgba(0, 0, 0, 0.7)';
-
-    let heroTextShadowActive = false;
-
-    function setHeroTextShadow(active: boolean) {
-      if (active === heroTextShadowActive) return;
-      heroTextShadowActive = active;
-      [
-        { el: headlineShadowEl, off: HEADLINE_SHADOW_OFF, on: HEADLINE_SHADOW_ON },
-        { el: taglineShadowEl, off: TAGLINE_SHADOW_OFF, on: TAGLINE_SHADOW_ON },
-      ].forEach(({ el, off, on }) => {
-        if (!el) return;
-        el.getAnimations().forEach((a) => a.cancel());
-        el.animate([{ textShadow: active ? off : on }, { textShadow: active ? on : off }], {
-          duration: 400,
-          easing: 'ease-out',
-          fill: 'forwards',
-        });
-      });
-    }
-
-    // First-visit nudge toward the drawable canvas — shown once per
-    // browser (localStorage, not sessionStorage), since a returning
-    // visitor already knows it's there and re-showing it every visit
-    // would just be noise. Dismissed by the first real interaction, or
-    // after a few seconds unattended either way.
-    const hint = document.querySelector<HTMLElement>('[data-hero-draw-hint]');
-    const HINT_SEEN_KEY = 'friendhood-hero-hint-seen';
-    if (hint && !localStorage.getItem(HINT_SEEN_KEY)) {
-      const showTimeout = window.setTimeout(() => {
-        hint.style.opacity = '1';
-      }, 1200);
-      const hideHint = () => {
-        window.clearTimeout(showTimeout);
-        hint.style.opacity = '0';
-        localStorage.setItem(HINT_SEEN_KEY, '1');
-      };
-      canvas.addEventListener('pointerdown', hideHint, { once: true });
-      window.setTimeout(hideHint, 7000);
-    }
-
-    const dpr = () => window.devicePixelRatio || 1;
-
-    function resizeCanvas() {
-      if (!canvas || !heroSection) return;
-      const rect = heroSection.getBoundingClientRect();
-      const scale = dpr();
-      const nextWidth = Math.round(rect.width * scale);
-      const nextHeight = Math.round(rect.height * scale);
-      if (canvas.width === nextWidth && canvas.height === nextHeight) return;
-      // No bitmap to preserve across the resize — blobs are kept as data
-      // and the whole canvas redraws from that every frame regardless, so
-      // resizing just changes the backing store size; the next render-loop
-      // tick repaints everything at the new size on its own.
-      canvas.width = nextWidth;
-      canvas.height = nextHeight;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-    }
-
-    resizeCanvas();
-
-    let canvasResizeRafId = 0;
-    window.addEventListener('resize', () => {
-      if (canvasResizeRafId) return;
-      canvasResizeRafId = requestAnimationFrame(() => {
-        canvasResizeRafId = 0;
-        resizeCanvas();
-      });
-    });
-
-    // Each spray is a cluster of many small scattered particles — grainy
-    // and huge rather than a smooth glowing orb, so it reads as paint on a
-    // canvas rather than light. The particle scatter is rendered ONCE per
-    // spawn onto its own small offscreen canvas (cheap: a few hundred
-    // fill() calls that happen only at spawn time, not every frame); the
-    // main render loop then just drawImage()s that pre-rendered texture
-    // with the current fade opacity — one cheap draw call per cluster per
-    // frame, however many particles it's made of, which is what keeps this
-    // fast even with a lot of clusters alive (see the old line-based
-    // version's lag for what happens re-evaluating expensive per-shape
-    // work every single frame).
-    interface SprayCluster {
-      x: number;
-      y: number;
-      radius: number;
-      texture: HTMLCanvasElement;
-      spawnTime: number;
-    }
-    // A handful of brighter points per spawn are kept as live data (not
-    // baked into the dust texture) and individually twinkle + drift every
-    // frame — a real starfield needs a few points that visibly move/pulse,
-    // not just a static cloud. Only a bounded few per spawn, redrawn
-    // individually, is what keeps that affordable — the bulk "dust" stays
-    // in the cheap pre-rendered texture below it.
-    interface TwinkleStar {
-      x: number;
-      y: number;
-      radius: number;
-      r: number;
-      g: number;
-      b: number;
-      phase: number;
-      twinkleSpeed: number;
-      // Independent X/Y drift oscillation (different speed and phase per
-      // axis, not derived from one shared angle) — traces an irregular
-      // Lissajous-like wobble instead of a perfect circular orbit, which is
-      // what made the motion read as too clean/mechanical to feel random.
-      driftSpeedX: number;
-      driftPhaseX: number;
-      driftSpeedY: number;
-      driftPhaseY: number;
-      spawnTime: number;
-    }
-    let clusters: SprayCluster[] = [];
-    let stars: TwinkleStar[] = [];
-    let renderRafId = 0;
-    const MIN_CLUSTER_RADIUS = 140;
-    const MAX_CLUSTER_RADIUS = 260;
-    // Both radii above are sized for a desktop-width canvas — on a narrow
-    // mobile canvas a single 140-260px burst can span most of the screen.
-    // Scaled down by the canvas's actual width relative to that desktop
-    // reference (1670px, the same content-width reference used elsewhere
-    // on the site), floored so it never shrinks to near-invisible dust.
-    const CLUSTER_SCALE_REFERENCE_WIDTH = 1670;
-    const MIN_CLUSTER_SCALE = 0.45;
-    function clusterScale() {
-      if (!canvas) return 1;
-      return Math.min(1, Math.max(MIN_CLUSTER_SCALE, canvas.clientWidth / CLUSTER_SCALE_REFERENCE_WIDTH));
-    }
-    // Fewer, size-varied particles read as scattered star-dust; the old
-    // 180-at-fairly-even-size was what made it look like an even coat of
-    // spray rather than something organic.
-    const PARTICLES_PER_CLUSTER = 110;
-    const STARS_PER_CLUSTER = 4;
-    const STAR_DRIFT_RADIUS = 2.5;
-    const FADE_IN_MS = 250;
-    const HOLD_MS = 20000;
-    const FADE_MS = 5000;
-    // Spawning on every pointermove would be excessive — one cluster every
-    // ~130ms while the pointer's down reads as a steady build-up without
-    // turning to mud.
-    const SPAWN_INTERVAL_MS = 130;
-    // MAX_LIVE_CLUSTERS/MAX_LIVE_STARS are hard backstops against unbounded
-    // memory growth (e.g. a pointer held down for minutes), not limits
-    // expected to trigger in normal use — they splice the array instantly
-    // with no fade, so hitting one mid-fade reads as a genuine bug (items
-    // "just disappearing") rather than a graceful cutoff. Sustained
-    // painting has a real steady-state population — spawn rate x how long
-    // each item stays alive — that both caps need comfortable headroom
-    // over: ~192 clusters (1000/130 spawns/sec x 25s cluster life) and
-    // ~770 stars (4x that rate x 25s star life). The old caps (220/500)
-    // sat right at or BELOW that steady state, so a normal ~15-20s painting
-    // session was enough to start truncating live items — that was the bug.
-    const MAX_LIVE_CLUSTERS = 600;
-    const MAX_LIVE_STARS = 1500;
-
-    // `currentColor` starts as a hardcoded hex default but gets overwritten
-    // with `getComputedStyle(...).color` as soon as the headline word first
-    // advances (see the word-cycle block above), which the browser reports
-    // back as "rgb(r, g, b)", not hex — so both forms need handling here.
-    function parseColor(color: string) {
-      if (color.startsWith('#')) {
-        const clean = color.slice(1);
-        return {
-          r: parseInt(clean.slice(0, 2), 16),
-          g: parseInt(clean.slice(2, 4), 16),
-          b: parseInt(clean.slice(4, 6), 16),
-        };
-      }
-      const match = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-      return match
-        ? { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]) }
-        : { r: 255, g: 255, b: 255 };
-    }
-
-    function buildSprayTexture(radius: number, r: number, g: number, b: number) {
-      const scale = dpr();
-      const size = Math.ceil(radius * 2 * scale);
-      const texture = document.createElement('canvas');
-      texture.width = size;
-      texture.height = size;
-      const tctx = texture.getContext('2d')!;
-      const center = size / 2;
-      for (let i = 0; i < PARTICLES_PER_CLUSTER; i++) {
-        // Uniform-area random point in a circle (not just random angle +
-        // random distance, which would bunch particles toward the centre)
-        // — sqrt(random) is the standard correction for that.
-        const angle = Math.random() * Math.PI * 2;
-        const dist = radius * scale * Math.sqrt(Math.random());
-        const px = center + Math.cos(angle) * dist;
-        const py = center + Math.sin(angle) * dist;
-        // Squaring random() skews toward small values with occasional
-        // bigger ones — mostly fine dust, not an even coat of same-sized
-        // dots, which is what read as "spray can" rather than star-dust.
-        const particleRadius = (0.5 + Math.pow(Math.random(), 2) * 2.5) * scale;
-        const alpha = 0.12 + Math.random() * 0.28;
-        tctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        tctx.beginPath();
-        tctx.arc(px, py, particleRadius, 0, Math.PI * 2);
-        tctx.fill();
-      }
-      return texture;
-    }
-
-    function spawnCluster(x: number, y: number, color: string) {
-      // Text shadow on the headline/tagline is only useful once there's
-      // actually spray content behind them to separate from — see the
-      // matching fade-out below.
-      setHeroTextShadow(true);
-      const { r, g, b } = parseColor(color);
-      const radius = (MIN_CLUSTER_RADIUS + Math.random() * (MAX_CLUSTER_RADIUS - MIN_CLUSTER_RADIUS)) * clusterScale();
-      const spawnTime = performance.now();
-      clusters.push({ x, y, radius, texture: buildSprayTexture(radius, r, g, b), spawnTime });
-      if (clusters.length > MAX_LIVE_CLUSTERS) {
-        clusters.splice(0, clusters.length - MAX_LIVE_CLUSTERS);
-      }
-
-      for (let i = 0; i < STARS_PER_CLUSTER; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = radius * Math.sqrt(Math.random());
-        stars.push({
-          x: x + Math.cos(angle) * dist,
-          y: y + Math.sin(angle) * dist,
-          radius: 1.5 + Math.random() * 2,
-          r,
-          g,
-          b,
-          phase: Math.random() * Math.PI * 2,
-          // Wide, per-star randomised range (was a tight 0.0009-0.0021) so
-          // flickers land at genuinely different, unpredictable intervals
-          // per star rather than a narrow band that still reads as one
-          // shared rhythm once enough stars are on screen together.
-          twinkleSpeed: 0.00022 + Math.random() * 0.0007,
-          // X and Y intentionally NOT the same speed (0.6-1.6x apart) — two
-          // independent sine waves at different frequencies trace an
-          // irregular wandering path rather than a clean circle or ellipse.
-          driftSpeedX: 0.00015 + Math.random() * 0.00012,
-          driftPhaseX: Math.random() * Math.PI * 2,
-          driftSpeedY: 0.00015 + Math.random() * 0.00012 * (0.6 + Math.random()),
-          driftPhaseY: Math.random() * Math.PI * 2,
-          spawnTime,
-        });
-      }
-      if (stars.length > MAX_LIVE_STARS) {
-        stars.splice(0, stars.length - MAX_LIVE_STARS);
-      }
-
-      if (!renderRafId) renderRafId = requestAnimationFrame(renderLoop);
-    }
-
-    function renderLoop() {
-      if (!ctx || !canvas) return;
-      const now = performance.now();
-      const scale = dpr();
-      clusters = clusters.filter((c) => now - c.spawnTime < HOLD_MS + FADE_MS);
-      stars = stars.filter((s) => now - s.spawnTime < HOLD_MS + FADE_MS);
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Plain alpha compositing, not additive ("lighter") blending — layers
-      // like actual paint/pigment instead of brightening like light where
-      // clusters overlap, which is what made the previous version read as
-      // a light show rather than an abstract canvas.
-      for (const c of clusters) {
-        const age = now - c.spawnTime;
-        let opacity = 1;
-        if (age < FADE_IN_MS) opacity = age / FADE_IN_MS;
-        else if (age > HOLD_MS) opacity = Math.max(0, 1 - (age - HOLD_MS) / FADE_MS);
-
-        ctx.globalAlpha = opacity;
-        const half = c.texture.width / 2;
-        ctx.drawImage(c.texture, c.x * scale - half, c.y * scale - half);
-      }
-
-      // The twinkling stars draw on top of the dust — individually
-      // animated, so this is where the "alive" motion actually comes from.
-      // twinkle is sin()-squared (always >= 0) so it pulses between dim and
-      // bright rather than ever fully vanishing; drift is a tiny slow
-      // circular wobble, not a directed movement, so it reads as floating
-      // rather than travelling anywhere.
-      for (const s of stars) {
-        const age = now - s.spawnTime;
-        let opacity = 1;
-        if (age < FADE_IN_MS) opacity = age / FADE_IN_MS;
-        else if (age > HOLD_MS) opacity = Math.max(0, 1 - (age - HOLD_MS) / FADE_MS);
-        if (opacity <= 0) continue;
-
-        // A high exponent on a clamped sine spends most of its time near
-        // the dim floor, only briefly spiking toward 1 when the phase lines
-        // up — reads as an occasional flash rather than the old smooth,
-        // constant back-and-forth pulse.
-        const twinkle = 0.3 + 0.7 * Math.pow(Math.max(0, Math.sin(now * s.twinkleSpeed + s.phase)), 8);
-        const px = (s.x + Math.sin(now * s.driftSpeedX + s.driftPhaseX) * STAR_DRIFT_RADIUS) * scale;
-        const py = (s.y + Math.sin(now * s.driftSpeedY + s.driftPhaseY) * STAR_DRIFT_RADIUS) * scale;
-
-        // Glow via a radial gradient, not shadowBlur — shadowBlur is a real
-        // per-call blur convolution, which is exactly what made the old
-        // line-based version laggy once more than a handful of shapes
-        // needed it every frame. A gradient fill is comparatively cheap
-        // even at a few hundred stars alive at once.
-        const glowAlpha = 0.16 * opacity * twinkle;
-        const glowRadius = s.radius * 2.5 * scale;
-        const glow = ctx.createRadialGradient(px, py, 0, px, py, glowRadius);
-        glow.addColorStop(0, `rgba(${s.r}, ${s.g}, ${s.b}, ${glowAlpha})`);
-        glow.addColorStop(1, `rgba(${s.r}, ${s.g}, ${s.b}, 0)`);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Crisp bright core on top of its own glow.
-        ctx.globalAlpha = opacity * twinkle;
-        ctx.fillStyle = `rgb(${s.r}, ${s.g}, ${s.b})`;
-        ctx.beginPath();
-        ctx.arc(px, py, s.radius * scale, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-
-      if (clusters.length > 0 || stars.length > 0) {
-        renderRafId = requestAnimationFrame(renderLoop);
-      } else {
-        // Nothing left to animate — stop rather than looping forever on a
-        // page nobody's actually touched. Also the moment every last spray
-        // has faded, so the headline/tagline shadow (see spawnCluster) goes
-        // with it rather than lingering with nothing left to justify it.
-        setHeroTextShadow(false);
-        renderRafId = 0;
-      }
-    }
-
-    function pointerPos(e: PointerEvent) {
-      const rect = canvas!.getBoundingClientRect();
-      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    }
-
-    // The media block (image/video) sits below the canvas in z-order, same
-    // as everywhere else in the hero — but once a gesture is in progress
-    // the canvas holds pointer capture (see startSpawning), which bypasses
-    // normal z-index hit-testing and would otherwise happily keep spawning
-    // orbs over the video. Checked by geometry instead, against fresh
-    // coordinates each call rather than a cached rect, since the media can
-    // reflow at different breakpoints.
-    function isOverMedia(clientX: number, clientY: number) {
-      if (!mediaEl) return false;
-      const r = mediaEl.getBoundingClientRect();
-      return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
-    }
-
-    let pointerDown = false;
-    let lastSpawnTime = 0;
-
-    // Touch specifically needs to tell a scroll swipe apart from a draw
-    // gesture — both are the same single-finger drag, so a browser can't
-    // distinguish them in advance the way it can for mouse (scroll there
-    // is a distinct wheel/trackpad gesture, not a mouse drag). Resolved by
-    // reading intent from TIME instead of direction: a normal swipe (the
-    // vast majority of touch interaction with this page) always scrolls,
-    // completely untouched by any of this, because nothing below ever
-    // calls preventDefault or claims the pointer until AFTER a deliberate
-    // hold. Only a touch that stays still for a beat commits to drawing —
-    // the same long-press-before-drag pattern other canvas/drawing apps
-    // use to resolve this exact conflict. By the time the hold timer
-    // fires, the touch has been stationary long enough that the browser's
-    // own gesture recognizer won't have started a scroll from it, so
-    // claiming the pointer at that point is uncontested.
-    const TOUCH_HOLD_MS = 400;
-    const TOUCH_HOLD_MOVE_TOLERANCE = 10;
-    let touchHoldTimer = 0;
-    let touchHoldStart = { x: 0, y: 0 };
-    let touchDrawing = false;
-
-    function beginDrawing(x: number, y: number, timeStamp: number, pointerId: number) {
-      pointerDown = true;
-      spawnCluster(x, y, currentColor);
-      lastSpawnTime = timeStamp;
-      // Delayed (fired from the hold timer, not directly inside the event
-      // handler for touch) — by that point some engines no longer consider
-      // the pointer "active" for capture purposes even though the finger
-      // is still down. Non-fatal either way: capture is a nice-to-have for
-      // keeping the gesture tracked past the canvas's own bounds, not a
-      // requirement for spawnCluster/keepSpawning to keep working.
-      try {
-        canvas!.setPointerCapture(pointerId);
-      } catch {}
-    }
-
-    function startSpawning(e: PointerEvent) {
-      if (isOverMedia(e.clientX, e.clientY)) return;
-      if (e.pointerType === 'touch') {
-        touchHoldStart = { x: e.clientX, y: e.clientY };
-        window.clearTimeout(touchHoldTimer);
-        touchHoldTimer = window.setTimeout(() => {
-          touchDrawing = true;
-          const { x, y } = pointerPos(e);
-          beginDrawing(x, y, performance.now(), e.pointerId);
-        }, TOUCH_HOLD_MS);
-        return;
-      }
-      const { x, y } = pointerPos(e);
-      beginDrawing(x, y, e.timeStamp, e.pointerId);
-    }
-
-    function keepSpawning(e: PointerEvent) {
-      if (e.pointerType === 'touch') {
-        if (!touchDrawing) {
-          // Moved more than a few px before the hold timer fired — this
-          // was a normal scroll swipe, not a hold-then-draw gesture.
-          // Cancel the pending timer and do nothing else; native scrolling
-          // was never interrupted in the first place.
-          const dx = e.clientX - touchHoldStart.x;
-          const dy = e.clientY - touchHoldStart.y;
-          if (Math.hypot(dx, dy) > TOUCH_HOLD_MOVE_TOLERANCE) {
-            window.clearTimeout(touchHoldTimer);
-          }
-          return;
-        }
-        // Now committed to drawing — stop the browser from also trying to
-        // scroll from the same gesture.
-        e.preventDefault();
-      }
-      if (!pointerDown) return;
-      if (isOverMedia(e.clientX, e.clientY)) return;
-      if (e.timeStamp - lastSpawnTime < SPAWN_INTERVAL_MS) return;
-      const { x, y } = pointerPos(e);
-      spawnCluster(x, y, currentColor);
-      lastSpawnTime = e.timeStamp;
-    }
-
-    function stopSpawning() {
-      window.clearTimeout(touchHoldTimer);
-      touchDrawing = false;
-      pointerDown = false;
-    }
-
-    canvas.addEventListener('pointerdown', startSpawning);
-    canvas.addEventListener('pointermove', keepSpawning);
-    canvas.addEventListener('pointerup', stopSpawning);
-    canvas.addEventListener('pointercancel', stopSpawning);
   }
 
   // Reel modal — the background hero video is already the showreel (muted,

@@ -17,6 +17,32 @@
   font-display: swap;
 }
 
+/* Experimental — trial weight, tried just for the hero H1 (see the
+   font-family override scoped to it in Hero.astro), not swapped in
+   site-wide. A separate family name from "Greed Extended" above rather
+   than a heavier font-weight on that one, since trial/production files
+   for the same family can't safely share one @font-face without risking
+   the wrong file winning at a given weight. Would need the licensed
+   (non-trial) Heavy file before this could ship for real. */
+@font-face {
+  font-family: "Greed Extended Heavy Trial";
+  src: url("../assets/fonts/GreedExtended-Heavy-TRIAL.woff2") format("woff2");
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+  /* This trial export's own declared ascent/descent run well past its
+     actual ink (measured live: e.g. "people" inks at 55.5px inside a 63px
+     em box, but renders as if it needed ~77.5px) — harmless in normal flow,
+     but it broke the Hero word-cycle's h-[1em] overflow-hidden clip box,
+     which relies on ascent/descent to place a word's baseline sensibly
+     within a fixed-height box. Overridden to close to the font's real ink
+     bounds (measured across the full hero word list, plus a small margin):
+     tallest ascender ~70.5% of the em, deepest descender ~20.8%. */
+  ascent-override: 72%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
 @font-face {
   font-family: "Greed Narrow";
   src:
