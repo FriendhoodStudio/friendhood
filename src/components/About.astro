@@ -30,8 +30,6 @@ const clients = about?.clients ?? [];
   <ImageCarousel images={introImages} />
 </section>
 
-<slot name="services" />
-
 <section class="flex flex-col gap-vertical-l px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-approach">
   <div class="flex w-full flex-col items-start gap-vertical-s">
     <p class="reveal-item font-tag text-detail text-grey-300">{approachLabel}</p>
@@ -52,6 +50,8 @@ const clients = about?.clients ?? [];
     ))}
   </div>
 </section>
+
+<slot name="services" />
 
 <style>
   /*
