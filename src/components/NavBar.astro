@@ -18,7 +18,7 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
         {/* Left padding is wider than the right on purpose: the logo SVG's own bounding box already
             reserves ~7px on the right for the ® mark past the last full-height letter, so equal
             code-level padding would leave the wordmark itself sitting closer to the left edge. */}
-        <img src={logo.src} alt="Friendhood — Home" class="h-[80%] w-auto" />
+        <img src={logo.src} alt="Friendhood — Home" class="nav-logo-img h-[80%] w-auto" />
       </a>
 
       <button
@@ -81,6 +81,15 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
      CSS transition above is only what plays while held down. */
   .nav-pill.is-settling {
     transition: none;
+  }
+
+  /* Smaller on desktop specifically — at 80% of --nav-menu-height (68px
+     there) the wordmark read as oversized next to the Menu button once the
+     pill itself is that much bigger than on mobile/tablet. */
+  @media (min-width: 1200px) {
+    .nav-logo-img {
+      height: 62%;
+    }
   }
 </style>
 
