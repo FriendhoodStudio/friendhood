@@ -17,16 +17,11 @@ const { services } = Astro.props;
 // REPEAT_COUNT in the script below.
 const REPEAT_COUNT = 5;
 const looped = Array.from({ length: REPEAT_COUNT }, () => services).flat();
-// vw-based (not a fixed px value stepped per breakpoint like most of the
-// site) since this needs to hold up continuously across the whole mobile/
-// tablet range, portrait AND landscape, not just the 4 Figma reference
-// widths — same reasoning as .col-grid's landscape override elsewhere.
-// Was 85vw: at narrow mobile widths the centered card left only ~5px of the
-// next one peeking past the inter-card gap, giving no visible hint the
-// track scrolls. 72vw keeps a clearer ~30-60px peek on both sides at real
-// mobile widths, while the 446px cap (unchanged) already gives a generous
-// peek from ~525px up — this only needed narrowing at the low end.
-const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
+// Width itself now lives on .services-card in the <style> block (with its
+// own desktop override — see there), so this is just the snap alignment;
+// kept as a separate inline style rather than folded into the class list
+// since it's a one-off scroll-container concern, not a reusable utility.
+const cardSizeStyle = 'scroll-snap-align:center;';
 ---
 
 <div
@@ -139,6 +134,18 @@ const cardSizeStyle = 'width:min(446px, 72vw); scroll-snap-align:center;';
      the much longer placeholder text Figma's example happened to use. */
   .services-card {
     height: 670px;
+    width: min(446px, 72vw);
+  }
+
+  /* Narrower still at desktop — 446px (the mobile/tablet cap) read as too
+     wide once there's enough screen for several cards' worth of peek either
+     side; matches the same 1200px threshold the rest of the site's "L" tier
+     switches on. Height/content padding are untouched, so this only tightens
+     the measure of the title/overview text, not how much of it fits. */
+  @media (min-width: 1200px) {
+    .services-card {
+      width: 380px;
+    }
   }
 
   /* Doubled on mobile specifically (20px vs the 10px the *1.25 formula
