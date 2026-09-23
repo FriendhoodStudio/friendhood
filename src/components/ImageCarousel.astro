@@ -16,7 +16,13 @@ const { images } = Astro.props;
           class="carousel-image reveal-item shrink-0 overflow-hidden rounded-card"
           data-wide={item.wide ? 'true' : 'false'}
         >
-          <img src={item.url} alt={item.alt} class="h-full w-full object-cover" loading="lazy" />
+          <img
+            src={item.url}
+            alt={item.alt}
+            class="h-full w-full cursor-zoom-in object-cover"
+            loading="lazy"
+            data-lightbox-image
+          />
         </div>
       ))}
     </div>

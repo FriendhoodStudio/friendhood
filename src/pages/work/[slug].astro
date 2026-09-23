@@ -4,6 +4,7 @@ import CategoryTag from '../../components/CategoryTag.astro';
 import DividerSmall from '../../components/DividerSmall.astro';
 import ProjectGallery from '../../components/ProjectGallery.astro';
 import ImageCarousel from '../../components/ImageCarousel.astro';
+import Lightbox from '../../components/Lightbox.astro';
 import { fetchProjectSlugs, fetchCaseStudy } from '../../lib/sanity/queries';
 
 export async function getStaticPaths() {
@@ -36,7 +37,13 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
       </div>
 
       <div class="reveal-item aspect-[16/9] w-full overflow-hidden rounded-card">
-        <img src={caseStudy.heroImageUrl} alt={caseStudy.heroImageAlt} class="h-full w-full object-cover" loading="eager" />
+        <img
+          src={caseStudy.heroImageUrl}
+          alt={caseStudy.heroImageAlt}
+          class="h-full w-full cursor-zoom-in object-cover"
+          loading="eager"
+          data-lightbox-image
+        />
       </div>
 
       {caseStudy.overview && (
@@ -68,7 +75,13 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
                 {item.type === 'video' ? (
                   <video src={item.url} class="h-full w-full object-cover" autoplay muted loop playsinline />
                 ) : (
-                  <img src={item.url} alt={item.alt} class="h-full w-full object-cover" loading="lazy" />
+                  <img
+                    src={item.url}
+                    alt={item.alt}
+                    class="h-full w-full cursor-zoom-in object-cover"
+                    loading="lazy"
+                    data-lightbox-image
+                  />
                 )}
               </div>
             ))}
@@ -140,6 +153,8 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
       <ProjectGallery projects={caseStudy.relatedProjects} showCaption={true} layout="grid" />
     </div>
   )}
+
+  <Lightbox />
 </Layout>
 
 <style>

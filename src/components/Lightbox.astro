@@ -1,0 +1,231 @@
+---
+// Case-study image lightbox. Any `[data-lightbox-image]` on the page —
+// the hero image, body media images, and every image inside every
+// ImageCarousel instance — opens this on click, flattened into one
+// full-screen carousel across the WHOLE page rather than each image's own
+// context. Rendered once per page; the script queries the marker
+// attribute globally, so nothing else needs to know this exists.
+---
+
+<div
+  data-lightbox-overlay
+  data-open="false"
+  inert
+  class="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center bg-back/95 p-[14px] opacity-0 backdrop-blur-[10px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100 sm:p-[24px]"
+>
+  <button
+    type="button"
+    data-lightbox-close
+    aria-label="Close"
+    class="lightbox-btn absolute right-[14px] top-[14px] flex h-[52px] w-[52px] cursor-pointer items-center justify-center rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px] transition-[scale] duration-300 ease-out hover:scale-110 sm:right-[24px] sm:top-[24px]"
+  >
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M1 1L17 17M17 1L1 17" stroke="#F3FAF0" stroke-width="1.5" stroke-linecap="round" />
+    </svg>
+  </button>
+
+  {/* Only meaningful with more than one image on the page — hidden via
+      script (same auto-disable idiom as ImageCarousel's own prev/next)
+      rather than a build-time check, since the full flattened count isn't
+      known until every component on the page has rendered. */}
+  <button
+    type="button"
+    data-lightbox-prev
+    aria-label="Previous image"
+    class="lightbox-btn absolute left-[14px] top-1/2 flex h-[52px] w-[52px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px] transition-[scale] duration-300 ease-out hover:scale-110 sm:left-[24px]"
+  >
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M11 2.5L4.5 9L11 15.5" stroke="#F3FAF0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
+  <button
+    type="button"
+    data-lightbox-next
+    aria-label="Next image"
+    class="lightbox-btn absolute right-[14px] top-1/2 flex h-[52px] w-[52px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px] transition-[scale] duration-300 ease-out hover:scale-110 sm:right-[24px]"
+  >
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M7 2.5L13.5 9L7 15.5" stroke="#F3FAF0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
+
+  <img
+    data-lightbox-image-el
+    src=""
+    alt=""
+    class="max-h-full max-w-full touch-none select-none rounded-card object-contain"
+    draggable="false"
+  />
+
+  <p
+    data-lightbox-counter
+    class="pointer-events-none absolute bottom-[14px] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-m border border-front/15 bg-grey-600 px-3 py-1 font-tag text-detail text-front backdrop-blur-[14px] sm:bottom-[24px]"
+  ></p>
+</div>
+
+<style>
+  .lightbox-btn.is-pressed {
+    transform: scale(0.82);
+    transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .lightbox-btn.is-settling {
+    transition: none;
+  }
+</style>
+
+<script>
+  import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock';
+
+  const overlay = document.querySelector<HTMLElement>('[data-lightbox-overlay]');
+  const imageEl = document.querySelector<HTMLImageElement>('[data-lightbox-image-el]');
+  const closeBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-close]');
+  const prevBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-prev]');
+  const nextBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-next]');
+  const counter = document.querySelector<HTMLElement>('[data-lightbox-counter]');
+
+  if (overlay && imageEl && closeBtn && prevBtn && nextBtn && counter) {
+    // Every marked image on the page, in DOM order — the hero, each body
+    // media image, and every image inside every ImageCarousel instance —
+    // flattened into one list regardless of which component rendered it,
+    // so paging through from any starting point covers the whole page.
+    const sources = Array.from(document.querySelectorAll<HTMLImageElement>('[data-lightbox-image]'));
+    const multiple = sources.length > 1;
+    prevBtn.hidden = !multiple;
+    nextBtn.hidden = !multiple;
+
+    let currentIndex = 0;
+
+    function render() {
+      const source = sources[currentIndex];
+      if (!source) return;
+      imageEl!.src = source.currentSrc || source.src;
+      imageEl!.alt = source.alt;
+      counter!.textContent = `${currentIndex + 1} / ${sources.length}`;
+    }
+
+    function open(index: number) {
+      currentIndex = index;
+      render();
+      overlay!.dataset.open = 'true';
+      overlay!.removeAttribute('inert');
+      lockBodyScroll();
+    }
+
+    function close() {
+      overlay!.dataset.open = 'false';
+      overlay!.setAttribute('inert', '');
+      unlockBodyScroll();
+    }
+
+    function next() {
+      currentIndex = (currentIndex + 1) % sources.length;
+      render();
+    }
+
+    function prev() {
+      currentIndex = (currentIndex - 1 + sources.length) % sources.length;
+      render();
+    }
+
+    sources.forEach((source, index) => {
+      source.addEventListener('click', () => open(index));
+    });
+
+    closeBtn.addEventListener('click', close);
+    nextBtn.addEventListener('click', next);
+    prevBtn.addEventListener('click', prev);
+
+    overlay.addEventListener('click', (e) => {
+      // Only the backdrop itself, not the image or any control, all of
+      // which are also technically within the overlay's own click target.
+      if (e.target === overlay) close();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (overlay!.dataset.open !== 'true') return;
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowRight' && multiple) next();
+      else if (e.key === 'ArrowLeft' && multiple) prev();
+    });
+
+    // Touch swipe — a simplified version of the services carousel's own
+    // exactly-one-step-per-gesture technique: no infinite loop or
+    // neighbouring-card peek to manage here, just one full-screen image at
+    // a time, so a plain drag-then-commit-on-threshold is enough. Live-
+    // follows the finger via translateX during the drag so it doesn't feel
+    // like a dead swipe-and-wait, then settles back to centre (new image)
+    // or forward to centre (same image) depending on which side of the
+    // threshold it ends on.
+    const SWIPE_COMMIT_THRESHOLD_PX = 50;
+    let swipePointerId: number | null = null;
+    let swipeStartX = 0;
+    let swipeDeltaX = 0;
+
+    imageEl.addEventListener('pointerdown', (e) => {
+      if (!multiple) return;
+      swipePointerId = e.pointerId;
+      swipeStartX = e.clientX;
+      swipeDeltaX = 0;
+      imageEl!.style.transition = 'none';
+      imageEl!.setPointerCapture(e.pointerId);
+    });
+
+    imageEl.addEventListener('pointermove', (e) => {
+      if (swipePointerId !== e.pointerId) return;
+      swipeDeltaX = e.clientX - swipeStartX;
+      imageEl!.style.translate = `${swipeDeltaX}px 0`;
+    });
+
+    function endSwipe(e: PointerEvent) {
+      if (swipePointerId !== e.pointerId) return;
+      swipePointerId = null;
+      imageEl!.style.transition = 'translate 250ms cubic-bezier(0.22, 1, 0.36, 1)';
+      imageEl!.style.translate = '0 0';
+      if (swipeDeltaX <= -SWIPE_COMMIT_THRESHOLD_PX) next();
+      else if (swipeDeltaX >= SWIPE_COMMIT_THRESHOLD_PX) prev();
+      swipeDeltaX = 0;
+    }
+
+    imageEl.addEventListener('pointerup', endSwipe);
+    imageEl.addEventListener('pointercancel', endSwipe);
+
+    // Overshoot-and-settle press feedback, same as every other icon button
+    // on the site.
+    [closeBtn, prevBtn, nextBtn].forEach((btn) => {
+      let settleAnim: Animation | null = null;
+
+      btn.addEventListener('pointerdown', () => {
+        settleAnim?.cancel();
+        btn.classList.remove('is-settling');
+        btn.classList.add('is-pressed');
+      });
+
+      const releasePress = () => {
+        if (!btn.classList.contains('is-pressed')) return;
+        settleAnim = btn.animate(
+          [
+            { transform: 'scale(0.82)' },
+            { transform: 'scale(1.12)', offset: 0.55 },
+            { transform: 'scale(0.97)', offset: 0.8 },
+            { transform: 'scale(1)' },
+          ],
+          { duration: 380, easing: 'ease-out', fill: 'forwards' }
+        );
+        btn.classList.add('is-settling');
+        btn.classList.remove('is-pressed');
+
+        const anim = settleAnim;
+        anim.finished
+          .then(() => {
+            anim.cancel();
+            btn.classList.remove('is-settling');
+          })
+          .catch(() => {});
+      };
+
+      btn.addEventListener('pointerup', releasePress);
+      btn.addEventListener('pointerleave', releasePress);
+      btn.addEventListener('pointercancel', releasePress);
+    });
+  }
+</script>
