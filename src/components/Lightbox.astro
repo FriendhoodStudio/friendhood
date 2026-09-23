@@ -49,18 +49,31 @@
     </svg>
   </button>
 
-  <img
-    data-lightbox-image-el
-    src=""
-    alt=""
-    class="max-h-full max-w-full touch-none select-none rounded-card object-contain"
-    draggable="false"
-  />
-
-  <p
-    data-lightbox-counter
-    class="pointer-events-none absolute bottom-[14px] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-m border border-front/15 bg-grey-600 px-3 py-1 font-tag text-detail text-front backdrop-blur-[14px] sm:bottom-[24px]"
-  ></p>
+  {/* Common coordinate space both images slide within — sized to the
+      overlay's own full padded content box (not to either image's natural
+      size) specifically so there's a shared 100%-wide track to translateX
+      across. Each image is then individually letterboxed inside that same
+      box via object-contain, exactly as a single centred image was
+      before. touch-action: none hands touch gesture recognition entirely
+      to the JS drag below — same reasoning as the services carousel: without
+      it, a thumb drag was fighting the browser's own native scroll/pan
+      gesture on the same element. */}
+  <div data-lightbox-stage class="relative h-full w-full overflow-hidden" style="touch-action: none;">
+    <img
+      data-lightbox-image-current
+      src=""
+      alt=""
+      class="absolute inset-0 h-full w-full select-none object-contain"
+      draggable="false"
+    />
+    <img
+      data-lightbox-image-incoming
+      src=""
+      alt=""
+      class="absolute inset-0 h-full w-full select-none object-contain opacity-0"
+      draggable="false"
+    />
+  </div>
 </div>
 
 <style>
@@ -77,13 +90,14 @@
   import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock';
 
   const overlay = document.querySelector<HTMLElement>('[data-lightbox-overlay]');
-  const imageEl = document.querySelector<HTMLImageElement>('[data-lightbox-image-el]');
+  const stage = document.querySelector<HTMLElement>('[data-lightbox-stage]');
+  const currentEl = document.querySelector<HTMLImageElement>('[data-lightbox-image-current]');
+  const incomingEl = document.querySelector<HTMLImageElement>('[data-lightbox-image-incoming]');
   const closeBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-close]');
   const prevBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-prev]');
   const nextBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-next]');
-  const counter = document.querySelector<HTMLElement>('[data-lightbox-counter]');
 
-  if (overlay && imageEl && closeBtn && prevBtn && nextBtn && counter) {
+  if (overlay && stage && currentEl && incomingEl && closeBtn && prevBtn && nextBtn) {
     // Every marked image on the page, in DOM order — the hero, each body
     // media image, and every image inside every ImageCarousel instance —
     // flattened into one list regardless of which component rendered it,
@@ -94,18 +108,68 @@
     nextBtn.hidden = !multiple;
 
     let currentIndex = 0;
+    const SLIDE_MS = 400;
+    const SLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
-    function render() {
-      const source = sources[currentIndex];
-      if (!source) return;
-      imageEl!.src = source.currentSrc || source.src;
-      imageEl!.alt = source.alt;
-      counter!.textContent = `${currentIndex + 1} / ${sources.length}`;
+    function srcFor(index: number) {
+      const source = sources[index];
+      return source ? { src: source.currentSrc || source.src, alt: source.alt } : null;
+    }
+
+    // Slides the CURRENT image out and the image at `index` in from the
+    // appropriate side, then settles both elements back into their resting
+    // roles — current visible at rest, incoming hidden and repositioned,
+    // ready for the next call. `direction` is +1 for next (incoming enters
+    // from the right, current exits left) or -1 for prev (mirrored) —
+    // independent of how the change was triggered (button, key, or swipe),
+    // so a keyboard press and a swipe animate identically.
+    let settleAnim: Animation[] = [];
+    function goTo(index: number, direction: 1 | -1) {
+      settleAnim.forEach((a) => a.cancel());
+      const upcoming = srcFor(index);
+      if (!upcoming) return;
+      currentIndex = index;
+      incomingEl!.src = upcoming.src;
+      incomingEl!.alt = upcoming.alt;
+      incomingEl!.style.opacity = '1';
+      incomingEl!.style.translate = `${direction * 100}% 0`;
+
+      const currentAnim = currentEl!.animate(
+        [{ translate: '0 0' }, { translate: `${-direction * 100}% 0` }],
+        { duration: SLIDE_MS, easing: SLIDE_EASING, fill: 'forwards' }
+      );
+      const incomingAnim = incomingEl!.animate(
+        [{ translate: `${direction * 100}% 0` }, { translate: '0 0' }],
+        { duration: SLIDE_MS, easing: SLIDE_EASING, fill: 'forwards' }
+      );
+      settleAnim = [currentAnim, incomingAnim];
+
+      Promise.all([currentAnim.finished, incomingAnim.finished])
+        .then(() => {
+          currentAnim.cancel();
+          incomingAnim.cancel();
+          // Incoming becomes the new resting "current" — copying its
+          // already-loaded src rather than swapping element roles keeps
+          // every other reference (and the CSS below) pointing at the
+          // same two elements permanently.
+          currentEl!.src = upcoming.src;
+          currentEl!.alt = upcoming.alt;
+          currentEl!.style.translate = '0 0';
+          incomingEl!.style.opacity = '0';
+          incomingEl!.style.translate = '0 0';
+        })
+        .catch(() => {});
     }
 
     function open(index: number) {
       currentIndex = index;
-      render();
+      const source = srcFor(index);
+      if (source) {
+        currentEl!.src = source.src;
+        currentEl!.alt = source.alt;
+      }
+      incomingEl!.style.opacity = '0';
+      incomingEl!.style.translate = '0 0';
       overlay!.dataset.open = 'true';
       overlay!.removeAttribute('inert');
       lockBodyScroll();
@@ -118,13 +182,11 @@
     }
 
     function next() {
-      currentIndex = (currentIndex + 1) % sources.length;
-      render();
+      goTo((currentIndex + 1) % sources.length, 1);
     }
 
     function prev() {
-      currentIndex = (currentIndex - 1 + sources.length) % sources.length;
-      render();
+      goTo((currentIndex - 1 + sources.length) % sources.length, -1);
     }
 
     sources.forEach((source, index) => {
@@ -136,7 +198,7 @@
     prevBtn.addEventListener('click', prev);
 
     overlay.addEventListener('click', (e) => {
-      // Only the backdrop itself, not the image or any control, all of
+      // Only the backdrop itself, not the stage or any control, all of
       // which are also technically within the overlay's own click target.
       if (e.target === overlay) close();
     });
@@ -148,61 +210,100 @@
       else if (e.key === 'ArrowLeft' && multiple) prev();
     });
 
-    // Touch swipe — a simplified version of the services carousel's own
-    // exactly-one-step-per-gesture technique: no infinite loop or
-    // neighbouring-card peek to manage here, just one full-screen image at
-    // a time, so a plain drag-then-commit-on-threshold is enough. Live-
-    // follows the finger via translateX during the drag so it doesn't feel
-    // like a dead swipe-and-wait, then settles back to centre (new image)
-    // or forward to centre (same image) depending on which side of the
-    // threshold it ends on.
+    // Touch/thumb drag — live-follows the finger by scrubbing the exact
+    // same current/incoming pair goTo() animates, just driven by pointer
+    // position instead of WAAPI, so a real drag and a tap-triggered slide
+    // use the same two elements and always look like one continuous
+    // motion rather than a drag that's disconnected from the "real" slide.
+    // Direction isn't known until the first real move (a few px of
+    // slack), since a swipe can start either way.
     const SWIPE_COMMIT_THRESHOLD_PX = 50;
     let swipePointerId: number | null = null;
     let swipeStartX = 0;
-    let swipeDeltaX = 0;
+    let swipeDirection: 1 | -1 | null = null;
 
-    imageEl.addEventListener('pointerdown', (e) => {
+    stage.addEventListener('pointerdown', (e) => {
       if (!multiple) return;
       swipePointerId = e.pointerId;
       swipeStartX = e.clientX;
-      swipeDeltaX = 0;
-      imageEl!.style.transition = 'none';
-      imageEl!.setPointerCapture(e.pointerId);
+      swipeDirection = null;
+      stage!.setPointerCapture(e.pointerId);
     });
 
-    imageEl.addEventListener('pointermove', (e) => {
+    stage.addEventListener('pointermove', (e) => {
       if (swipePointerId !== e.pointerId) return;
-      swipeDeltaX = e.clientX - swipeStartX;
-      imageEl!.style.translate = `${swipeDeltaX}px 0`;
+      const dx = e.clientX - swipeStartX;
+      if (!swipeDirection) {
+        if (Math.abs(dx) < 4) return;
+        swipeDirection = dx < 0 ? 1 : -1;
+        const upcoming = srcFor((currentIndex + swipeDirection + sources.length) % sources.length);
+        if (!upcoming) return;
+        incomingEl!.style.transition = 'none';
+        incomingEl!.src = upcoming.src;
+        incomingEl!.alt = upcoming.alt;
+        incomingEl!.style.opacity = '1';
+        currentEl!.style.transition = 'none';
+      }
+      const clampedDx = Math.max(-stage!.clientWidth, Math.min(stage!.clientWidth, dx));
+      currentEl!.style.translate = `${clampedDx}px 0`;
+      incomingEl!.style.translate = `${clampedDx + swipeDirection * stage!.clientWidth}px 0`;
     });
 
     function endSwipe(e: PointerEvent) {
       if (swipePointerId !== e.pointerId) return;
       swipePointerId = null;
-      imageEl!.style.transition = 'translate 250ms cubic-bezier(0.22, 1, 0.36, 1)';
-      imageEl!.style.translate = '0 0';
-      if (swipeDeltaX <= -SWIPE_COMMIT_THRESHOLD_PX) next();
-      else if (swipeDeltaX >= SWIPE_COMMIT_THRESHOLD_PX) prev();
-      swipeDeltaX = 0;
+      if (!swipeDirection) return;
+      const dx = e.clientX - swipeStartX;
+      currentEl!.style.transition = `translate ${SLIDE_MS}ms ${SLIDE_EASING}`;
+      incomingEl!.style.transition = `translate ${SLIDE_MS}ms ${SLIDE_EASING}`;
+      if (Math.abs(dx) >= SWIPE_COMMIT_THRESHOLD_PX) {
+        const direction = swipeDirection;
+        currentEl!.style.translate = `${-direction * 100}% 0`;
+        incomingEl!.style.translate = '0 0';
+        const nextIndex = (currentIndex + direction + sources.length) % sources.length;
+        window.setTimeout(() => {
+          currentEl!.style.transition = 'none';
+          incomingEl!.style.transition = 'none';
+          currentIndex = nextIndex;
+          const settled = srcFor(currentIndex);
+          if (settled) {
+            currentEl!.src = settled.src;
+            currentEl!.alt = settled.alt;
+          }
+          currentEl!.style.translate = '0 0';
+          incomingEl!.style.opacity = '0';
+          incomingEl!.style.translate = '0 0';
+        }, SLIDE_MS);
+      } else {
+        currentEl!.style.translate = '0 0';
+        incomingEl!.style.translate = `${swipeDirection * 100}% 0`;
+        window.setTimeout(() => {
+          currentEl!.style.transition = 'none';
+          incomingEl!.style.transition = 'none';
+          incomingEl!.style.opacity = '0';
+          incomingEl!.style.translate = '0 0';
+        }, SLIDE_MS);
+      }
+      swipeDirection = null;
     }
 
-    imageEl.addEventListener('pointerup', endSwipe);
-    imageEl.addEventListener('pointercancel', endSwipe);
+    stage.addEventListener('pointerup', endSwipe);
+    stage.addEventListener('pointercancel', endSwipe);
 
     // Overshoot-and-settle press feedback, same as every other icon button
     // on the site.
     [closeBtn, prevBtn, nextBtn].forEach((btn) => {
-      let settleAnim: Animation | null = null;
+      let pressAnim: Animation | null = null;
 
       btn.addEventListener('pointerdown', () => {
-        settleAnim?.cancel();
+        pressAnim?.cancel();
         btn.classList.remove('is-settling');
         btn.classList.add('is-pressed');
       });
 
       const releasePress = () => {
         if (!btn.classList.contains('is-pressed')) return;
-        settleAnim = btn.animate(
+        pressAnim = btn.animate(
           [
             { transform: 'scale(0.82)' },
             { transform: 'scale(1.12)', offset: 0.55 },
@@ -214,7 +315,7 @@
         btn.classList.add('is-settling');
         btn.classList.remove('is-pressed');
 
-        const anim = settleAnim;
+        const anim = pressAnim;
         anim.finished
           .then(() => {
             anim.cancel();
