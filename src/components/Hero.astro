@@ -149,14 +149,6 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
           <img src={media.url} alt={media.alt} class="h-full w-full object-cover" loading="eager" />
         )}
 
-        {/* The card's own footage runs right up to its rounded bottom edge,
-            which then meets the section's solid near-black background with
-            nothing in between — a hard, blunt cut regardless of how light
-            or busy that last row of pixels happens to be. Fading the card's
-            own bottom edge into --color-back first means it dissolves into
-            the page instead of just stopping. */}
-        <div class="hero-media-bottom-fade pointer-events-none absolute inset-x-0 bottom-0 h-[18%]" aria-hidden="true"></div>
-
         {/* Deliberately a separate file from the muted loop above (see the
             reelVideo schema field) — wearecollins.com's own reel section
             does the same: a lightweight preview loop plus a distinct
@@ -343,16 +335,6 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     .hero-gradient {
       animation: none;
     }
-  }
-
-  /* See the markup comment by hero-media-bottom-fade — dissolves the
-     showreel card's bottom edge into the page background rather than
-     letting it cut straight to it. Fades toward --color-back specifically
-     (not transparent), since the fade needs to actually match the flat
-     section background it's blending into, not just fade the image to
-     nothing. */
-  .hero-media-bottom-fade {
-    background: linear-gradient(to bottom, transparent, var(--color-back) 100%);
   }
 
   .hero-tagline-shadow {
