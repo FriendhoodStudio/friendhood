@@ -119,27 +119,21 @@ const categories = [...categoryCounts.values()].sort((a, b) => a.category.title.
         entering.forEach((card) => { card.style.display = ''; });
         grid?.toggleAttribute('data-filtered', Boolean(slug));
 
-        // The scroll-scrubbed reveal system (scrollReveal.ts) sets each
-        // card's opacity/translate directly via inline style, computed from
-        // its position at the last real scroll/resize event — which is
-        // stale the instant filtering reflows the grid (surviving cards
-        // moving up to fill gaps left by removed ones). Nothing else
-        // re-triggers that recalculation, so a card whose pre-filter
-        // position hadn't been scrolled to yet stays stuck invisible
-        // (opacity: 0) even though it's now sitting in plain view — only a
-        // genuine user scroll would ever recompute it and reveal it. A
-        // synthetic scroll event forces that recalculation immediately
-        // instead of leaving it to chance.
-        window.dispatchEvent(new Event('scroll'));
+        // Collected so the scroll-reveal recompute below can wait for all
+        // of them to actually finish (see the comment there) rather than
+        // firing alongside them.
+        const settling: Animation[] = [];
 
         // Entrance for cards newly matching the filter, lightly staggered.
         entering.forEach((card, i) => {
-          card.animate(
-            [
-              { opacity: 0, scale: 0.92 },
-              { opacity: 1, scale: 1 },
-            ],
-            { duration: FLIP_DURATION, delay: i * 40, easing: FLIP_EASING, fill: 'backwards' }
+          settling.push(
+            card.animate(
+              [
+                { opacity: 0, scale: 0.92 },
+                { opacity: 1, scale: 1 },
+              ],
+              { duration: FLIP_DURATION, delay: i * 40, easing: FLIP_EASING, fill: 'backwards' }
+            )
           );
         });
 
@@ -156,13 +150,33 @@ const categories = [...categoryCounts.values()].sort((a, b) => a.category.title.
           const moved = Math.abs(dx) > 1 || Math.abs(dy) > 1;
           const resized = Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01;
           if (!moved && !resized) return;
-          card.animate(
-            [
-              { translate: `${dx}px ${dy}px`, scale: `${scaleX} ${scaleY}` },
-              { translate: '0 0', scale: '1 1' },
-            ],
-            { duration: FLIP_DURATION, easing: FLIP_EASING }
+          settling.push(
+            card.animate(
+              [
+                { translate: `${dx}px ${dy}px`, scale: `${scaleX} ${scaleY}` },
+                { translate: '0 0', scale: '1 1' },
+              ],
+              { duration: FLIP_DURATION, easing: FLIP_EASING }
+            )
           );
+        });
+
+        // The scroll-scrubbed reveal system (scrollReveal.ts) sets each
+        // card's opacity/translate directly via inline style, computed from
+        // getBoundingClientRect() at the moment it runs. Dispatching this
+        // synchronously (right here, before the FLIP animations above)
+        // means its rAF fires on the very next frame — exactly when those
+        // animations have just started, so it's reading each card's
+        // transient, still-offset MID-ANIMATION position (their old rect,
+        // translated) rather than its real settled one. That bakes in a
+        // wrong opacity (often 0, i.e. invisible) that nothing afterwards
+        // ever recomputes — only a genuine later scroll would, which is
+        // exactly what looked like cards "not appearing, or only appearing
+        // on scroll" after filtering. Waiting for every FLIP animation to
+        // actually finish first means this only ever measures the real,
+        // settled layout.
+        Promise.all(settling.map((anim) => anim.finished.catch(() => {}))).then(() => {
+          window.dispatchEvent(new Event('scroll'));
         });
       };
 
