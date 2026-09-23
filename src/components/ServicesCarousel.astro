@@ -33,11 +33,20 @@ const cardSizeStyle = 'scroll-snap-align:center;';
       tries to snap after essentially every small scroll delta rather than
       waiting for the gesture to actually finish, which is what read as
       jerky. `proximity` only snaps once scrolling naturally comes to rest
-      near a snap point, so an active gesture isn't fighting it mid-scroll. */}
+      near a snap point, so an active gesture isn't fighting it mid-scroll.
+
+      `touch-action: none` hands the browser's own touch-scroll gesture
+      recognizer off entirely — without it, a finger drag was BOTH driving
+      the exactly-one-card stepper below AND kicking off the browser's own
+      native momentum-scroll on this same overflow-x:auto element, each one
+      fighting the other's scrollLeft writes every frame. That's what read
+      as cards jumping around on mobile. All touch gesture handling here
+      (horizontal stepping, vertical swipe-to-close) is already fully
+      hand-rolled in JS, so nothing native is lost by opting out. */}
   <div
     data-services-track
     class="flex w-full items-center gap-[var(--spacing-gutter)] overflow-x-auto px-[10vw] py-[10px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    style="scroll-snap-type: x proximity;"
+    style="scroll-snap-type: x proximity; touch-action: none;"
   >
     {looped.map((service, i) => (
       <div
