@@ -615,36 +615,31 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       if (width) win.style.width = `${width}px`;
     });
 
-    // Roll overshoot-and-settle — replaces an earlier motion-blur treatment
-    // on the same roll (tried, then swapped for this instead). WAAPI rather
-    // than the CSS `transition-transform` this replaced, so it can swing
-    // past the target position before settling, same overshoot-and-settle
-    // language as the nav pill/footer buttons and the width change below.
-    // The step size between frames is always exactly one framePercent (an
-    // `advance()` call only ever moves the index by 1), so — unlike the
-    // width change, where the delta varies per word pair and has to be
-    // measured — the overshoot/settle amounts here are just a fixed
-    // fraction of that one constant step.
+    // Roll — replaces an earlier motion-blur treatment on the same roll
+    // (tried, then swapped for this instead). WAAPI rather than the CSS
+    // `transition-transform` this replaced, so animateWordWidth below (a
+    // real overshoot-and-settle, unlike this one — see the no-overshoot
+    // comment in playWordRoll) can stay in sync with it via the same
+    // Animation-based approach.
     let rollAnim: Animation | null = null;
     function playWordRoll(targetPercent: number) {
       const startPercent = -(index - 1) * framePercent;
       rollAnim?.cancel();
-      const delta = targetPercent - startPercent;
-      // Overshooting the roll at all means, for a moment, scrolling PAST
-      // the target frame within the window's clipped view — which peeks a
-      // sliver of the NEXT frame's text into view from the other side
-      // ("show-through"). 0.18 was enough overshoot for that peek to
-      // actually be visible; 0.06 keeps the same spring quality while
-      // staying small enough that the clip hides it.
-      const overshoot = targetPercent + delta * 0.06;
-      const settle = targetPercent - delta * 0.02;
+      // No overshoot on this one, unlike every other press/release
+      // interaction on the site — overshooting at all means, for a moment,
+      // scrolling PAST the target frame within the window's clipped view,
+      // peeking a sliver of the adjacent word's ink past the ascent/descent
+      // margin ("show-through"). Tried at several shrinking fractions
+      // (0.18, 0.06, 0.02) and each was still visible on mobile (390px,
+      // 40px headline) if you looked closely enough, on every transition,
+      // not just words with deep descenders — the margin just isn't big
+      // enough to swallow ANY overshoot reliably. This is also the one
+      // overshoot on the site whose "spring" is mostly hidden behind a clip
+      // anyway (the viewer only ever sees the word slide and settle, never
+      // the swing past), so there's very little felt quality actually lost
+      // by cutting it entirely rather than continuing to shrink it.
       rollAnim = track.animate(
-        [
-          { transform: `translateY(${startPercent}%)` },
-          { transform: `translateY(${overshoot}%)`, offset: 0.6 },
-          { transform: `translateY(${settle}%)`, offset: 0.85 },
-          { transform: `translateY(${targetPercent}%)` },
-        ],
+        [{ transform: `translateY(${startPercent}%)` }, { transform: `translateY(${targetPercent}%)` }],
         { duration: 650, easing: 'ease-out', fill: 'forwards' }
       );
       const anim = rollAnim;
@@ -685,9 +680,11 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       const startWidth = win.getBoundingClientRect().width;
       widthAnim?.cancel();
       const delta = targetWidth - startWidth;
-      // Dialled down alongside the roll's own overshoot (see playWordRoll)
-      // — kept paired so the two still read as one coordinated motion
-      // rather than the width visibly out-springing the roll.
+      // The roll itself no longer overshoots (see the no-overshoot comment
+      // in playWordRoll — a clipped window has no room for it), but a
+      // width change has nothing to clip against, so it keeps its own
+      // spring here same as every other press/release interaction on the
+      // site.
       const overshoot = targetWidth + delta * 0.06;
       const settle = targetWidth - delta * 0.02;
       widthAnim = win.animate(
