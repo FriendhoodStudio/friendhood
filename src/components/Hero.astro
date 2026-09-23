@@ -174,13 +174,13 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     data-reel-overlay
     data-open="false"
     inert
-    class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/95 p-[var(--page-margin)] opacity-0 backdrop-blur-[10px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100"
+    class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/95 p-[14px] opacity-0 backdrop-blur-[10px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100 sm:p-[24px]"
   >
     <button
       type="button"
       data-reel-close
       aria-label="Close video"
-      class="reel-close-btn absolute right-[var(--page-margin)] top-[var(--page-margin)] flex h-[52px] w-[52px] cursor-pointer items-center justify-center rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px] transition-[scale] duration-300 ease-out hover:scale-110"
+      class="reel-close-btn absolute right-[14px] top-[14px] flex h-[52px] w-[52px] cursor-pointer items-center justify-center rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px] transition-[scale] duration-300 ease-out hover:scale-110 sm:right-[24px] sm:top-[24px]"
     >
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
         <path d="M1 1L17 17M17 1L1 17" stroke="#F3FAF0" stroke-width="1.5" stroke-linecap="round" />
@@ -413,6 +413,8 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 </style>
 
 <script>
+  import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock';
+
   // Scroll-scrubbed hero entrance, modeled on wearecollins.com's reel section:
   // the media block grows from slightly-scaled-down to full size, and the small
   // caption above it drifts upward, as the hero scrolls up through the viewport.
@@ -756,12 +758,24 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       reelVideo!.muted = false;
       reelVideo!.currentTime = 0;
       reelVideo!.play().catch(() => {});
+      lockBodyScroll();
+      reelWentFullscreen = false;
+      // Covers opening the reel while the phone is already lying landscape
+      // (not just tilting into landscape after the fact).
+      handleReelOrientationChange();
     }
 
     function closeReel() {
       reelOverlay!.dataset.open = 'false';
       reelOverlay!.setAttribute('inert', '');
       reelVideo!.pause();
+      unlockBodyScroll();
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      const anyVideo = reelVideo as HTMLVideoElement & {
+        webkitExitFullscreen?: () => void;
+        webkitDisplayingFullscreen?: boolean;
+      };
+      if (anyVideo.webkitDisplayingFullscreen) anyVideo.webkitExitFullscreen?.();
     }
 
     reelTrigger.addEventListener('click', openReel);
@@ -774,6 +788,57 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && reelOverlay.dataset.open === 'true') closeReel();
     });
+
+    // Tilting the phone to landscape while the reel is open reads as "make
+    // this fullscreen" — the same gesture native video apps (YouTube etc.)
+    // already train people on — so mirror it via the Fullscreen API rather
+    // than leaving the viewer to find a button. iOS Safari doesn't expose
+    // the standard API on <video> the way other browsers do; it has its own
+    // native fullscreen video player instead, entered via
+    // `webkitEnterFullscreen` and — critically — dismissed by swiping down,
+    // which fires `webkitendfullscreen` on the video element rather than
+    // the standard `fullscreenchange` event. Either dismissal path (that
+    // swipe, the standard API's Escape/back gesture, or its own close
+    // control) should read as "leave the reel entirely", not "drop back to
+    // the modal underneath" — so both close the whole overlay, not just
+    // fullscreen.
+    const reelVideoEl = reelVideo as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+    let reelWentFullscreen = false;
+
+    function enterReelFullscreen() {
+      if (reelWentFullscreen || reelOverlay!.dataset.open !== 'true') return;
+      if (document.fullscreenElement || (document as unknown as { webkitFullscreenElement?: unknown }).webkitFullscreenElement) return;
+      reelWentFullscreen = true;
+      if (reelVideoEl.requestFullscreen) {
+        reelVideoEl.requestFullscreen().catch(() => {
+          reelWentFullscreen = false;
+        });
+      } else if (reelVideoEl.webkitEnterFullscreen) {
+        reelVideoEl.webkitEnterFullscreen();
+      } else {
+        reelWentFullscreen = false;
+      }
+    }
+
+    function handleReelOrientationChange() {
+      if (!window.matchMedia('(max-width: 767px)').matches) return;
+      if (window.matchMedia('(orientation: landscape)').matches) {
+        enterReelFullscreen();
+      }
+    }
+
+    reelVideoEl.addEventListener('webkitendfullscreen', () => {
+      reelWentFullscreen = false;
+      if (reelOverlay!.dataset.open === 'true') closeReel();
+    });
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        const wasAutoFullscreen = reelWentFullscreen;
+        reelWentFullscreen = false;
+        if (wasAutoFullscreen && reelOverlay!.dataset.open === 'true') closeReel();
+      }
+    });
+    window.matchMedia('(orientation: landscape)').addEventListener('change', handleReelOrientationChange);
 
     // Same press/release overshoot as the nav pill, footer buttons, and the
     // services card's copy-email button — quick press-in via the CSS
