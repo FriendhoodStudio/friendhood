@@ -132,7 +132,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 
     {media && (
       <div
-        class="relative z-20 aspect-[1670/939] w-full cursor-default overflow-hidden rounded-card"
+        class="hero-media-aspect relative z-20 w-full cursor-default overflow-hidden rounded-card"
         data-hero-media
       >
         {media.type === 'video' ? (
@@ -380,6 +380,21 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
   @media (max-width: 767px) {
     .hero-mobile-break {
       display: block;
+    }
+  }
+
+  /* The showreel card's native 1670:939 (~16:9) asset ratio, at full mobile
+     viewport width, renders as a thin strip with barely any height — fine
+     once there's room either side of it (tablet/desktop), too squeezed to
+     read as a real hero moment on a narrow phone screen. 4:5 (portrait)
+     on mobile only, matching the ratio already used for Work case study
+     media elsewhere on the site rather than introducing a one-off. */
+  .hero-media-aspect {
+    aspect-ratio: 4 / 5;
+  }
+  @media (min-width: 768px) {
+    .hero-media-aspect {
+      aspect-ratio: 1670 / 939;
     }
   }
 
