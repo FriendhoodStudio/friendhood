@@ -83,6 +83,14 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
     transition: none;
   }
 
+  /* 5% bigger than the shared mobile/tablet default (80% → 84%) — mobile
+     only, so tablet stays at 80%. */
+  @media (max-width: 767px) {
+    .nav-logo-img {
+      height: 84%;
+    }
+  }
+
   /* Smaller on desktop specifically — at 80% of --nav-menu-height (68px
      there) the wordmark read as oversized next to the Menu button once the
      pill itself is that much bigger than on mobile/tablet. */
