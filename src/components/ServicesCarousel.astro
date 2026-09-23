@@ -120,9 +120,14 @@ const cardSizeStyle = 'scroll-snap-align:center;';
                   class="pointer-events-none absolute right-0 top-full mt-2 whitespace-nowrap rounded-m border border-front/15 bg-grey-600 px-3 py-1 opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out group-hover:opacity-100"
                 >
                   <span class="relative block h-[18px] overflow-hidden">
+                    {/* leading-[18px] (not leading-none) — same fix as the
+                        nav Menu/Close toggle's own h-[21px] window: height
+                        alone doesn't vertically centre a single line of
+                        text in a taller box, it just leaves the extra
+                        space at the bottom. */}
                     <span
                       data-copy-email-status-track
-                      class="flex flex-col font-tag text-detail leading-none text-front transition-transform duration-400 ease-in-out"
+                      class="flex flex-col font-tag text-detail leading-[18px] text-front transition-transform duration-400 ease-in-out"
                     >
                       <span class="block h-[18px]">Enquire now</span>
                       <span data-copy-email-status-result class="block h-[18px]"></span>

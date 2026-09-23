@@ -49,9 +49,15 @@ const year = new Date().getFullYear();
               class="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-m border border-front/15 bg-grey-600 px-3 py-1 opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out group-hover:opacity-100"
             >
               <span class="relative block h-[18px] overflow-hidden">
+                {/* leading-[18px] (not leading-none) — same fix as the nav
+                    Menu/Close toggle's own h-[21px] window (see the comment
+                    there): height alone doesn't vertically centre a single
+                    line of text in a taller box, it just leaves the extra
+                    space at the bottom. Setting line-height to exactly the
+                    box height centres it via CSS's own half-leading. */}
                 <span
                   data-copy-email-status-track
-                  class="flex flex-col font-tag text-detail leading-none text-front transition-transform duration-400 ease-in-out"
+                  class="flex flex-col font-tag text-detail leading-[18px] text-front transition-transform duration-400 ease-in-out"
                 >
                   <span class="block h-[18px]">Click to copy</span>
                   <span data-copy-email-status-result class="block h-[18px]"></span>
