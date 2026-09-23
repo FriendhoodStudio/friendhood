@@ -30,8 +30,17 @@ const hoverWords =
 const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 ---
 
+{/* pb-vertical-m: the section (and its dark gradient backdrop below, which
+    exactly matches this box) previously ended flush with the showreel
+    card's own bottom edge — so the card's hard edge and the actual Hero/
+    Services section boundary landed on the same pixel, reading as one
+    single hard cut rather than two separate, softer things (an image
+    ending, and a section changing). A little dark backdrop below the card
+    first lets the card's edge sit inside a section, not ON the seam.
+    Services' own top padding is reduced by the same amount (see there) so
+    the total visible gap before "How we help" doesn't grow. */}
 <section
-  class="relative flex flex-col items-center px-[var(--page-margin)]"
+  class="relative flex flex-col items-center px-[var(--page-margin)] pb-vertical-m"
   data-hero-section
 >
   {/* Backdrop: the gradient's own colour stops are lifted directly from the

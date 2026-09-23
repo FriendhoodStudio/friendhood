@@ -20,3 +20,19 @@ const projects: ProjectCardData[] = await fetchFeaturedProjects();
   <LogoCarousel />
   <LinkCards />
 </Layout>
+
+<style is:global>
+  /* Services also renders on About, straight after a different section
+     there with its own already-tuned gap — so its default pt-vertical-xl
+     stays untouched globally. Scoped to only when it directly follows Hero
+     (Home only): Hero now has its own pb-vertical-m (see the comment there)
+     so its dark backdrop no longer ends flush with the showreel card, and
+     this reduces Services' side of the gap by the same amount so the two
+     combined don't add up to more than the original vertical-xl. */
+  /* General sibling (~), not adjacent (+): Hero also renders its reel
+     overlay as a sibling right after its own closing tag, so Services
+     isn't literally adjacent to it in the DOM. */
+  [data-hero-section] ~ [data-reveal-group='services'] {
+    padding-top: calc(var(--spacing-vertical-xl) - var(--spacing-vertical-m));
+  }
+</style>
