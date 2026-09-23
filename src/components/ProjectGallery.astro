@@ -13,8 +13,12 @@ interface Props {
 const { projects, showCaption = true, layout = 'scroll' } = Astro.props;
 ---
 
+{/* [scrollbar-width:none]/[&::-webkit-scrollbar]:hidden below — same
+    treatment as the services carousel track: a visible native scrollbar
+    under this horizontally-scrolling row reads as a stray UI element,
+    not a scroll affordance. */}
 {layout === 'scroll' ? (
-  <section class="overflow-x-auto overflow-y-hidden">
+  <section class="overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
     <div
       data-reveal-group="project-gallery"
       class="flex w-max items-end gap-horizontal-m px-[var(--page-margin)] pt-vertical-l pb-vertical-xl"

@@ -56,6 +56,13 @@ const categories = [...categoryCounts.values()].sort((a, b) => a.category.title.
     display: flex;
     flex-wrap: nowrap;
     overflow-x: auto;
+    /* Same scrollbar-hiding treatment as the services carousel track — a
+       visible native scrollbar under a row of pill buttons reads as a
+       stray UI element, not a scroll affordance. */
+    scrollbar-width: none;
+  }
+  #work-filters::-webkit-scrollbar {
+    display: none;
   }
   @media (min-width: 768px) {
     #work-filters {
