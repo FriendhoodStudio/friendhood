@@ -9,6 +9,11 @@ const links: FooterLink[] = footer?.links ?? [
   { label: 'Email us', href: 'mailto:hello@friendhood.co.uk' },
 ];
 
+// This is a static build (output: "static"), so this only reflects the
+// year at the last deploy, not "now" for every visitor — correct for most
+// of the year, but would sit stale from Jan 1 until the next rebuild. The
+// script below corrects it client-side so it's always the real current
+// year regardless of build freshness; this stays as the pre-JS/no-JS value.
 const year = new Date().getFullYear();
 ---
 
@@ -68,7 +73,7 @@ const year = new Date().getFullYear();
 
   <div class="footer-legal-row flex w-full flex-col items-start gap-[8px]">
     <p class="footer-legal font-body text-front">Friendhood is a limited company registered in Scotland (SC685765)</p>
-    <p class="footer-legal font-body text-front">All rights reserved &copy;{year}</p>
+    <p class="footer-legal font-body text-front">All rights reserved &copy;<span data-footer-year>{year}</span></p>
   </div>
 </footer>
 
@@ -127,7 +132,13 @@ const year = new Date().getFullYear();
      shrink along with it. */
   .footer-legal {
     font-size: calc(var(--text-detail) * 0.9);
-    line-height: var(--text-detail--line-height);
+    /* --text-detail--line-height (0.96) is deliberately tight for the
+       single-line uppercase labels it's shared with (nav Menu button,
+       category tags) — too tight for this legal copy, which reads as
+       cramped, especially once it wraps to two lines on narrow mobile.
+       A literal value rather than another shared token, since nothing
+       else needs to loosen alongside it. */
+    line-height: 1.3;
     letter-spacing: var(--text-detail--letter-spacing);
   }
 </style>
@@ -136,6 +147,11 @@ const year = new Date().getFullYear();
   import { initScrollRevealGroup } from '../lib/scrollReveal';
 
   initScrollRevealGroup('footer');
+
+  // Keeps the copyright year correct between deploys — see the comment by
+  // `year` in the frontmatter above.
+  const footerYear = document.querySelector<HTMLElement>('[data-footer-year]');
+  if (footerYear) footerYear.textContent = String(new Date().getFullYear());
 
   // Overshoot-and-settle press feedback, same as the nav pill and the
   // service cards' email button — applied to every footer button (the
