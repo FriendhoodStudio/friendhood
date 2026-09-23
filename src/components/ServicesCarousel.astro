@@ -57,7 +57,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
         data-name={service.name}
       >
         <div class="flex w-full flex-col items-start gap-[20px]">
-          <div class="relative h-[325px] w-full overflow-hidden">
+          <div class="relative aspect-square w-full overflow-hidden">
             {/* Eager, not lazy — this carousel is hidden until opened, so
                 lazy-loading buys nothing on initial page load, and it was
                 actively harmful here: 30 card copies exist for the infinite
@@ -170,12 +170,21 @@ const cardSizeStyle = 'scroll-snap-align:center;';
      has 9 module tags across 3 rows) badly overshot every REAL service's
      actual content: measured directly, the tallest real card's content
      (tags included) bottoms out around 592px, not anywhere near Figma's
-     reference length. 670 = that ~592px plus Figma's own 75px bottom
-     padding, plus a small buffer — snug against real content rather than
-     the much longer placeholder text Figma's example happened to use. */
+     reference length. That was 325px image + 267px of gap/text/tags below
+     it — so 592 = 325 + 267, and the fixed height itself was that plus
+     Figma's own 75px bottom padding and a small buffer: 670 = 592 + 75 + 3.
+
+     The image is a square now (see the aspect-square container in the
+     markup above), so its height tracks the card's own width instead of a
+     flat 325px — meaning the height this card needs to stay snug against
+     real content ALSO now tracks its width, via the same --services-card-
+     image-size custom property both use: height = image size (= width,
+     square) + that same fixed 267+75+3 = 345px budget for everything below
+     the image, which doesn't itself depend on image size. */
   .services-card {
-    height: 670px;
-    width: min(446px, 72vw);
+    --services-card-image-size: min(446px, 72vw);
+    height: calc(var(--services-card-image-size) + 345px);
+    width: var(--services-card-image-size);
   }
 
   /* Tablet gets its own tier, narrower than the mobile 446px cap — that cap
@@ -187,7 +196,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
      spare width to work with. */
   @media (min-width: 768px) {
     .services-card {
-      width: 400px;
+      --services-card-image-size: 400px;
     }
   }
 
@@ -197,7 +206,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
      text, not how much of it fits. */
   @media (min-width: 1200px) {
     .services-card {
-      width: 380px;
+      --services-card-image-size: 380px;
     }
   }
 
