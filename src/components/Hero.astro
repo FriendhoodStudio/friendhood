@@ -967,5 +967,116 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 
     applyPressOvershoot(reelTrigger, 0.95, 1.04, 0.99);
     applyPressOvershoot(reelClose, 0.82, 1.12, 0.97);
+
+    // Swipe down to close, mobile/tablet only — same gesture as the
+    // case-study Lightbox's own swipe-to-close. Only ever relevant in the
+    // reel's normal (non-native-fullscreen) presentation, i.e. its "first
+    // state" before any tilt-to-fullscreen or manual native fullscreen
+    // engages: once real fullscreen kicks in, the browser's own fullscreen
+    // UI replaces this overlay entirely (and already has its own dismiss
+    // gesture — see webkitendfullscreen above), so there's nothing here
+    // left to swipe on regardless — no explicit "not fullscreen" check
+    // needed, it falls out of the DOM/JS simply not being what's on screen
+    // at that point.
+    //
+    // Listens on reelOverlay, not just the video — same reasoning as the
+    // Lightbox's own tap-toggle: the close button is a sibling of the
+    // video, not a descendant, so a swipe starting on or near it should
+    // still work. touch-action is deliberately left at its default (not
+    // set to none, unlike the Lightbox's custom stage) since the native
+    // <video controls> bar needs its own default touch handling (tap to
+    // show/hide controls, drag the scrub bar) to keep working — body
+    // scroll is already locked via lockBodyScroll() in openReel(), so
+    // there's no native page-scroll for a stray touch to trigger anyway,
+    // and e.preventDefault() below only fires once a gesture is already
+    // confirmed vertical, past the point where a horizontal scrub-bar drag
+    // would have been.
+    function isMobileOrTablet() {
+      return window.innerWidth < 1200;
+    }
+
+    const REEL_SWIPE_CLOSE_THRESHOLD_PX = 100;
+    const REEL_SWIPE_CLOSE_VELOCITY_PX_MS = 0.5;
+
+    let reelSwipePointerId: number | null = null;
+    let reelSwipeStartX = 0;
+    let reelSwipeStartY = 0;
+    let reelSwipeStartTime = 0;
+    let reelSwipeActive = false;
+    let reelSwipeDeltaY = 0;
+
+    reelOverlay.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch' || !isMobileOrTablet()) return;
+      reelSwipePointerId = e.pointerId;
+      reelSwipeStartX = e.clientX;
+      reelSwipeStartY = e.clientY;
+      reelSwipeStartTime = e.timeStamp;
+      reelSwipeActive = false;
+      reelSwipeDeltaY = 0;
+    });
+
+    reelOverlay.addEventListener('pointermove', (e) => {
+      if (reelSwipePointerId !== e.pointerId) return;
+      const dx = e.clientX - reelSwipeStartX;
+      const dy = e.clientY - reelSwipeStartY;
+
+      if (!reelSwipeActive) {
+        // Wait for enough movement to confidently read direction — locking
+        // on the first pixel of jitter would misclassify a real horizontal
+        // scrub-bar drag.
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (Math.abs(dy) <= Math.abs(dx)) {
+          // Horizontal-dominant — leave it entirely to native (the scrub
+          // bar, most likely).
+          reelSwipePointerId = null;
+          return;
+        }
+        reelSwipeActive = true;
+        reelVideo!.setPointerCapture(e.pointerId);
+        reelVideo!.style.transition = 'none';
+      }
+
+      e.preventDefault();
+      reelSwipeDeltaY = Math.max(0, dy); // downward only — an upward drag is a no-op
+      reelVideo!.style.translate = `0 ${reelSwipeDeltaY}px`;
+      reelVideo!.style.opacity = String(Math.max(0.3, 1 - reelSwipeDeltaY / 400));
+    });
+
+    function endReelSwipe(e: PointerEvent) {
+      if (reelSwipePointerId !== e.pointerId) return;
+      reelSwipePointerId = null;
+      if (!reelSwipeActive) return;
+      reelSwipeActive = false;
+      try {
+        reelVideo!.releasePointerCapture(e.pointerId);
+      } catch {
+        // Already released/invalid — nothing to clean up.
+      }
+
+      const elapsed = e.timeStamp - reelSwipeStartTime;
+      const velocity = reelSwipeDeltaY / Math.max(elapsed, 1);
+      if (reelSwipeDeltaY > REEL_SWIPE_CLOSE_THRESHOLD_PX || velocity > REEL_SWIPE_CLOSE_VELOCITY_PX_MS) {
+        closeReel();
+        // Reset AFTER the overlay's own close fade (transition-opacity
+        // duration-400) finishes, not immediately — resetting right away
+        // would visibly snap the video back into place while the overlay
+        // is still visible mid-fade.
+        window.setTimeout(() => {
+          reelVideo!.style.translate = '0';
+          reelVideo!.style.opacity = '1';
+        }, 400);
+      } else {
+        // Under threshold — spring back.
+        reelVideo!.style.transition = 'translate 300ms ease-out, opacity 300ms ease-out';
+        reelVideo!.style.translate = '0';
+        reelVideo!.style.opacity = '1';
+        window.setTimeout(() => {
+          reelVideo!.style.transition = 'none';
+        }, 300);
+      }
+    }
+
+    reelOverlay.addEventListener('pointerup', endReelSwipe);
+    reelOverlay.addEventListener('pointercancel', endReelSwipe);
   }
 </script>
