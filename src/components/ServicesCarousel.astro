@@ -78,7 +78,7 @@ const { services } = Astro.props;
         data-name={service.name}
       >
         <div class="flex w-full flex-col items-start gap-[20px]">
-          <div class="relative aspect-square w-full overflow-hidden">
+          <div class="services-card-image relative w-full overflow-hidden">
             {/* Only the middle copy (the real, initially-centred set) is
                 eager — lazy-loading buys nothing for THOSE since the
                 carousel is hidden until opened, same reasoning as before.
@@ -240,6 +240,24 @@ const { services } = Astro.props;
   }
   .services-card:active {
     cursor: grabbing;
+  }
+
+  /* Square below desktop (confirmed via direct measurement — the image
+     itself was never actually the wrong ratio), landscape 5:4 at 1200px+
+     specifically. A shorter image directly shortens the whole card (height
+     is just natural flex-column sizing now, no fixed formula to update in
+     lockstep) — the concern being addressed is a card taller than a
+     shorter/non-maximised desktop browser window, which the modal overlay
+     has no scroll mechanism to recover from if it happens. Mobile/tablet
+     keep the square crop; that's a full-screen-ish surface where the
+     height budget was never the issue. */
+  .services-card-image {
+    aspect-ratio: 1;
+  }
+  @media (min-width: 1200px) {
+    .services-card-image {
+      aspect-ratio: 5 / 4;
+    }
   }
 
   /* Doubled on mobile specifically (20px vs the 10px the *1.25 formula
