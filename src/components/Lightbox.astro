@@ -24,6 +24,31 @@
     </svg>
   </button>
 
+  {/* Rotating to landscape already TRIES to enter fullscreen on its own
+      (see the script) — but the Fullscreen API only ever grants that from
+      a genuine, direct user gesture (a tap), never from an orientation-
+      change event, so most mobile browsers (Safari especially) silently
+      refuse the automatic attempt and the browser's own chrome stays
+      visible. This button is the reliable fallback: a real tap, shown
+      only when it's actually relevant (open, mobile, landscape). */}
+  <button
+    type="button"
+    data-lightbox-fullscreen
+    hidden
+    aria-label="Toggle fullscreen"
+    class="lightbox-btn absolute left-[14px] top-[14px] z-10 flex h-[52px] w-[52px] cursor-pointer items-center justify-center rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px] transition-[scale] duration-300 ease-out hover:scale-110 sm:left-[24px] sm:top-[24px]"
+  >
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="M2 6.5V3a1 1 0 0 1 1-1h3.5M15.5 6.5V3a1 1 0 0 0-1-1H11M2 11.5V15a1 1 0 0 0 1 1h3.5M15.5 11.5V15a1 1 0 0 1-1 1H11"
+        stroke="#F3FAF0"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  </button>
+
   {/* Only meaningful with more than one image on the page — hidden via
       script (same auto-disable idiom as ImageCarousel's own prev/next)
       rather than a build-time check, since the full flattened count isn't
@@ -102,8 +127,9 @@
   const closeBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-close]');
   const prevBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-prev]');
   const nextBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-next]');
+  const fullscreenBtn = document.querySelector<HTMLButtonElement>('[data-lightbox-fullscreen]');
 
-  if (overlay && stage && currentEl && incomingEl && closeBtn && prevBtn && nextBtn) {
+  if (overlay && stage && currentEl && incomingEl && closeBtn && prevBtn && nextBtn && fullscreenBtn) {
     // Every marked image on the page, in DOM order — the hero, each body
     // media image, and every image inside every ImageCarousel instance —
     // flattened into one list regardless of which component rendered it,
@@ -187,7 +213,20 @@
       });
     }
 
+    // The manual button only ever needs to exist where the automatic
+    // attempt above can actually fail and matter: open, mobile, landscape.
+    // Elsewhere the fixed inset-0 overlay already reads as "full screen"
+    // on its own, so there's nothing for the button to offer.
+    function updateFullscreenButtonVisibility() {
+      const eligible =
+        overlay!.dataset.open === 'true' &&
+        window.matchMedia('(max-width: 767px)').matches &&
+        window.matchMedia('(orientation: landscape)').matches;
+      fullscreenBtn!.hidden = !eligible;
+    }
+
     function handleLightboxOrientationChange() {
+      updateFullscreenButtonVisibility();
       if (!window.matchMedia('(max-width: 767px)').matches) return;
       if (window.matchMedia('(orientation: landscape)').matches) {
         enterLightboxFullscreen();
@@ -198,6 +237,17 @@
       if (!document.fullscreenElement) lightboxWentFullscreen = false;
     });
     window.matchMedia('(orientation: landscape)').addEventListener('change', handleLightboxOrientationChange);
+
+    fullscreenBtn.addEventListener('click', () => {
+      if (document.fullscreenElement === overlay) {
+        document.exitFullscreen().catch(() => {});
+      } else {
+        lightboxWentFullscreen = true;
+        overlay!.requestFullscreen?.().catch(() => {
+          lightboxWentFullscreen = false;
+        });
+      }
+    });
 
     function open(index: number) {
       currentIndex = index;
@@ -222,6 +272,7 @@
       overlay!.setAttribute('inert', '');
       unlockBodyScroll();
       if (document.fullscreenElement === overlay) document.exitFullscreen().catch(() => {});
+      updateFullscreenButtonVisibility();
     }
 
     function next() {
@@ -335,7 +386,7 @@
 
     // Overshoot-and-settle press feedback, same as every other icon button
     // on the site.
-    [closeBtn, prevBtn, nextBtn].forEach((btn) => {
+    [closeBtn, prevBtn, nextBtn, fullscreenBtn].forEach((btn) => {
       let pressAnim: Animation | null = null;
 
       btn.addEventListener('pointerdown', () => {
