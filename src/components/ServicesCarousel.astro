@@ -15,26 +15,32 @@ const { services } = Astro.props;
   data-open="false"
   class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/50 opacity-0 backdrop-blur-[25px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100"
 >
-  {/* Every card is absolutely positioned and placed purely by JS (see the
-      script's render()) via one continuous "offset" number — not a real
-      scroll position. The previous version drove this by scrolling a real
-      overflow-x:auto strip (with content repeated 5x to fake an infinite
-      loop), with JS then fighting that native scroll for exact per-card
-      control on top of it. Two systems sharing one position was the root
-      of a whole run of bugs: touch drags fighting the browser's own
-      native touch-scroll on the same element, a new drag racing a
-      still-finishing native smooth-scroll from the previous one, "which
-      card is current" going ambiguous mid-transition. A single JS-owned
-      position removes the seam between them entirely — there's no native
-      scroll left to disagree with, and no repeated DOM needed for the
-      loop (see wrappedDelta in the script). touch-action: none keeps the
-      browser's own touch gesture recognizer out of the way of the
-      hand-rolled drag below (horizontal stepping and vertical
-      swipe-to-close both live entirely in JS, same as before). */}
-  <div data-services-track class="relative flex w-full gap-[var(--spacing-gutter)]" style="touch-action: none;">
+  {/* Position is now 100% native — a real overflow-x:auto strip with
+      scroll-snap-type:x mandatory, not a JS-owned "offset" fighting or
+      replacing the browser's own scroll. A previous version tried both a
+      hand-rolled transform-position engine AND, before that, native scroll
+      fought by JS on top of it — every input path (touch, trackpad, mouse
+      drag, wheel) needed its own from-scratch reimplementation of
+      gesture-start/move/end, momentum, and snap, and real devices kept
+      surfacing timing/capture edge cases no amount of patching fully
+      closed. Handing position and momentum back to the browser removes
+      that whole category outright: touch/trackpad scrolling and
+      snap-to-nearest-card are native and free. touch-action: pan-x still
+      lets native horizontal panning through but leaves the vertical axis
+      free for our own swipe-to-close JS (see script) — the standard way to
+      combine a native scroll axis with a custom gesture on the other one.
+      No infinite loop for now (cards simply clamp at both ends) — that's
+      a deliberate, disclosed scope cut while the core interaction proves
+      itself; the classic scroll-snap way to add it back later is cloning
+      a card at each end, not reintroducing a JS-owned position. */}
+  <div
+    data-services-track
+    class="flex w-full snap-x snap-mandatory gap-[var(--spacing-gutter)] overflow-x-auto"
+    style="touch-action: pan-x; scrollbar-width: none; user-select: none;"
+  >
     {services.map((service, i) => (
       <div
-        class="services-card absolute left-1/2 top-1/2 flex flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[75px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
+        class="services-card flex shrink-0 snap-center flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[75px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
         data-service-card
         data-index={i}
         data-name={service.name}
@@ -137,29 +143,25 @@ const { services } = Astro.props;
 </div>
 
 <style>
-  /* Height lives here (not just on .services-card) so the track — the
-     containing block every card's left:50%/top:50% resolves against — is
-     exactly as tall as a card, keeping top:50% landing on the real visual
-     centre. Single source of truth for both via the custom property,
-     inherited down to .services-card below rather than redeclared there.
-
-     740 (matching Figma's own reference example — node 7382:2286 — which
-     has 9 module tags across 3 rows) badly overshot every REAL service's
-     actual content: measured directly, the tallest real card's content
-     (tags included) bottoms out around 592px, not anywhere near Figma's
-     reference length. That was 325px image + 267px of gap/text/tags below
-     it — so 592 = 325 + 267, and the fixed height itself was that plus
-     Figma's own 75px bottom padding and a small buffer: 670 = 592 + 75 + 3.
-
-     The image is a square (see the aspect-square container in the markup
-     above), so its height tracks the card's own width instead of a flat
-     325px — meaning the height needed to stay snug against real content
-     ALSO now tracks width: height = image size (= width, square) + that
-     same fixed 267+75+3 = 345px budget for everything below the image,
-     which doesn't itself depend on image size. */
+  /* Card height is no longer pinned here at all — with normal (non-
+     absolute) flex-row children, the track's own cross-size just follows
+     its tallest child automatically, so there's nothing to keep in sync by
+     hand any more. Only the shared width var lives on the track now,
+     inherited down to .services-card below. scroll-padding-inline mirrors
+     the track's own inline padding — both have to agree, since that pair
+     is what lets the FIRST and LAST cards also reach dead centre (without
+     it, scroll-snap can only centre a card once there's already a full
+     half-track's worth of empty space to scroll into on that side). Hiding
+     the scrollbar is purely cosmetic — the peeking cards themselves are
+     the scroll affordance, a visible scrollbar under the overlay would
+     just be visual noise. */
   [data-services-track] {
     --services-card-image-size: min(446px, 72vw);
-    height: calc(var(--services-card-image-size) + 345px);
+    padding-inline: calc((100% - var(--services-card-image-size)) / 2);
+    scroll-padding-inline: calc((100% - var(--services-card-image-size)) / 2);
+  }
+  [data-services-track]::-webkit-scrollbar {
+    display: none;
   }
 
   /* Tablet gets its own tier, narrower than the mobile 446px cap — that cap
@@ -186,8 +188,11 @@ const { services } = Astro.props;
   }
 
   .services-card {
-    height: calc(var(--services-card-image-size) + 345px);
     width: var(--services-card-image-size);
+    cursor: grab;
+  }
+  .services-card:active {
+    cursor: grabbing;
   }
 
   /* Doubled on mobile specifically (20px vs the 10px the *1.25 formula
@@ -259,55 +264,50 @@ const { services } = Astro.props;
     else unlockBodyScroll();
   }
 
-  // --- Positioning engine --------------------------------------------------
+  // --- Position & visual state ---------------------------------------------
   //
-  // `offset` is "which absolute slot is centred right now" — not clamped to
-  // 0..N-1, so it freely grows or shrinks through any number of laps (e.g.
-  // -14, 0, 23). Each card's actual on-screen slot is whichever of its
-  // repeats (i, i±N, i±2N, ...) sits closest to `offset`, found fresh every
-  // render via wrappedDelta below. That's what gives the infinite loop for
-  // free, with no repeated DOM and no "silently jump the position once
-  // you're deep enough into a copy" bookkeeping the previous scroll-based
-  // version needed.
+  // Actual position is just `track.scrollLeft` now — native, browser-owned,
+  // never shadowed by a parallel JS number. Everything below only ever
+  // READS scroll position to drive the purely-visual scale/fade of peeking
+  // cards; nothing here writes position directly except the one-time
+  // instant jump in openAt (equivalent to an un-animated scrollIntoView).
   //
-  // `targetOffset` is separate: the authoritative "index we're heading to
-  // or resting on", updated synchronously the instant any gesture/key/click
-  // commits — never re-derived from `offset` itself (which can be
-  // fractional or mid-animation). The previous version found "current
-  // card" by checking scroll position, which was ambiguous while a native
-  // smooth-scroll from the PREVIOUS commit was still mid-flight — a fast or
-  // repeated swipe/key-press doesn't wait for it to finish, so two commits
-  // in a row could each independently land on the wrong neighbour. Explicit
-  // state instead of a re-derived guess removes that ambiguity outright,
-  // and — since this whole engine owns the animation itself now instead of
-  // handing it to the browser's native smooth-scroll — every gesture can
-  // just cancel and redirect it instantly and deterministically.
-  let offset = 0;
-  let targetOffset = 0;
-
-  // Recomputed fresh each call rather than cached, since the resting card
-  // width changes at every breakpoint (and is itself fluid — min(446px,
-  // 72vw) — below the tablet tier). getComputedStyle, not
-  // getBoundingClientRect: the latter reflects the CURRENT rendered size
-  // including whatever scale() a card presently has applied (peeking cards
-  // are scaled down — see cardVisualState), which would silently corrupt
-  // this if it ever happened to measure a non-centred card.
+  // step()/cardCenter() use offsetWidth/offsetLeft (the element's LAYOUT
+  // box), not getBoundingClientRect (its PAINTED box) — peeking cards carry
+  // a scale() transform for the fade effect below, which changes their
+  // painted rect but never their layout box or offsetLeft. Reading layout
+  // values means this stays correct however a card is currently scaled.
   function step(): number {
     if (!track || !cards[0]) return 0;
-    const width = parseFloat(getComputedStyle(cards[0]).width) || 0;
     const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
-    return width + gap;
+    return cards[0].offsetWidth + gap;
   }
 
-  // Shortest signed distance (in card-steps) from `from` to `index`,
-  // wrapping around the N-card loop — e.g. with N=6, index 0 read from
-  // from=5 is +1 away (wrap forward), not -5. Works for fractional `from`
-  // too (mid-drag or mid-animation), which is what makes a single set of
-  // real DOM cards behave like an infinite strip without ever needing to
-  // silently reposition anything.
-  function wrappedDelta(index: number, from: number): number {
-    const raw = index - from;
-    return raw - N * Math.round(raw / N);
+  function cardDelta(card: HTMLElement): number {
+    if (!track) return 0;
+    const s = step();
+    if (!s) return 0;
+    const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+    const trackCenter = track.scrollLeft + track.clientWidth / 2;
+    return (cardCenter - trackCenter) / s;
+  }
+
+  // Whichever card currently sits closest to the track's visual centre —
+  // the native-scroll equivalent of the old JS-owned targetOffset, just
+  // always re-derived from the real scroll position instead of tracked
+  // separately, since there's no seam any more for the two to disagree
+  // across.
+  function nearestIndex(): number {
+    let best = 0;
+    let bestDist = Infinity;
+    cards.forEach((card, i) => {
+      const d = Math.abs(cardDelta(card));
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    return best;
   }
 
   // Scale/fade cards by distance from centre — the closer to centre, the
@@ -321,91 +321,54 @@ const { services } = Astro.props;
     return { scale: 1 - t * 0.15, opacity: 1 - t * 0.45 };
   }
 
-  // Only N (6) real elements exist now — no more 30-copy loop buffer to
-  // skip-optimise around, so every card is simply repositioned every call.
-  function render() {
-    const s = step();
-    cards.forEach((card, i) => {
-      const delta = wrappedDelta(i, offset);
-      const { scale, opacity } = cardVisualState(delta);
-      card.style.transform = `translate(-50%, -50%) translateX(${delta * s}px) scale(${scale})`;
+  function updateVisualState() {
+    cards.forEach((card) => {
+      const { scale, opacity } = cardVisualState(cardDelta(card));
+      card.style.transform = `scale(${scale})`;
       card.style.opacity = String(opacity);
     });
   }
 
-  // Self-owned tween from the current (possibly mid-drag) offset to an
-  // absolute target — replaces native scrollTo({behavior:'smooth'}), which
-  // couldn't be reliably interrupted or redirected mid-flight (see the
-  // targetOffset comment above) and was the actual root of the "lands on
-  // the wrong card" and "swipe sometimes does nothing" reports. Owning
-  // start/cancel/redirect directly instead means a new gesture can always
-  // cancel and take over cleanly, with nothing left running behind it.
-  let tweenFrameId = 0;
-  function cancelTween() {
-    if (tweenFrameId) cancelAnimationFrame(tweenFrameId);
-    tweenFrameId = 0;
+  // rAF-throttled for the scroll listener — scroll can fire far faster than
+  // the screen repaints, and writing transform/opacity on every raw event
+  // is the same jank source a raw pointermove listener would be.
+  let visualRafId = 0;
+  function scheduleVisualUpdate() {
+    if (visualRafId) return;
+    visualRafId = requestAnimationFrame(() => {
+      visualRafId = 0;
+      updateVisualState();
+    });
   }
 
-  function animateTo(target: number, durationMs = 380) {
-    cancelTween();
-    targetOffset = target;
-    const start = offset;
-    const delta = target - start;
-    if (Math.abs(delta) < 0.001) {
-      offset = target;
-      render();
-      return;
-    }
-    const startTime = performance.now();
-    function tick(now: number) {
-      const t = Math.min((now - startTime) / durationMs, 1);
-      const eased = 1 - Math.pow(1 - t, 3); // ease-out-cubic
-      offset = start + delta * eased;
-      render();
-      if (t < 1) {
-        tweenFrameId = requestAnimationFrame(tick);
-      } else {
-        offset = target;
-        render();
-        tweenFrameId = 0;
-      }
-    }
-    tweenFrameId = requestAnimationFrame(tick);
-  }
-
-  render();
+  track?.addEventListener('scroll', scheduleVisualUpdate, { passive: true });
+  updateVisualState();
 
   // Per the Figma annotation, the carousel "emerges from bottom of page" — driven
   // via WAAPI (not a CSS transition) so it can play per-card, staggered from the
   // centered card outward, and the exact reverse (outward in first, center last)
   // on close. Each card animates its own translateY entrance while holding its
-  // cardVisualState scale/opacity (and its resting translateX) as the end value,
-  // so it settles exactly where render() would have put it — no fighting
-  // between the two.
+  // cardVisualState scale/opacity as the end value, so it settles exactly where
+  // updateVisualState would have put it — no fighting between the two.
   const SLIDE_DISTANCE = 120;
   const STAGGER_MS = 80;
   const STAGGER_RANGE = 2; // cards more than this far from center share the outermost delay
 
   function playOpenAnimation() {
-    const s = step();
-    cards.forEach((card, i) => {
+    cards.forEach((card) => {
       card.getAnimations().forEach((anim) => anim.cancel());
       // Same stale-hit-test-after-cancel concern as below, but for a leftover
       // animation from a previous open/close cycle (e.g. a close animation
       // still in its pre-start delay when the carousel is reopened) — flush
       // right away rather than only after this new animation's own finish.
       void card.offsetWidth;
-      const delta = wrappedDelta(i, targetOffset);
+      const delta = cardDelta(card);
       const { scale, opacity } = cardVisualState(delta);
-      const x = delta * s;
       const distance = Math.min(Math.abs(delta), STAGGER_RANGE);
       const anim = card.animate(
         [
-          {
-            transform: `translate(-50%, -50%) translateX(${x}px) translateY(${SLIDE_DISTANCE}px) scale(${scale})`,
-            opacity: 0,
-          },
-          { transform: `translate(-50%, -50%) translateX(${x}px) translateY(0) scale(${scale})`, opacity },
+          { transform: `scale(${scale}) translateY(${SLIDE_DISTANCE}px)`, opacity: 0 },
+          { transform: `scale(${scale}) translateY(0)`, opacity },
         ],
         {
           duration: 600,
@@ -415,9 +378,9 @@ const { services } = Astro.props;
         }
       );
       // Release the animation once it settles so its fill:forwards effect stops
-      // pinning transform/opacity — otherwise it permanently overrides render()
-      // as the user scrolls/drags afterward, and the centered card stops
-      // rescaling.
+      // pinning transform/opacity — otherwise it permanently overrides
+      // updateVisualState as the user scrolls afterward, and the centered
+      // card stops rescaling.
       anim.finished
         .then(() => {
           anim.cancel();
@@ -434,30 +397,20 @@ const { services } = Astro.props;
   }
 
   function playCloseAnimation() {
-    const s = step();
-    cards.forEach((card, i) => {
+    cards.forEach((card) => {
       card.getAnimations().forEach((anim) => anim.cancel());
       void card.offsetWidth;
-      const delta = wrappedDelta(i, targetOffset);
+      const delta = cardDelta(card);
       const { scale, opacity } = cardVisualState(delta);
-      const x = delta * s;
       const distance = Math.min(Math.abs(delta), STAGGER_RANGE);
       // Reverse of the open stagger: farthest-from-center cards leave first,
       // the centered card leaves last.
       const delay = (STAGGER_RANGE - distance) * STAGGER_MS;
       card.animate(
         [
-          { transform: `translate(-50%, -50%) translateX(${x}px) translateY(0) scale(${scale})`, opacity, offset: 0 },
-          {
-            transform: `translate(-50%, -50%) translateX(${x}px) translateY(${SLIDE_DISTANCE}px) scale(${scale})`,
-            opacity,
-            offset: 0.55,
-          },
-          {
-            transform: `translate(-50%, -50%) translateX(${x}px) translateY(${SLIDE_DISTANCE}px) scale(${scale})`,
-            opacity: 0,
-            offset: 1,
-          },
+          { transform: `scale(${scale}) translateY(0)`, opacity, offset: 0 },
+          { transform: `scale(${scale}) translateY(${SLIDE_DISTANCE}px)`, opacity, offset: 0.55 },
+          { transform: `scale(${scale}) translateY(${SLIDE_DISTANCE}px)`, opacity: 0, offset: 1 },
         ],
         { duration: 700, delay, easing: 'ease-in', fill: 'forwards' }
       );
@@ -478,10 +431,15 @@ const { services } = Astro.props;
   function openAt(index: number) {
     setOpen(true);
     openedAt = performance.now();
-    cancelTween();
-    offset = index;
-    targetOffset = index;
-    render();
+    const card = cards[index];
+    if (track && card) {
+      // Instant jump, not scrollIntoView({behavior:'smooth'}) — this is the
+      // resting position the entrance animation plays FROM, so it must
+      // already be correct before that animation starts, not visibly
+      // travel there first.
+      track.scrollLeft = card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2;
+    }
+    updateVisualState();
     playOpenAnimation();
   }
 
@@ -503,164 +461,68 @@ const { services } = Astro.props;
 
   // Clicking anywhere that isn't a card (the overlay backdrop, or the track's own
   // padding/gap areas around the cards) closes the carousel.
+  //
+  // setPointerCapture only reroutes POINTER events, not the separate legacy
+  // mouse event stream 'click' belongs to — so a mouse-drag-to-scroll (see
+  // below) that starts on a card but ends over the gap between cards (a
+  // very ordinary drag distance) still gets a real 'click' synthesized on
+  // the gap/backdrop at mouseup, same as a real click would. Recording the
+  // pointerdown position and bailing here if the eventual click is more
+  // than a few px away from it is what actually distinguishes "a drag that
+  // happened to end outside a card" from "a genuine tap/click on the
+  // backdrop to dismiss" — closest()-on-target alone can't tell those apart.
+  let backdropPointerDownPos: { x: number; y: number } | null = null;
+  overlay?.addEventListener('pointerdown', (e) => {
+    backdropPointerDownPos = { x: e.clientX, y: e.clientY };
+  });
   overlay?.addEventListener('click', (e) => {
     if (performance.now() - openedAt < OPEN_SETTLE_MS) return;
+    if (backdropPointerDownPos) {
+      const dx = e.clientX - backdropPointerDownPos.x;
+      const dy = e.clientY - backdropPointerDownPos.y;
+      if (Math.hypot(dx, dy) > 8) return;
+    }
     const target = e.target as HTMLElement;
     if (target.closest('[data-service-card]')) return;
     close();
   });
 
+  // Clamped at both ends for now — no wraparound (see the top-of-file note
+  // on the dropped infinite loop).
   document.addEventListener('keydown', (e) => {
     if (!isOpen()) return;
     if (e.key === 'Escape') {
       close();
-    } else if (e.key === 'ArrowRight') {
-      animateTo(Math.round(targetOffset) + 1);
-    } else if (e.key === 'ArrowLeft') {
-      animateTo(Math.round(targetOffset) - 1);
+      return;
     }
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const next = nearestIndex() + (e.key === 'ArrowRight' ? 1 : -1);
+    if (next < 0 || next >= N) return;
+    cards[next].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   });
 
-  // Clicking a peeking (not-yet-centered) card brings it to centre — a
-  // click naturally only fires when the pointer didn't move meaningfully
-  // between down and up (that's the browser's own distinction, not custom
-  // logic here), so this never fires as a spurious side effect of a real
-  // swipe/drag being handled elsewhere. The close/copy-email buttons opt
-  // out since they already have their own click behaviour.
+  // Clicking a peeking (not-yet-centered) card brings it to centre. Same
+  // drag-vs-click distinction as the backdrop-close handler above (and the
+  // same reason it's needed): a mouse-drag-to-scroll that starts on one
+  // card can easily end over a NEIGHBOURING card, which still gets a real
+  // 'click' at mouseup — without the movement guard that would also
+  // trigger a click-to-jump on top of the drag's own native scroll,
+  // fighting it. The close/copy-email buttons opt out since they already
+  // have their own click behaviour.
   track?.addEventListener('click', (e) => {
+    if (backdropPointerDownPos && Math.hypot(e.clientX - backdropPointerDownPos.x, e.clientY - backdropPointerDownPos.y) > 8) {
+      return;
+    }
     const target = e.target as HTMLElement;
     if (target.closest('[data-services-close]') || target.closest('[data-copy-email]')) return;
     const card = target.closest<HTMLElement>('[data-service-card]');
-    if (!card) return;
-    const idx = cards.indexOf(card);
-    if (idx === -1) return;
-    const delta = wrappedDelta(idx, targetOffset);
-    if (delta === 0) return; // already centred
-    animateTo(targetOffset + delta);
+    if (!card || cards.indexOf(card) === nearestIndex()) return;
+    card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   });
-
-  // Swipe-down-to-close, mobile/tablet only (below the desktop breakpoint) —
-  // a standard bottom-sheet dismiss gesture, using the same drag-handle pill
-  // (data-services-close) already rendered as a visual affordance for it.
-  // Touch-only (mouse already has its own horizontal stepper below,
-  // explicitly gated to pointerType 'mouse') so the two never compete for
-  // the same pointer. Stays completely hands-off — no preventDefault, no
-  // pointer capture — until the gesture is clearly vertical-dominant (a few
-  // px of movement with |dy| > |dx|), so a real horizontal swipe between
-  // cards is never intercepted or made to feel laggy.
-  const SWIPE_CLOSE_THRESHOLD_PX = 100;
-  const SWIPE_CLOSE_VELOCITY_PX_MS = 0.5;
 
   function isMobileOrTablet() {
     return window.innerWidth < 1200;
   }
-
-  // Exactly-one-card-per-gesture: a swipe/drag of any length or speed
-  // always resolves to exactly the next or previous card, never several.
-  // Still live-follows the pointer during the drag (clamped to one card's
-  // own step distance, so even a huge/fast drag can't visually pass more
-  // than one neighbour) so it keeps the tactile, finger-tracks-the-card
-  // feel rather than jumping straight from gesture to result.
-  const STEP_COMMIT_THRESHOLD_PX = 10;
-
-  let dragPointerId: number | null = null;
-  let dragStartX = 0;
-  let dragStartOffset = 0; // offset's own value at drag start — for live-follow continuity from wherever things visually are right now
-  let dragStartTarget = 0; // targetOffset's value at drag start — the authoritative basis the eventual commit is relative to
-  let dragCaptured = false;
-
-  function startCardStep(pointerId: number, clientX: number) {
-    if (!track) return;
-    // A new gesture always takes over immediately — cancelling any
-    // still-running tween means nothing is left fighting this drag's own
-    // writes to `offset`.
-    cancelTween();
-    dragPointerId = pointerId;
-    dragStartX = clientX;
-    dragStartOffset = offset;
-    dragStartTarget = targetOffset;
-    dragCaptured = false;
-  }
-
-  // The actual offset write is throttled to once per animation frame
-  // (below), not once per pointermove — touch in particular can fire
-  // pointermove far faster than the screen can repaint, and rewriting
-  // transform/opacity on every raw event was almost certainly the real
-  // source of the drag feeling jerky. Batching every event that arrives
-  // within one frame down to a single write is the standard fix.
-  let moveRafId = 0;
-  let pendingClientX = 0;
-
-  function moveCardStep(clientX: number) {
-    if (dragPointerId === null) return;
-    const s = step();
-    if (!s) return;
-    if (!dragCaptured) {
-      dragCaptured = true;
-      try {
-        track?.setPointerCapture(dragPointerId);
-      } catch {
-        // Can legitimately fail if the pointer was already released between
-        // startCardStep and this first move (e.g. an extremely quick
-        // tap-drag) — the gesture just won't be captured, harmless.
-      }
-    }
-    pendingClientX = clientX;
-    if (moveRafId) return;
-    moveRafId = requestAnimationFrame(() => {
-      moveRafId = 0;
-      if (dragPointerId === null) return;
-      const dx = pendingClientX - dragStartX;
-      const clampedDx = Math.max(-s, Math.min(s, dx));
-      offset = dragStartOffset - clampedDx / s;
-      render();
-    });
-  }
-
-  // Direction only, not distance or velocity, decides the outcome — that's
-  // the whole point of this replacing a free scroll. Below the commit
-  // threshold (a real drag was never confirmed, e.g. a click/tap with a
-  // pixel or two of jitter), springs back to the card the gesture started
-  // on instead of stepping.
-  function endCardStep(clientX: number) {
-    if (dragPointerId === null) return;
-    cancelAnimationFrame(moveRafId);
-    moveRafId = 0;
-    const dx = clientX - dragStartX;
-    const wasCaptured = dragCaptured;
-    const startTarget = dragStartTarget;
-    const endedPointerId = dragPointerId;
-    dragPointerId = null;
-    dragCaptured = false;
-    // Explicit release rather than relying solely on the implicit release a
-    // pointerup/pointercancel is supposed to trigger on its own — real
-    // mobile browsers have known inconsistencies here, and a stale capture
-    // left on the track can affect how the NEXT touch's events are
-    // delivered to it, which is consistent with swipes only working every
-    // other attempt (an intervening tap/click elsewhere was what actually
-    // cleared it, not anything this code was doing).
-    if (wasCaptured) {
-      try {
-        track?.releasePointerCapture(endedPointerId);
-      } catch {
-        // Already released/invalid — nothing to clean up.
-      }
-    }
-    if (!wasCaptured) return;
-    let target = Math.round(startTarget);
-    if (dx <= -STEP_COMMIT_THRESHOLD_PX) target = Math.round(startTarget) + 1;
-    else if (dx >= STEP_COMMIT_THRESHOLD_PX) target = Math.round(startTarget) - 1;
-    animateTo(target);
-  }
-
-  let swipeCard: HTMLElement | null = null;
-  let swipeScale = 1;
-  let swipeStartX = 0;
-  let swipeStartY = 0;
-  let swipeStartTime = 0;
-  let swipeDeltaY = 0;
-  let swipeDirection: 'vertical' | 'horizontal' | null = null;
-  let swipePointerId: number | null = null;
 
   // Distinct from close() (used by the pill button/Escape/backdrop click):
   // that path always animates cards from a resting translateY(0), which
@@ -681,111 +543,87 @@ const { services } = Astro.props;
     card.getAnimations().forEach((a) => a.cancel());
     const anim = card.animate(
       [
-        {
-          transform: `translate(-50%, -50%) scale(${scale}) translateY(${fromY}px)`,
-          opacity: getComputedStyle(card).opacity,
-        },
-        { transform: `translate(-50%, -50%) scale(${scale}) translateY(${fromY + SLIDE_DISTANCE}px)`, opacity: 0 },
+        { transform: `scale(${scale}) translateY(${fromY}px)`, opacity: getComputedStyle(card).opacity },
+        { transform: `scale(${scale}) translateY(${fromY + SLIDE_DISTANCE}px)`, opacity: 0 },
       ],
       { duration: 350, easing: 'ease-in', fill: 'forwards' }
     );
     anim.finished.then(() => anim.cancel()).catch(() => {});
   }
 
-  // `swipeCard` is only ever needed for the VERTICAL branch (the specific
-  // element to animate a dismiss on) — it must not also gate whether a
-  // gesture starts at all. Cards are absolutely positioned now, with real
-  // gaps between them (the peeking-card spacing), so a touch starting in
-  // one of those gaps has no `[data-service-card]` ancestor — requiring
-  // one here meant that touch silently did nothing at all, for either
-  // direction, which is what kept reading as swipes randomly not
-  // responding on mobile depending on exactly where the thumb landed.
-  // `swipePointerId` (not `swipeCard`) is the "is a gesture active" gate.
+  // Swipe-down-to-close, mobile/tablet only (below the desktop breakpoint) —
+  // a standard bottom-sheet dismiss gesture. touch-action: pan-x (see the
+  // track's markup) already keeps native horizontal panning/scrolling free
+  // to run on its own — this only ever has to recognise and act on the
+  // VERTICAL case; a horizontal-dominant touch is simply abandoned here
+  // (swipePointerId reset to null) and left entirely to native scroll,
+  // which is already moving by the time that happens.
+  const SWIPE_CLOSE_THRESHOLD_PX = 100;
+  const SWIPE_CLOSE_VELOCITY_PX_MS = 0.5;
+
+  let swipeCard: HTMLElement | null = null;
+  let swipeScale = 1;
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeStartTime = 0;
+  let swipeDeltaY = 0;
+  let swipeActive = false;
+  let swipePointerId: number | null = null;
+
   track?.addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'touch' || !isMobileOrTablet() || !track) return;
+    if (e.pointerType !== 'touch' || !isMobileOrTablet()) return;
     const card = (e.target as HTMLElement).closest<HTMLElement>('[data-service-card]');
+    if (!card) return; // nothing to animate a dismiss on — leave entirely to native scroll
     swipeCard = card;
-    swipeScale = card ? cardVisualState(wrappedDelta(cards.indexOf(card), targetOffset)).scale : 1;
+    swipeScale = cardVisualState(cardDelta(card)).scale;
     swipeStartX = e.clientX;
     swipeStartY = e.clientY;
     swipeStartTime = e.timeStamp;
     swipeDeltaY = 0;
-    swipeDirection = null;
+    swipeActive = false;
     swipePointerId = e.pointerId;
   });
 
   track?.addEventListener('pointermove', (e) => {
-    if (swipePointerId === null || e.pointerId !== swipePointerId || !track) return;
+    if (swipePointerId === null || e.pointerId !== swipePointerId || !swipeCard) return;
     const dx = e.clientX - swipeStartX;
     const dy = e.clientY - swipeStartY;
 
-    if (!swipeDirection) {
+    if (!swipeActive) {
       // Wait for enough movement to confidently read the gesture's
       // direction — locking on the first pixel of jitter would misclassify
       // real horizontal swipes.
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      const wantsVertical = Math.abs(dy) > Math.abs(dx);
-      if (wantsVertical && !swipeCard) {
-        // A vertical swipe with no specific card under the thumb (started
-        // in a gap) has nothing to animate a dismiss on — abandon just
-        // this gesture rather than misreading it as horizontal.
+      if (Math.abs(dy) <= Math.abs(dx)) {
+        // Horizontal — hand off entirely to native scroll.
         swipePointerId = null;
+        swipeCard = null;
         return;
       }
-      swipeDirection = wantsVertical ? 'vertical' : 'horizontal';
-      if (swipeDirection === 'vertical') {
-        swipeCard!.setPointerCapture(swipePointerId);
-      } else {
-        // A real horizontal swipe — handed off to the shared exactly-one-
-        // card-per-gesture stepper above.
-        startCardStep(swipePointerId, swipeStartX);
-      }
+      swipeActive = true;
+      swipeCard.setPointerCapture(swipePointerId);
     }
 
-    if (swipeDirection === 'horizontal') {
-      e.preventDefault();
-      moveCardStep(e.clientX);
-      return;
-    }
-
-    if (swipeDirection !== 'vertical') return;
     e.preventDefault();
     swipeDeltaY = Math.max(0, dy); // downward only — an upward drag is a no-op
-    swipeCard!.style.transform = `translate(-50%, -50%) scale(${swipeScale}) translateY(${swipeDeltaY}px)`;
-    swipeCard!.style.opacity = String(Math.max(0.4, 1 - swipeDeltaY / 400));
+    swipeCard.style.transform = `scale(${swipeScale}) translateY(${swipeDeltaY}px)`;
+    swipeCard.style.opacity = String(Math.max(0.4, 1 - swipeDeltaY / 400));
   });
 
   function endSwipe(e: PointerEvent) {
-    if (swipePointerId === null || e.pointerId !== swipePointerId || !track) return;
+    if (swipePointerId === null || e.pointerId !== swipePointerId || !swipeCard) return;
     const card = swipeCard;
-    const direction = swipeDirection;
+    const wasActive = swipeActive;
     const endedPointerId = swipePointerId;
     swipeCard = null;
-    swipeDirection = null;
-    // Explicit reset/release rather than leaning on the next pointerdown to
-    // overwrite these — see the matching comment in endCardStep. Real
-    // mobile browsers don't always fire the implicit pointer-capture
-    // release as reliably as the spec implies, and a stale capture left on
-    // the card can affect the NEXT swipe's own events, which matches
-    // swipes only working every other attempt (an intervening tap/click
-    // elsewhere was what actually cleared it, not this code).
+    swipeActive = false;
     swipePointerId = null;
-    if (direction === 'vertical' && card) {
-      try {
-        card.releasePointerCapture(endedPointerId);
-      } catch {
-        // Already released/invalid — nothing to clean up.
-      }
+    if (!wasActive) return;
+    try {
+      card.releasePointerCapture(endedPointerId);
+    } catch {
+      // Already released/invalid — nothing to clean up.
     }
-
-    if (direction === 'horizontal') {
-      endCardStep(e.clientX);
-      return;
-    }
-
-    // A vertical direction is never set without a card (see pointermove
-    // above), so this is just satisfying the type checker.
-    if (direction !== 'vertical' || !card) return;
 
     const elapsed = e.timeStamp - swipeStartTime;
     const velocity = swipeDeltaY / Math.max(elapsed, 1);
@@ -797,23 +635,19 @@ const { services } = Astro.props;
       card.getAnimations().forEach((a) => a.cancel());
       const settle = card.animate(
         [
-          {
-            transform: `translate(-50%, -50%) scale(${swipeScale}) translateY(${swipeDeltaY}px)`,
-            opacity: card.style.opacity,
-          },
-          { transform: `translate(-50%, -50%) scale(${swipeScale}) translateY(-8px)`, opacity: 1, offset: 0.7 },
-          { transform: `translate(-50%, -50%) scale(${swipeScale}) translateY(0)`, opacity: 1 },
+          { transform: `scale(${swipeScale}) translateY(${swipeDeltaY}px)`, opacity: card.style.opacity },
+          { transform: `scale(${swipeScale}) translateY(-8px)`, opacity: 1, offset: 0.7 },
+          { transform: `scale(${swipeScale}) translateY(0)`, opacity: 1 },
         ],
         { duration: 380, easing: 'ease-out', fill: 'forwards' }
       );
       settle.finished
         .then(() => {
           settle.cancel();
-          // Unlike the old flow-layout version, there's no CSS default for
-          // this card to fall back to once the inline style is cleared —
-          // position is 100% JS-driven now, so re-assert its normal resting
-          // transform instead of clearing it to nothing.
-          render();
+          // No CSS default for this card to fall back to once the inline
+          // style is cleared — re-assert its normal resting scale/opacity
+          // instead of clearing it to nothing.
+          updateVisualState();
         })
         .catch(() => {});
     }
@@ -822,90 +656,44 @@ const { services } = Astro.props;
   track?.addEventListener('pointerup', endSwipe);
   track?.addEventListener('pointercancel', endSwipe);
 
-  // Mouse drag: same exactly-one-card-per-gesture stepper as the touch
-  // horizontal path above. Pointer capture is deferred to moveCardStep's
-  // first real call rather than happening unconditionally on pointerdown
-  // (i.e. on every plain click too), since doing either on a click with no
-  // drag has been observed to make Chrome's compositor-thread hit-testing
-  // briefly resolve the click to the track underneath instead of the
-  // card/button actually under the cursor.
+  // Click-and-drag-to-scroll for plain-mouse desktop users (a trackpad's
+  // two-finger swipe already scrolls the track natively via wheel deltaX —
+  // this is only for a mouse with no trackpad). Directly drives scrollLeft;
+  // native scroll-snap takes over and animates to the nearest card the
+  // instant the gesture ends, the same as it does after any other scroll —
+  // no custom tween needed here.
+  let mouseDragging = false;
+  let mouseDragStartX = 0;
+  let mouseDragStartScrollLeft = 0;
+  let mouseMoveRafId = 0;
+  let pendingMouseClientX = 0;
+
   track?.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse' || !track) return;
-    startCardStep(e.pointerId, e.clientX);
+    mouseDragging = true;
+    mouseDragStartX = e.clientX;
+    mouseDragStartScrollLeft = track.scrollLeft;
   });
 
   track?.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse' || dragPointerId !== e.pointerId) return;
-    moveCardStep(e.clientX);
+    if (e.pointerType !== 'mouse' || !mouseDragging || !track) return;
+    pendingMouseClientX = e.clientX;
+    if (mouseMoveRafId) return;
+    mouseMoveRafId = requestAnimationFrame(() => {
+      mouseMoveRafId = 0;
+      if (!mouseDragging || !track) return;
+      track.scrollLeft = mouseDragStartScrollLeft - (pendingMouseClientX - mouseDragStartX);
+    });
   });
 
-  function endMouseStep(e: PointerEvent) {
-    if (e.pointerType !== 'mouse' || dragPointerId !== e.pointerId) return;
-    endCardStep(e.clientX);
+  function endMouseDrag(e: PointerEvent) {
+    if (e.pointerType !== 'mouse') return;
+    mouseDragging = false;
   }
 
-  track?.addEventListener('pointerup', endMouseStep);
-  track?.addEventListener('pointercancel', endMouseStep);
-
-  // Trackpad/mouse-wheel: same exactly-one-card-per-gesture stepper as
-  // touch and mouse-drag above, not free scrolling — a two-finger trackpad
-  // swipe is the most common way this carousel actually gets used on a Mac,
-  // so a fast swipe flying past several cards would be exactly the
-  // "several cards at once" behaviour this whole stepper exists to avoid.
-  //
-  // Wheel events have no distinct start/end the way pointer events do — a
-  // single physical trackpad swipe fires many small 'wheel' events in
-  // quick succession, not one. A synthetic pointerId plus an idle timeout
-  // stands in for that: the gesture is "live" for as long as events keep
-  // arriving, and only commits once they stop for a beat.
-  const WHEEL_POINTER_ID = -999;
-  const WHEEL_IDLE_MS = 100;
-  let wheelActive = false;
-  let wheelVirtualX = 0;
-  let wheelIdleTimeoutId = 0;
-
-  track?.addEventListener(
-    'wheel',
-    (e) => {
-      // Don't fight an actual touch/mouse-drag gesture already in progress.
-      if (dragPointerId !== null && dragPointerId !== WHEEL_POINTER_ID) return;
-
-      if (!wheelActive) {
-        // Vertical-dominant input (a plain mouse wheel, or a trackpad
-        // scroll that's mostly vertical) is left alone — only a genuinely
-        // horizontal gesture takes over the carousel. But this check is
-        // only meaningful for deciding whether to START a gesture — real
-        // trackpad hardware produces noisy per-event deltas (especially as
-        // a swipe decelerates near its end, where deltaX shrinks toward 0
-        // and deltaY can briefly exceed it even mid-swipe), so re-running
-        // this same check on every event of an already-active gesture
-        // silently dropped some of them entirely — their deltaX never
-        // reached wheelVirtualX below, AND the idle-timeout didn't get
-        // refreshed for them either, which could end the gesture early,
-        // mid-swipe. That's what read as a trackpad swipe sometimes doing
-        // nothing. Once a gesture is active, every event belongs to it
-        // regardless of that event's own delta ratio.
-        if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
-        wheelActive = true;
-        wheelVirtualX = 0;
-        startCardStep(WHEEL_POINTER_ID, 0);
-      }
-
-      e.preventDefault();
-      // Scrolling "forward" (deltaX > 0, the same direction as swiping left
-      // to reveal the next card) has to decrease this virtual position to
-      // match — moveCardStep/endCardStep read direction from clientX
-      // decreasing exactly the way a real leftward drag would.
-      wheelVirtualX -= e.deltaX;
-      moveCardStep(wheelVirtualX);
-      window.clearTimeout(wheelIdleTimeoutId);
-      wheelIdleTimeoutId = window.setTimeout(() => {
-        wheelActive = false;
-        endCardStep(wheelVirtualX);
-      }, WHEEL_IDLE_MS);
-    },
-    { passive: false }
-  );
+  track?.addEventListener('pointerup', endMouseDrag);
+  track?.addEventListener('pointercancel', endMouseDrag);
+  track?.addEventListener('pointerleave', endMouseDrag);
 
   copyButtons = overlay ? Array.from(overlay.querySelectorAll<HTMLButtonElement>('[data-copy-email]')) : [];
   copyButtons.forEach((copyButton) => {
