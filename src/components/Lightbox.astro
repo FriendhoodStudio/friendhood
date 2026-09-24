@@ -337,14 +337,22 @@
       else if (e.key === 'ArrowLeft' && multiple) prev();
     });
 
-    // Press-and-hold on the image hides every control (close/prev/next/
-    // fullscreen) for an unobstructed look at it, fading them back in on
-    // release — a separate set of listeners from the swipe ones above
-    // (not nested inside them) specifically so it still works even with
-    // only one image on the page, where the swipe handlers bail out via
+    // Press-and-hold hides every control (close/prev/next/fullscreen) for
+    // an unobstructed look at the image, fading them back in on release —
+    // a separate set of listeners from the swipe ones below (not nested
+    // inside them) specifically so it still works even with only one image
+    // on the page, where the swipe handlers bail out via
     // `if (!multiple) return;` before ever running. Cancelled the instant
     // real movement is detected, so it can never fire mid-swipe — a hold
     // that turns into a drag is a swipe, not a hold.
+    //
+    // Listens on `overlay`, not `stage` — the four buttons are siblings of
+    // stage, not descendants of it, so a press starting directly ON or near
+    // one (very natural to do — the buttons sit right at the edges of the
+    // image) never bubbled to a stage-scoped listener at all, and nothing
+    // would hide. overlay is the actual common ancestor of both the stage
+    // and every button, so a hold anywhere in the lightbox — image or
+    // button — triggers the same hide/show consistently.
     const LONG_PRESS_MS = 400;
     const LONG_PRESS_MOVE_TOLERANCE_PX = 8;
     let longPressTimeoutId = 0;
@@ -365,7 +373,7 @@
       longPressPointerId = null;
     }
 
-    stage.addEventListener('pointerdown', (e) => {
+    overlay.addEventListener('pointerdown', (e) => {
       cancelLongPress();
       longPressPointerId = e.pointerId;
       longPressStartX = e.clientX;
@@ -378,7 +386,7 @@
       }, LONG_PRESS_MS);
     });
 
-    stage.addEventListener('pointermove', (e) => {
+    overlay.addEventListener('pointermove', (e) => {
       if (longPressPointerId !== e.pointerId || !longPressTimeoutId) return;
       const dx = e.clientX - longPressStartX;
       const dy = e.clientY - longPressStartY;
@@ -393,8 +401,8 @@
       if (wasTriggered) showChrome();
     }
 
-    stage.addEventListener('pointerup', endLongPress);
-    stage.addEventListener('pointercancel', endLongPress);
+    overlay.addEventListener('pointerup', endLongPress);
+    overlay.addEventListener('pointercancel', endLongPress);
 
     // Touch/thumb drag — horizontal live-follows the finger by scrubbing
     // the exact same current/incoming pair goTo() animates, just driven by
