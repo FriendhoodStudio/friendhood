@@ -28,7 +28,7 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
       {pageLinks.map((link, i) => (
         <a
           href={link.href}
-          class="menu-item menu-link font-display text-h1 text-front"
+          class="menu-item menu-link nav-menu-page-link font-display text-h1 text-front"
           data-delay={i * STAGGER_MS}
         >
           {link.label}
@@ -83,6 +83,15 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
 
   .menu-link {
     transition: translate 300ms ease-out;
+  }
+
+  /* Same trial Heavy weight as the Hero H1 (see global.css's @font-face
+     comment on "Greed Extended Heavy Trial") — used here too per explicit
+     go-ahead despite it not being the licensed file yet. Falls back to the
+     regular Greed Extended (already loaded via font-display) if the trial
+     file is ever pulled, rather than dropping to the generic sans-serif. */
+  .nav-menu-page-link {
+    font-family: "Greed Extended Heavy Trial", "Greed Extended", sans-serif;
   }
 
   .menu-link:hover {
