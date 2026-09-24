@@ -25,22 +25,22 @@ const { services } = Astro.props;
       closed. Handing position and momentum back to the browser removes
       that whole category outright.
 
-      snap-proximity, not snap-mandatory: mandatory snapping is well known
-      to fight continuous trackpad/wheel input specifically — it tries to
-      force-snap on every tiny pause a trackpad's discrete delta reporting
-      naturally produces mid-gesture, which reads as jerky/fighting-back
-      rather than one smooth motion. Touch scrolling doesn't show this
-      because mobile browsers run touch+snap through a much more
-      aggressively optimised, fully compositor-owned path — the same CSS
-      property, but a genuinely different underlying code path per input
-      type, which is why this was fine on mobile and not on desktop.
-      Proximity only snaps once a scroll actually comes to rest near a
-      point, letting a trackpad swipe flow continuously; a mouse-drag (see
-      script) still always ends up centred because the drag handler's own
-      release logic finishes with an explicit scrollIntoView regardless of
-      how "close" the snap point is. touch-action: pan-x lets native
-      horizontal panning through but leaves the vertical axis free for our
-      own swipe-to-close JS (see script).
+      snap-mandatory, not snap-proximity: proximity was tried first on the
+      theory that mandatory snap fights continuous trackpad input — real in
+      general, but not what was actually happening here once the real bug
+      (a blocking, non-passive scroll listener elsewhere — see git history)
+      was fixed. Proximity's own cost turned out worse in practice:
+      "uncertain" landings (it only snaps once a scroll happens to end up
+      already near a point, so a resting position between two cards is a
+      real, reachable state) and, worse, an ambiguous resting spot right at
+      the real/clone boundary could read as nearestIndex()'s wrong side,
+      making correctLoopPosition (see script) "correct" onto the wrong
+      neighbour — which is what looked like sliding backward instead of
+      looping forward. Mandatory always settles cleanly on an exact card,
+      which both a decisive landing and a reliable loop correction depend
+      on. touch-action: pan-x lets native horizontal panning through but
+      leaves the vertical axis free for our own swipe-to-close JS (see
+      script).
 
       The loop is a real card cloned at each end of the array — three full
       copies of the service list back-to-back (see the REPEAT map below),
@@ -56,7 +56,7 @@ const { services } = Astro.props;
       the real one the instant the scroll goes idle. */}
   <div
     data-services-track
-    class="flex w-full snap-x snap-proximity gap-[var(--spacing-gutter)] overflow-x-auto"
+    class="flex w-full snap-x snap-mandatory gap-[var(--spacing-gutter)] overflow-x-auto"
     style="touch-action: pan-x; scrollbar-width: none; user-select: none;"
   >
     {[0, 1, 2].map((copyIndex) => services.map((service, i) => (
@@ -416,7 +416,11 @@ const { services } = Astro.props;
     if (flatIndex >= N && flatIndex < 2 * N) return; // already the real copy
     const logical = ((flatIndex % N) + N) % N;
     const real = realCards[logical];
-    track.scrollLeft = real.offsetLeft - (track.clientWidth - real.offsetWidth) / 2;
+    // scrollTo({behavior:'instant'}), not a bare scrollLeft assignment —
+    // explicit about intent rather than relying on the default ScrollBehavior
+    // (which a bare property write also follows, but naming it removes any
+    // ambiguity if something upstream ever ends up setting scroll-behavior).
+    track.scrollTo({ left: real.offsetLeft - (track.clientWidth - real.offsetWidth) / 2, behavior: 'instant' });
     updateVisualState();
   }
 
@@ -775,14 +779,17 @@ const { services } = Astro.props;
 
   // Click-and-drag-to-scroll for plain-mouse desktop users (a trackpad's
   // two-finger swipe already scrolls the track natively via wheel deltaX —
-  // this is only for a mouse with no trackpad). Directly drives scrollLeft;
-  // snap-proximity (not mandatory — see the top-of-file comment) means this
-  // no longer fights the browser trying to force-snap mid-drag the way it
-  // would have under mandatory. { passive: true } throughout since this
-  // never calls preventDefault — writing scrollLeft has no default browser
-  // action to cancel, and a mouse pointermove listener doesn't carry the
-  // touch-compositor cost a non-passive one would anyway, but there's no
-  // reason not to be explicit about it.
+  // this is only for a mouse with no trackpad). Directly drives scrollLeft
+  // live during the drag; under snap-mandatory the browser may visually
+  // nudge toward a snap point between writes, but that's cosmetic mid-drag
+  // jitter, not a functional problem — endMouseDrag below always finishes
+  // with its own explicit scrollIntoView regardless of wherever the native
+  // snap left things, so the release position is deterministic either way.
+  // { passive: true } throughout since this never calls preventDefault —
+  // writing scrollLeft has no default browser action to cancel, and a
+  // mouse pointermove listener doesn't carry the touch-compositor cost a
+  // non-passive one would anyway, but there's no reason not to be explicit
+  // about it.
   let mouseDragging = false;
   let mouseDragStartX = 0;
   let mouseDragStartScrollLeft = 0;
