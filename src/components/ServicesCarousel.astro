@@ -303,10 +303,23 @@ const { services } = Astro.props;
   // a scale() transform for the fade effect below, which changes their
   // painted rect but never their layout box or offsetLeft. Reading layout
   // values means this stays correct however a card is currently scaled.
+  //
+  // The gap is cached rather than read fresh via getComputedStyle on every
+  // call — it only ever changes at a breakpoint (see updateCachedGap below,
+  // re-run on resize), but cardDelta runs per card per scroll frame, so an
+  // uncached getComputedStyle here was 18 unnecessary style recalculations
+  // every single frame of a continuous scroll.
+  let cachedGap = 0;
+  function updateCachedGap() {
+    if (!track) return;
+    cachedGap = parseFloat(getComputedStyle(track).columnGap) || 0;
+  }
+  updateCachedGap();
+  window.addEventListener('resize', updateCachedGap);
+
   function step(): number {
-    if (!track || !cards[0]) return 0;
-    const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
-    return cards[0].offsetWidth + gap;
+    if (!cards[0]) return 0;
+    return cards[0].offsetWidth + cachedGap;
   }
 
   function cardDelta(card: HTMLElement): number {
@@ -347,11 +360,16 @@ const { services } = Astro.props;
     return { scale: 1 - t * 0.15, opacity: 1 - t * 0.45 };
   }
 
+  // Two passes, not one combined loop — all the layout reads (cardDelta,
+  // via offsetLeft/offsetWidth) happen first, then all the style writes.
+  // transform/opacity don't themselves affect layout, so this was never
+  // full forced-synchronous-layout thrashing, but interleaving 18 reads and
+  // 18 writes per frame is still needlessly more work than two flat passes.
   function updateVisualState() {
-    cards.forEach((card) => {
-      const { scale, opacity } = cardVisualState(cardDelta(card));
-      card.style.transform = `scale(${scale})`;
-      card.style.opacity = String(opacity);
+    const states = cards.map((card) => cardVisualState(cardDelta(card)));
+    cards.forEach((card, i) => {
+      card.style.transform = `scale(${states[i].scale})`;
+      card.style.opacity = String(states[i].opacity);
     });
   }
 
