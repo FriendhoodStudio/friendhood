@@ -276,18 +276,18 @@ const { services } = Astro.props;
 
   /* Sits behind the close handle and copy-email button, giving them a
      legible backdrop against whatever the photo underneath is doing —
-     needed once the close handle lost its own background chip. Two
-     separate fades stacked on the same element, both anchored at the top
-     and softening to nothing by the same point, so neither reads as a hard
-     edge: the tint via the gradient's own alpha stops, and the blur
-     STRENGTH itself via mask-image (backdrop-filter has no way to vary its
-     own intensity across an element — masking the element that carries it
-     is the actual technique for a "graduating blur" rather than a blurred
-     rectangle with a sharp cutoff). */
+     needed once the close handle lost its own background chip. Used to
+     also carry backdrop-filter: blur(6px) for a "graduating blur" effect
+     (mask-image fading its strength toward nothing) — dropped for the same
+     reason the main card's own backdrop-blur-[25px] was: this is a
+     full-card-width, 110px-tall backdrop-filter on every one of up to 18
+     simultaneous card elements (the loop's clone copies), a meaningfully
+     large area for one of the most expensive effects a browser composites.
+     The gradient tint alone (mask-image still softens ITS edge, which is
+     cheap — just alpha compositing, not a filter) still reads as a
+     legible scrim on its own. */
   .services-card-top-fade {
     background: linear-gradient(to bottom, rgba(13, 13, 13, 0.45), rgba(13, 13, 13, 0) 100%);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
     mask-image: linear-gradient(to bottom, black, transparent 100%);
     -webkit-mask-image: linear-gradient(to bottom, black, transparent 100%);
   }
