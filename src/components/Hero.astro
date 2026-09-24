@@ -178,12 +178,16 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
   </div>
 </section>
 
+{/* px-0 on mobile (py only) so the video can run edge-to-edge — see the
+    video's own comment below for why. sm:p-[24px] restores the original
+    symmetric padding once there's enough width that a letterboxed,
+    rounded-corner video reads better than a full-bleed one. */}
 {reelVideoUrl && (
   <div
     data-reel-overlay
     data-open="false"
     inert
-    class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/95 p-[14px] opacity-0 backdrop-blur-[10px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100 sm:p-[24px]"
+    class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/95 px-0 py-[14px] opacity-0 backdrop-blur-[10px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100 sm:p-[24px]"
   >
     <button
       type="button"
@@ -195,10 +199,19 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
         <path d="M1 1L17 17M17 1L1 17" stroke="#F3FAF0" stroke-width="1.5" stroke-linecap="round" />
       </svg>
     </button>
+    {/* Full-bleed on mobile — w-full/h-auto (not max-w-full, which only
+        caps size against however big the video's own intrinsic dimensions
+        already render) so it genuinely stretches to fill the now-
+        edge-to-edge overlay width, with square corners to match (rounding
+        a corner that's sitting flush against the screen edge reads as a
+        mistake, not a design choice). Reverts to the original
+        letterboxed-and-rounded treatment from the tablet tier up, where
+        the overlay still has real side padding for a rounded corner to
+        sit within. */}
     <video
       data-reel-video
       src={reelVideoUrl}
-      class="max-h-full max-w-full rounded-card"
+      class="h-auto w-full sm:h-auto sm:max-h-full sm:w-auto sm:max-w-full sm:rounded-card"
       controls
       playsinline
       preload="none"
