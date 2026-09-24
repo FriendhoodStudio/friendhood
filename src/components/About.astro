@@ -146,10 +146,13 @@ const clients = about?.clients ?? [];
 <section class="flex flex-col gap-vertical-s px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-clients">
   <p class="reveal-item font-tag text-detail text-grey-300">{clientsLabel}</p>
   {/* Each name its own span (not the old single joined-string <p>) so JS
-      can highlight them individually as a "reading line" sweeps down the
-      viewport on scroll (see the script) — separators are plain text
-      between spans, not part of any name's own highlight state. */}
-  <p class="reveal-item w-full font-heading text-h3">
+      can highlight exactly one at a time as you scroll (see the script) —
+      separators are plain text between spans, not part of any name's own
+      highlight state, so the <p> itself still needs its own resting colour:
+      those bare " • " text nodes inherit from it directly (they were
+      rendering as invisible black text before this, once colour moved onto
+      the .client-name spans and this class list lost its own). */}
+  <p class="reveal-item w-full font-heading text-h3 text-[#5c5c5c]">
     {clients.map((name, i) => (
       <>
         <span class="client-name" data-client-name>{name}</span>
@@ -166,27 +169,43 @@ const clients = about?.clients ?? [];
     initScrollRevealGroup(name);
   }
 
-  // Client names light up in sequence as you scroll — driven by a fixed
-  // "reading line" partway down the viewport (65%, past the point most
-  // reading focus naturally sits) rather than an index-based split of the
-  // list: a name's own live position is what decides whether it's been
-  // "read" yet, the same geometry-driven philosophy initScrollReveal above
-  // uses. That's what makes this correct regardless of how many names wrap
-  // onto each line at a given viewport width, and naturally bidirectional —
-  // scrolling back up un-highlights names the same way scrolling down lit
-  // them, with no separate reverse-case to write.
+  // Client names light up ONE AT A TIME as you scroll — not by each name's
+  // own line position (an earlier version used a fixed "reading line" and a
+  // per-name rect check, which highlighted whole visual LINES at once,
+  // since every name sharing a wrapped line also shares almost the same
+  // rect.top — that's the "batches" behaviour this replaces). Position on
+  // screen isn't used at all now: a single active index is driven purely by
+  // how far the whole paragraph has scrolled through the viewport (its own
+  // top position, from entering at the bottom to fully exiting at the top),
+  // mapped onto the name list as a timeline independent of how any of them
+  // happen to wrap. That's what guarantees exactly one name is ever active,
+  // regardless of line-wrapping, and it's naturally bidirectional —
+  // scrolling back up walks the same index back down, no reverse-case to
+  // write separately.
   const clientNames = Array.from(document.querySelectorAll<HTMLElement>('[data-client-name]'));
+  const clientsParagraph = clientNames[0]?.closest('p') ?? null;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  if (clientNames.length && !reduceMotion) {
-    const READING_LINE_VH = 0.65;
+  if (clientNames.length && clientsParagraph && !reduceMotion) {
+    function clamp(value: number, min: number, max: number) {
+      return Math.min(max, Math.max(min, value));
+    }
 
     function updateClientHighlight() {
-      const lineY = window.innerHeight * READING_LINE_VH;
-      clientNames.forEach((span) => {
-        const rect = span.getBoundingClientRect();
-        const center = rect.top + rect.height / 2;
-        span.classList.toggle('client-name--active', center < lineY);
+      const vh = window.innerHeight;
+      const rect = clientsParagraph!.getBoundingClientRect();
+      // progress 0: paragraph's top is at the bottom of the viewport (just
+      // arriving). progress 1: paragraph's top has scrolled a full
+      // paragraph-height above the top of the viewport (fully passed) —
+      // using its own height rather than a fixed distance means the sweep
+      // always completes over exactly this paragraph's own scroll traversal,
+      // however many lines it wraps into at the current viewport width.
+      const start = vh;
+      const end = -rect.height;
+      const progress = clamp((start - rect.top) / (start - end), 0, 1);
+      const activeIndex = Math.min(clientNames.length - 1, Math.floor(progress * clientNames.length));
+      clientNames.forEach((span, i) => {
+        span.classList.toggle('client-name--active', i === activeIndex);
       });
     }
 
