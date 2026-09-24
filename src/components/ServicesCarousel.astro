@@ -677,12 +677,20 @@ const { services } = Astro.props;
     anim.finished.then(() => anim.cancel()).catch(() => {});
   }
 
+  // `swipeCard` is only ever needed for the VERTICAL branch (the specific
+  // element to animate a dismiss on) — it must not also gate whether a
+  // gesture starts at all. Cards are absolutely positioned now, with real
+  // gaps between them (the peeking-card spacing), so a touch starting in
+  // one of those gaps has no `[data-service-card]` ancestor — requiring
+  // one here meant that touch silently did nothing at all, for either
+  // direction, which is what kept reading as swipes randomly not
+  // responding on mobile depending on exactly where the thumb landed.
+  // `swipePointerId` (not `swipeCard`) is the "is a gesture active" gate.
   track?.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'touch' || !isMobileOrTablet() || !track) return;
     const card = (e.target as HTMLElement).closest<HTMLElement>('[data-service-card]');
-    if (!card) return;
     swipeCard = card;
-    swipeScale = cardVisualState(wrappedDelta(cards.indexOf(card), targetOffset)).scale;
+    swipeScale = card ? cardVisualState(wrappedDelta(cards.indexOf(card), targetOffset)).scale : 1;
     swipeStartX = e.clientX;
     swipeStartY = e.clientY;
     swipeStartTime = e.timeStamp;
@@ -692,7 +700,7 @@ const { services } = Astro.props;
   });
 
   track?.addEventListener('pointermove', (e) => {
-    if (!swipeCard || e.pointerId !== swipePointerId || !track) return;
+    if (swipePointerId === null || e.pointerId !== swipePointerId || !track) return;
     const dx = e.clientX - swipeStartX;
     const dy = e.clientY - swipeStartY;
 
@@ -701,9 +709,17 @@ const { services } = Astro.props;
       // direction — locking on the first pixel of jitter would misclassify
       // real horizontal swipes.
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      swipeDirection = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal';
+      const wantsVertical = Math.abs(dy) > Math.abs(dx);
+      if (wantsVertical && !swipeCard) {
+        // A vertical swipe with no specific card under the thumb (started
+        // in a gap) has nothing to animate a dismiss on — abandon just
+        // this gesture rather than misreading it as horizontal.
+        swipePointerId = null;
+        return;
+      }
+      swipeDirection = wantsVertical ? 'vertical' : 'horizontal';
       if (swipeDirection === 'vertical') {
-        swipeCard.setPointerCapture(swipePointerId);
+        swipeCard!.setPointerCapture(swipePointerId);
       } else {
         // A real horizontal swipe — handed off to the shared exactly-one-
         // card-per-gesture stepper above.
@@ -720,12 +736,12 @@ const { services } = Astro.props;
     if (swipeDirection !== 'vertical') return;
     e.preventDefault();
     swipeDeltaY = Math.max(0, dy); // downward only — an upward drag is a no-op
-    swipeCard.style.transform = `translate(-50%, -50%) scale(${swipeScale}) translateY(${swipeDeltaY}px)`;
-    swipeCard.style.opacity = String(Math.max(0.4, 1 - swipeDeltaY / 400));
+    swipeCard!.style.transform = `translate(-50%, -50%) scale(${swipeScale}) translateY(${swipeDeltaY}px)`;
+    swipeCard!.style.opacity = String(Math.max(0.4, 1 - swipeDeltaY / 400));
   });
 
   function endSwipe(e: PointerEvent) {
-    if (!swipeCard || e.pointerId !== swipePointerId || !track) return;
+    if (swipePointerId === null || e.pointerId !== swipePointerId || !track) return;
     const card = swipeCard;
     const direction = swipeDirection;
     swipeCard = null;
@@ -736,7 +752,9 @@ const { services } = Astro.props;
       return;
     }
 
-    if (direction !== 'vertical') return;
+    // A vertical direction is never set without a card (see pointermove
+    // above), so this is just satisfying the type checker.
+    if (direction !== 'vertical' || !card) return;
 
     const elapsed = e.timeStamp - swipeStartTime;
     const velocity = swipeDeltaY / Math.max(elapsed, 1);
