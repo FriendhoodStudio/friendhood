@@ -60,21 +60,20 @@ const clients = about?.clients ?? [];
    * scrolls as a discrete unit, and every card's image ends up the same
    * height since they all share that width (aspect-ratio does the rest).
    *
-   * At desktop the row switches to CSS Grid with auto-fill/minmax (same
-   * pattern as .services-grid) instead of a hardcoded 3-column track list —
-   * Sanity's approachCards array has no max-count validation, so a 4th (or
-   * 5th) card an editor adds in Studio reflows into however many columns
-   * actually fit, evenly stretched, rather than wrapping into a new row of
-   * mostly-empty tracks the way a fixed repeat(3, 1fr) would. It also still
-   * gets the general grid benefit over flexbox: tracks always divide the
-   * container's ACTUAL width exactly, at any real browser width, not just
-   * the 4 Figma reference breakpoints col-4 was measured against.
-   *
-   * auto-fill, not auto-fit: auto-fit collapses unfilled tracks and hands
-   * their space to the remaining items, which stretches a lone (or few)
-   * card(s) to fill the whole row — auto-fill keeps the empty tracks in
-   * place instead, so cards stay at their normal column width with blank
-   * space beside them until there are enough to actually fill the row.
+   * At desktop the row switches to a literal repeat(3, 1fr), matching
+   * global.css's own note on why (search "Approach cards' desktop-only
+   * grid" there) — this was briefly `repeat(auto-fill, minmax(var(--col-4),
+   * 1fr))` instead, which is exactly the failure mode that comment warns
+   * .col-grid itself avoids: --col-4 is constant across the WHOLE 1200–
+   * 1919px range, so at the narrower end of it auto-fill could only fit 2
+   * columns, and that row's 1fr tracks then claimed all the leftover width
+   * each — badly oversized cards, reported directly as "the approach cards
+   * go to two in a row on certain screen sizes." repeat(3, 1fr) has no such
+   * failure mode: 3 columns always divide the row evenly regardless of
+   * viewport width within this tier. A card count that isn't a multiple of
+   * 3 just leaves a normally-proportioned partial last row (not stretched,
+   * not broken) — completely standard grid behaviour, not something that
+   * needed solving.
    *
    * Full-bleed break-out + scroll-padding-inline scroll mechanics come from
    * the shared .full-bleed-scroll class (see global.css) — this block only
@@ -93,7 +92,7 @@ const clients = about?.clients ?? [];
   @media (min-width: 1200px) {
     .approach-row {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(var(--col-4), 1fr));
+      grid-template-columns: repeat(3, 1fr);
       align-items: start;
       scroll-snap-type: none;
     }
