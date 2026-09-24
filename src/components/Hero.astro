@@ -80,15 +80,24 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
         <Fragment>
           {/* The cycling word sits inside a plain h-[1em] window, same as
               the static headline text's own line box — the Heavy trial
-              weight's top/bottom clipping and the next-word show-through
-              both traced back to the font FILE's own declared ascent/
-              descent metrics running well past its actual ink, and are
-              fixed at the font-face level (see the ascent-override/
-              descent-override comment in global.css), not here.
-              That fix is vertical-only, though: it doesn't touch the
-              window's WIDTH, which is set to the exact measured advance-
-              width of the current word (see the script below) — and this
-              font's rounded terminals paint slightly past that advance
+              weight's top/bottom clipping traced back to the font FILE's
+              own declared ascent/descent metrics running well past its
+              actual ink, fixed at the font-face level (see the
+              ascent-override/descent-override comment in global.css), not
+              here. That fix alone wasn't enough to stop next-word
+              show-through during the roll's overshoot, though (confirmed on
+              real mobile devices even with the overshoot fraction shrunk
+              repeatedly) — the actual fix for THAT is the track's own
+              gap-[0.15em] (see data-hero-word-track): stacked frames used
+              to sit directly flush against each other, so an overshoot
+              peeking even slightly past the target frame landed straight on
+              the next word's own ink with zero buffer. The gap gives any
+              reasonable overshoot real empty space to travel through first
+              — see the script's playWordRoll for the matching pixel-based
+              (not percentage-based) roll math this requires.
+              Separately: the window's WIDTH is set to the exact measured
+              advance-width of the current word (see the script below), and
+              this font's rounded terminals paint slightly past that advance
               width on the right regardless (confirmed live: a Range over
               the text node measures flush with the window's edge, "govs"/
               "orgs"/etc.'s trailing "s" is still visibly clipped there).
@@ -101,7 +110,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
           {headlineBefore}<span
             class="hero-word-window-clip relative inline-block h-[1em] align-bottom overflow-visible"
             data-hero-word-window
-          ><span class="flex flex-col items-start" data-hero-word-track>
+          ><span class="flex flex-col items-start gap-[0.15em]" data-hero-word-track>
             {loopWords.map((word, i) => (
               <span
                 class="block h-[1em] whitespace-nowrap leading-none"
@@ -587,11 +596,28 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     const win = wordWindow;
     const track = wordTrack;
     const frameCount = track.children.length;
-    // translateY(%) is relative to the track's OWN height (all frames
-    // stacked), not a single frame — so one frame is (100 / frameCount)%,
-    // not a flat 100%.
-    const framePercent = 100 / frameCount;
     let index = 0;
+
+    // Pixel step (one frame's own height + the gap-[0.15em] after it — see
+    // the markup comment), not a percentage of the track's total height —
+    // percentage-based translateY was exactly what made the roll's
+    // overshoot show adjacent-word ink on mobile: with zero space reserved
+    // between stacked frames, ANY overshoot past the target frame's own
+    // position landed straight on the next frame's real content, no matter
+    // how small the overshoot fraction. Frame height (not width) is uniform
+    // across every word — all frames share the same font-size/line-height,
+    // only their WIDTH differs — so a single measured step covers all of
+    // them, re-measured on resize/font-load same as frameWidths below since
+    // both em-based values (the h-[1em] frame and the gap-[0.15em]) scale
+    // with font-size across breakpoints.
+    let frameStep = 0;
+    function measureFrameStep() {
+      const first = track.children[0] as HTMLElement | undefined;
+      if (!first) return;
+      const gap = parseFloat(getComputedStyle(track).rowGap) || 0;
+      frameStep = first.getBoundingClientRect().height + gap;
+    }
+    measureFrameStep();
 
     // Each word has a different natural width. The window is sized to
     // exactly the word currently showing (not the widest of the set) and
@@ -626,6 +652,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       frameWidths = frames.map((frame) => frame.getBoundingClientRect().width);
       const width = frameWidths[index];
       if (width) win.style.width = `${width}px`;
+      measureFrameStep();
     });
 
     // Roll — replaces an earlier motion-blur treatment on the same roll
@@ -634,32 +661,44 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     // real overshoot-and-settle, unlike this one — see the no-overshoot
     // comment in playWordRoll) can stay in sync with it via the same
     // Animation-based approach.
+    // Fractions of one frameStep, not fixed px — so the excursion scales
+    // with the actual measured step (which itself scales with font-size
+    // across breakpoints) rather than needing its own per-breakpoint
+    // tuning. 0.1 keeps the overshoot's peak excursion (0.1 * frameStep,
+    // where frameStep = 1em + the 0.15em gap ≈ 1.15em) at roughly 0.115em
+    // past the target — comfortably inside the 0.15em gap with real margin
+    // to spare, unlike the old percentage-based version which had zero
+    // buffer at all and showed adjacent-word ink at every fraction tried.
+    const ROLL_OVERSHOOT_FRACTION = 0.1;
+    const ROLL_SETTLE_FRACTION = -0.025;
+
     let rollAnim: Animation | null = null;
-    function playWordRoll(targetPercent: number) {
-      const startPercent = -(index - 1) * framePercent;
+    function playWordRoll(targetPx: number) {
+      const startPx = -(index - 1) * frameStep;
       rollAnim?.cancel();
-      // No overshoot on this one, unlike every other press/release
-      // interaction on the site — overshooting at all means, for a moment,
-      // scrolling PAST the target frame within the window's clipped view,
-      // peeking a sliver of the adjacent word's ink past the ascent/descent
-      // margin ("show-through"). Tried at several shrinking fractions
-      // (0.18, 0.06, 0.02) and each was still visible on mobile (390px,
-      // 40px headline) if you looked closely enough, on every transition,
-      // not just words with deep descenders — the margin just isn't big
-      // enough to swallow ANY overshoot reliably. This is also the one
-      // overshoot on the site whose "spring" is mostly hidden behind a clip
-      // anyway (the viewer only ever sees the word slide and settle, never
-      // the swing past), so there's very little felt quality actually lost
-      // by cutting it entirely rather than continuing to shrink it.
+      // Overshoot restored (was cut entirely — see git history/prior
+      // session notes — once gap-[0.15em] existed, there was nowhere safe
+      // for it to swing into and it showed adjacent-word ink on mobile no
+      // matter how small the fraction). The gap now gives it real empty
+      // space to travel through first, so the spring reads the same as
+      // every other press/release interaction on the site again.
+      const delta = targetPx - startPx;
+      const overshootPx = targetPx + delta * ROLL_OVERSHOOT_FRACTION;
+      const settlePx = targetPx + delta * ROLL_SETTLE_FRACTION;
       rollAnim = track.animate(
-        [{ transform: `translateY(${startPercent}%)` }, { transform: `translateY(${targetPercent}%)` }],
+        [
+          { transform: `translateY(${startPx}px)` },
+          { transform: `translateY(${overshootPx}px)`, offset: 0.7 },
+          { transform: `translateY(${settlePx}px)`, offset: 0.88 },
+          { transform: `translateY(${targetPx}px)` },
+        ],
         { duration: 650, easing: 'ease-out', fill: 'forwards' }
       );
       const anim = rollAnim;
       anim.finished
         .then(() => {
           anim.cancel();
-          track.style.transform = `translateY(${targetPercent}%)`;
+          track.style.transform = `translateY(${targetPx}px)`;
           if (rollAnim === anim) rollAnim = null;
           // Once the roll into the final looping-duplicate frame actually
           // completes, reset immediately rather than waiting for the next
@@ -745,7 +784,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       // with nothing to recover it.
       if (index >= frameCount - 1) resetToFirstFrame();
       index++;
-      playWordRoll(-index * framePercent);
+      playWordRoll(-index * frameStep);
       const width = frameWidths[index];
       if (width) animateWordWidth(width);
     }
@@ -761,15 +800,26 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
         resizeRafId = 0;
         frameWidths = frames.map((frame) => frame.getBoundingClientRect().width);
         const width = frameWidths[index];
-        if (!width) return;
-        // Instant, not animated — this is a layout correction for the new
-        // viewport/font-size, not a user-triggered roll. Cancels any
-        // in-flight overshoot from animateWordWidth first, since that's a
-        // WAAPI animation now rather than a CSS transition this could
-        // previously suspend by zeroing the transition-duration.
-        widthAnim?.cancel();
-        widthAnim = null;
-        win.style.width = `${width}px`;
+        if (width) {
+          // Instant, not animated — this is a layout correction for the new
+          // viewport/font-size, not a user-triggered roll. Cancels any
+          // in-flight overshoot from animateWordWidth first, since that's a
+          // WAAPI animation now rather than a CSS transition this could
+          // previously suspend by zeroing the transition-duration.
+          widthAnim?.cancel();
+          widthAnim = null;
+          win.style.width = `${width}px`;
+        }
+        // Same instant-correction reasoning for the vertical position:
+        // frameStep is also em-based (both the h-[1em] frame and the
+        // gap-[0.15em] scale with font-size), so it's stale after a
+        // breakpoint change too — left uncorrected, the track would sit at
+        // a pixel offset computed for the OLD font-size and land on the
+        // wrong frame, or partway between two.
+        measureFrameStep();
+        rollAnim?.cancel();
+        rollAnim = null;
+        track.style.transform = `translateY(${-index * frameStep}px)`;
       });
     });
 
