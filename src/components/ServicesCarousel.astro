@@ -8,20 +8,6 @@ interface Props {
 }
 
 const { services } = Astro.props;
-// Rendered 5x (not 3x) so the carousel can loop seamlessly: scrolling out of
-// the outer copies silently jumps back into the equivalent position nearer
-// the middle. Sustained/fast swiping (real scroll momentum, not just a JS
-// scrollLeft assignment) was occasionally outrunning a 3-copy buffer and
-// hitting the true start/end of the track instead of wrapping — five copies
-// triples the buffer before that can happen. Must stay in sync with
-// REPEAT_COUNT in the script below.
-const REPEAT_COUNT = 5;
-const looped = Array.from({ length: REPEAT_COUNT }, () => services).flat();
-// Width itself now lives on .services-card in the <style> block (with its
-// own desktop override — see there), so this is just the snap alignment;
-// kept as a separate inline style rather than folded into the class list
-// since it's a one-off scroll-container concern, not a reusable utility.
-const cardSizeStyle = 'scroll-snap-align:center;';
 ---
 
 <div
@@ -29,29 +15,26 @@ const cardSizeStyle = 'scroll-snap-align:center;';
   data-open="false"
   class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/50 opacity-0 backdrop-blur-[25px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100"
 >
-  {/* `mandatory` scroll-snap fights continuous trackpad/wheel scrolling — it
-      tries to snap after essentially every small scroll delta rather than
-      waiting for the gesture to actually finish, which is what read as
-      jerky. `proximity` only snaps once scrolling naturally comes to rest
-      near a snap point, so an active gesture isn't fighting it mid-scroll.
-
-      `touch-action: none` hands the browser's own touch-scroll gesture
-      recognizer off entirely — without it, a finger drag was BOTH driving
-      the exactly-one-card stepper below AND kicking off the browser's own
-      native momentum-scroll on this same overflow-x:auto element, each one
-      fighting the other's scrollLeft writes every frame. That's what read
-      as cards jumping around on mobile. All touch gesture handling here
-      (horizontal stepping, vertical swipe-to-close) is already fully
-      hand-rolled in JS, so nothing native is lost by opting out. */}
-  <div
-    data-services-track
-    class="flex w-full items-center gap-[var(--spacing-gutter)] overflow-x-auto px-[10vw] py-[10px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    style="scroll-snap-type: x proximity; touch-action: none;"
-  >
-    {looped.map((service, i) => (
+  {/* Every card is absolutely positioned and placed purely by JS (see the
+      script's render()) via one continuous "offset" number — not a real
+      scroll position. The previous version drove this by scrolling a real
+      overflow-x:auto strip (with content repeated 5x to fake an infinite
+      loop), with JS then fighting that native scroll for exact per-card
+      control on top of it. Two systems sharing one position was the root
+      of a whole run of bugs: touch drags fighting the browser's own
+      native touch-scroll on the same element, a new drag racing a
+      still-finishing native smooth-scroll from the previous one, "which
+      card is current" going ambiguous mid-transition. A single JS-owned
+      position removes the seam between them entirely — there's no native
+      scroll left to disagree with, and no repeated DOM needed for the
+      loop (see wrappedDelta in the script). touch-action: none keeps the
+      browser's own touch gesture recognizer out of the way of the
+      hand-rolled drag below (horizontal stepping and vertical
+      swipe-to-close both live entirely in JS, same as before). */}
+  <div data-services-track class="relative flex w-full gap-[var(--spacing-gutter)]" style="touch-action: none;">
+    {services.map((service, i) => (
       <div
-        class="services-card flex shrink-0 flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[75px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
-        style={cardSizeStyle}
+        class="services-card absolute left-1/2 top-1/2 flex flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[75px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
         data-service-card
         data-index={i}
         data-name={service.name}
@@ -59,13 +42,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
         <div class="flex w-full flex-col items-start gap-[20px]">
           <div class="relative aspect-square w-full overflow-hidden">
             {/* Eager, not lazy — this carousel is hidden until opened, so
-                lazy-loading buys nothing on initial page load, and it was
-                actively harmful here: 30 card copies exist for the infinite
-                loop (6 services x 5 repeats), so scrolling constantly
-                crossed new copies into the lazy-load threshold, each
-                triggering a fetch/decode/paint right in the middle of the
-                scroll gesture — a much better fit for the reported
-                stuttering than anything else investigated so far. */}
+                lazy-loading buys nothing on initial page load. */}
             <img src={service.imageUrl} alt="" class="h-full w-full object-cover" loading="eager" />
             {/* Gradiating darkness + blur behind the two controls below —
                 a plain flat scrim would read as a hard-edged box sitting on
@@ -160,11 +137,11 @@ const cardSizeStyle = 'scroll-snap-align:center;';
 </div>
 
 <style>
-  /* Fixed rather than content-sized — overview text length and module-tag
-     count both vary per service, which left cards with visibly uneven
-     bottoms since several sit partially visible side-by-side in the
-     carousel at once. Internal gaps/padding were tightened alongside this
-     specifically so real content still fits without clipping.
+  /* Height lives here (not just on .services-card) so the track — the
+     containing block every card's left:50%/top:50% resolves against — is
+     exactly as tall as a card, keeping top:50% landing on the real visual
+     centre. Single source of truth for both via the custom property,
+     inherited down to .services-card below rather than redeclared there.
 
      740 (matching Figma's own reference example — node 7382:2286 — which
      has 9 module tags across 3 rows) badly overshot every REAL service's
@@ -174,17 +151,15 @@ const cardSizeStyle = 'scroll-snap-align:center;';
      it — so 592 = 325 + 267, and the fixed height itself was that plus
      Figma's own 75px bottom padding and a small buffer: 670 = 592 + 75 + 3.
 
-     The image is a square now (see the aspect-square container in the
-     markup above), so its height tracks the card's own width instead of a
-     flat 325px — meaning the height this card needs to stay snug against
-     real content ALSO now tracks its width, via the same --services-card-
-     image-size custom property both use: height = image size (= width,
-     square) + that same fixed 267+75+3 = 345px budget for everything below
-     the image, which doesn't itself depend on image size. */
-  .services-card {
+     The image is a square (see the aspect-square container in the markup
+     above), so its height tracks the card's own width instead of a flat
+     325px — meaning the height needed to stay snug against real content
+     ALSO now tracks width: height = image size (= width, square) + that
+     same fixed 267+75+3 = 345px budget for everything below the image,
+     which doesn't itself depend on image size. */
+  [data-services-track] {
     --services-card-image-size: min(446px, 72vw);
     height: calc(var(--services-card-image-size) + 345px);
-    width: var(--services-card-image-size);
   }
 
   /* Tablet gets its own tier, narrower than the mobile 446px cap — that cap
@@ -195,7 +170,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
      clearer peek without going as narrow as desktop, which has much more
      spare width to work with. */
   @media (min-width: 768px) {
-    .services-card {
+    [data-services-track] {
       --services-card-image-size: 400px;
     }
   }
@@ -205,9 +180,14 @@ const cardSizeStyle = 'scroll-snap-align:center;';
      untouched, so this only tightens the measure of the title/overview
      text, not how much of it fits. */
   @media (min-width: 1200px) {
-    .services-card {
+    [data-services-track] {
       --services-card-image-size: 380px;
     }
+  }
+
+  .services-card {
+    height: calc(var(--services-card-image-size) + 345px);
+    width: var(--services-card-image-size);
   }
 
   /* Doubled on mobile specifically (20px vs the 10px the *1.25 formula
@@ -263,28 +243,9 @@ const cardSizeStyle = 'scroll-snap-align:center;';
   const overlay = document.querySelector<HTMLElement>('[data-services-overlay]');
   const track = document.querySelector<HTMLElement>('[data-services-track]');
   const cards = track ? Array.from(track.querySelectorAll<HTMLElement>('[data-service-card]')) : [];
-  // Must match REPEAT_COUNT in the frontmatter above.
-  const REPEAT_COUNT = 5;
-  const setSize = cards.length / REPEAT_COUNT;
+  const N = cards.length;
 
   let copyButtons: HTMLButtonElement[] = [];
-
-  // The authoritative "current card" — set exactly once at every commit
-  // point (a step/click/key resolves, or handleLoop silently shifts the
-  // strip by one repeated set) rather than re-derived from scroll position
-  // on demand. A previous version found "current" by checking which card's
-  // centre was closest to the track's current centre — correct at rest,
-  // but AMBIGUOUS while a previous centerCard() scrollTo({behavior:
-  // 'smooth'}) is still mid-flight (a fast/repeated swipe or key-press
-  // doesn't wait for it to finish): scrollLeft sits somewhere between the
-  // old and new card, and "closest card" can resolve to either one,
-  // non-deterministically. Every navigation (keyboard, click-to-jump, the
-  // drag stepper) re-ran that same position-based check on each call, so
-  // two swipes in quick succession could each independently roll the dice
-  // on that ambiguity and land on the wrong neighbour — exactly what read
-  // as "unresponsive and unpredictable". Tracking the intended index
-  // directly removes the ambiguity instead of trying to resolve it.
-  let liveIndex = 0;
 
   function isOpen() {
     return overlay?.dataset.open === 'true';
@@ -298,153 +259,135 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     else unlockBodyScroll();
   }
 
-  // Center the given card in the track, optionally without a smooth scroll
-  // (used when first opening, so it doesn't visibly animate into place).
-  // (A custom rAF-driven tween replaced this for a while, to try to fix
-  // swipe-commit jerkiness — reverted: it made keyboard, which was never
-  // janky, janky too, without actually fixing the swipe case. Native smooth
-  // scroll it is; see moveCardStep further down for the real fix, which is
-  // about the live drag itself, not this commit step.)
-  function centerCard(card: HTMLElement, smooth: boolean) {
-    if (!track) return;
-    const targetLeft =
-      card.offsetLeft - track.clientWidth / 2 + card.offsetWidth / 2;
-    track.scrollTo({ left: targetLeft, behavior: smooth ? 'smooth' : 'instant' });
+  // --- Positioning engine --------------------------------------------------
+  //
+  // `offset` is "which absolute slot is centred right now" — not clamped to
+  // 0..N-1, so it freely grows or shrinks through any number of laps (e.g.
+  // -14, 0, 23). Each card's actual on-screen slot is whichever of its
+  // repeats (i, i±N, i±2N, ...) sits closest to `offset`, found fresh every
+  // render via wrappedDelta below. That's what gives the infinite loop for
+  // free, with no repeated DOM and no "silently jump the position once
+  // you're deep enough into a copy" bookkeeping the previous scroll-based
+  // version needed.
+  //
+  // `targetOffset` is separate: the authoritative "index we're heading to
+  // or resting on", updated synchronously the instant any gesture/key/click
+  // commits — never re-derived from `offset` itself (which can be
+  // fractional or mid-animation). The previous version found "current
+  // card" by checking scroll position, which was ambiguous while a native
+  // smooth-scroll from the PREVIOUS commit was still mid-flight — a fast or
+  // repeated swipe/key-press doesn't wait for it to finish, so two commits
+  // in a row could each independently land on the wrong neighbour. Explicit
+  // state instead of a re-derived guess removes that ambiguity outright,
+  // and — since this whole engine owns the animation itself now instead of
+  // handing it to the browser's native smooth-scroll — every gesture can
+  // just cancel and redirect it instantly and deterministically.
+  let offset = 0;
+  let targetOffset = 0;
+
+  // Recomputed fresh each call rather than cached, since the resting card
+  // width changes at every breakpoint (and is itself fluid — min(446px,
+  // 72vw) — below the tablet tier). getComputedStyle, not
+  // getBoundingClientRect: the latter reflects the CURRENT rendered size
+  // including whatever scale() a card presently has applied (peeking cards
+  // are scaled down — see cardVisualState), which would silently corrupt
+  // this if it ever happened to measure a non-centred card.
+  function step(): number {
+    if (!track || !cards[0]) return 0;
+    const width = parseFloat(getComputedStyle(cards[0]).width) || 0;
+    const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+    return width + gap;
   }
 
+  // Shortest signed distance (in card-steps) from `from` to `index`,
+  // wrapping around the N-card loop — e.g. with N=6, index 0 read from
+  // from=5 is +1 away (wrap forward), not -5. Works for fractional `from`
+  // too (mid-drag or mid-animation), which is what makes a single set of
+  // real DOM cards behave like an infinite strip without ever needing to
+  // silently reposition anything.
+  function wrappedDelta(index: number, from: number): number {
+    const raw = index - from;
+    return raw - N * Math.round(raw / N);
+  }
 
-  // Scale/fade cards by distance from the track's visual center — the closer
-  // to center, the larger and more opaque, per the Figma annotation calling for
-  // "the rest smaller and faded". Shared by the idle scroll state and the
-  // entrance/exit animations below, so a card's animated end-state always
-  // matches what it settles to at rest.
-  //
-  // Falloff floors (at t=1, the peeking card just off to either side): was
-  // 0.3 opacity / 0.75 scale, which — especially now that the resting card
-  // width narrowed to give a bigger peek (see cardSizeStyle above) — left
-  // the peeking card too washed out to read as "the next card" rather than
-  // just background blur. 0.55 / 0.85 keeps the same de-emphasis language
-  // (still clearly secondary to the centered card) while staying legible.
-  function cardVisualState(card: HTMLElement, center: number) {
-    if (!track) return { scale: 1, opacity: 1 };
-    const cardCenter = card.offsetLeft + card.offsetWidth / 2;
-    const dist = Math.abs(cardCenter - center);
-    const t = Math.min(dist / (track.clientWidth / 2), 1);
+  // Scale/fade cards by distance from centre — the closer to centre, the
+  // larger and more opaque, per the Figma annotation calling for "the rest
+  // smaller and faded". One full step away (a peeking neighbour) is where
+  // this bottoms out at its floor; 0.55 opacity / 0.85 scale keeps that
+  // peeking card reading as "the next card" rather than washing out into
+  // background blur.
+  function cardVisualState(delta: number) {
+    const t = Math.min(Math.abs(delta), 1);
     return { scale: 1 - t * 0.15, opacity: 1 - t * 0.45 };
   }
 
-  // Rewriting transform/opacity on all 30 card copies (6 services x
-  // REPEAT_COUNT 5, for the infinite loop) every single scroll frame is most
-  // of what was making this feel stuttery — the vast majority of those are
-  // off-screen copies already sitting at cardVisualState's t=1 floor, whose
-  // computed scale/opacity hasn't actually changed frame to frame. Every
-  // card also carries a 25px backdrop-blur (see .services-card), which is
-  // expensive to recomposite — so this was forcing a GPU-costly re-blur on
-  // ~24 invisible cards every frame for zero visual difference. Skipping
-  // cards already well past the falloff distance (double the distance where
-  // cardVisualState clamps to its floor, as safety margin so a card is
-  // always left in its correct final floored state before we stop touching
-  // it) cuts real per-frame work from 30 elements down to the handful
-  // actually near the visible center.
-  //
-  // That still left a handful of NEARBY cards being rewritten every single
-  // frame during an active drag even when their own computed scale/opacity
-  // hadn't meaningfully changed since the last frame (e.g. a card that's
-  // already sitting at or near its floor value while a DIFFERENT card is
-  // the one actually animating past it) — this is very likely what was
-  // making the drag itself feel like it was lagging behind the finger,
-  // rather than anything about the eventual commit animation: each of
-  // those redundant writes still forces the same expensive blur recomposite
-  // for zero visual difference. Caching the last-written values per card
-  // and skipping the DOM write entirely when nothing changed by more than a
-  // rounding epsilon removes that dead weight.
-  const cardScaleCache = new Map<HTMLElement, number>();
-  const cardOpacityCache = new Map<HTMLElement, number>();
-
-  function updateCardAppearance() {
-    if (!track) return;
-    const center = track.scrollLeft + track.clientWidth / 2;
-    const skipDistance = track.clientWidth;
-    cards.forEach((card) => {
-      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
-      if (Math.abs(cardCenter - center) > skipDistance) return;
-      const { scale, opacity } = cardVisualState(card, center);
-      const prevScale = cardScaleCache.get(card);
-      const prevOpacity = cardOpacityCache.get(card);
-      if (
-        prevScale !== undefined &&
-        prevOpacity !== undefined &&
-        Math.abs(prevScale - scale) < 0.001 &&
-        Math.abs(prevOpacity - opacity) < 0.001
-      ) {
-        return;
-      }
-      cardScaleCache.set(card, scale);
-      cardOpacityCache.set(card, opacity);
-      card.style.transform = `scale(${scale})`;
+  // Only N (6) real elements exist now — no more 30-copy loop buffer to
+  // skip-optimise around, so every card is simply repositioned every call.
+  function render() {
+    const s = step();
+    cards.forEach((card, i) => {
+      const delta = wrappedDelta(i, offset);
+      const { scale, opacity } = cardVisualState(delta);
+      card.style.transform = `translate(-50%, -50%) translateX(${delta * s}px) scale(${scale})`;
       card.style.opacity = String(opacity);
     });
   }
 
-  // Infinite loop: once scrolled deep enough into an outer copy, silently
-  // jump by exactly one copy's width — content repeats, so the jump is
-  // invisible. The 1.5-copy-wide dead zone at each end (rather than 0.5) is
-  // the buffer that absorbs scroll-momentum overshoot from fast/sustained
-  // swiping before it could ever reach the track's true start/end.
-  function handleLoop() {
-    if (!track) return;
-    const setWidth = track.scrollWidth / REPEAT_COUNT;
-    const dead = setWidth * 1.5;
-    if (track.scrollLeft < dead) {
-      track.scrollLeft += setWidth;
-      // liveIndex tracks a specific flat card element (0-29), not "which
-      // service is showing" — shifting the strip by one repeated set
-      // changes which element is actually centred (to an identical-
-      // looking copy) even though nothing looks different, so it has to
-      // move by the same one-set amount or it silently goes stale.
-      liveIndex += setSize;
-    } else if (track.scrollLeft > track.scrollWidth - dead) {
-      track.scrollLeft -= setWidth;
-      liveIndex -= setSize;
-    }
+  // Self-owned tween from the current (possibly mid-drag) offset to an
+  // absolute target — replaces native scrollTo({behavior:'smooth'}), which
+  // couldn't be reliably interrupted or redirected mid-flight (see the
+  // targetOffset comment above) and was the actual root of the "lands on
+  // the wrong card" and "swipe sometimes does nothing" reports. Owning
+  // start/cancel/redirect directly instead means a new gesture can always
+  // cancel and take over cleanly, with nothing left running behind it.
+  let tweenFrameId = 0;
+  function cancelTween() {
+    if (tweenFrameId) cancelAnimationFrame(tweenFrameId);
+    tweenFrameId = 0;
   }
 
-  let rafId = 0;
-  // handleLoop's scrollLeft jump used to run on every scroll frame — visually
-  // seamless in theory (the repeated content is identical either side of the
-  // jump), but in practice, reassigning scrollLeft WHILE the browser is
-  // mid-way through native momentum/inertial scrolling interrupts its
-  // deceleration curve, which reads as a visible stutter even though nothing
-  // actually looks different. Debouncing it to only run once scrolling has
-  // genuinely settled avoids fighting that momentum — the 1.5-copy-wide dead
-  // zone (see handleLoop) already exists specifically to give room for a
-  // fast swipe to keep coasting past the true edge before this ever needs to
-  // fire, so a short delay here doesn't risk it running too late.
-  let loopTimeoutId = 0;
-  function onScroll() {
-    if (rafId) return;
-    rafId = requestAnimationFrame(() => {
-      updateCardAppearance();
-      rafId = 0;
-    });
-    window.clearTimeout(loopTimeoutId);
-    loopTimeoutId = window.setTimeout(handleLoop, 120);
+  function animateTo(target: number, durationMs = 380) {
+    cancelTween();
+    targetOffset = target;
+    const start = offset;
+    const delta = target - start;
+    if (Math.abs(delta) < 0.001) {
+      offset = target;
+      render();
+      return;
+    }
+    const startTime = performance.now();
+    function tick(now: number) {
+      const t = Math.min((now - startTime) / durationMs, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out-cubic
+      offset = start + delta * eased;
+      render();
+      if (t < 1) {
+        tweenFrameId = requestAnimationFrame(tick);
+      } else {
+        offset = target;
+        render();
+        tweenFrameId = 0;
+      }
+    }
+    tweenFrameId = requestAnimationFrame(tick);
   }
+
+  render();
 
   // Per the Figma annotation, the carousel "emerges from bottom of page" — driven
   // via WAAPI (not a CSS transition) so it can play per-card, staggered from the
   // centered card outward, and the exact reverse (outward in first, center last)
   // on close. Each card animates its own translateY entrance while holding its
-  // cardVisualState scale/opacity as the end value, so it settles exactly where
-  // updateCardAppearance would have put it — no fighting between the two.
+  // cardVisualState scale/opacity (and its resting translateX) as the end value,
+  // so it settles exactly where render() would have put it — no fighting
+  // between the two.
   const SLIDE_DISTANCE = 120;
   const STAGGER_MS = 80;
   const STAGGER_RANGE = 2; // cards more than this far from center share the outermost delay
-  let openedCardIndex = 0;
 
   function playOpenAnimation() {
-    if (!track) return;
-    const center = track.scrollLeft + track.clientWidth / 2;
+    const s = step();
     cards.forEach((card, i) => {
       card.getAnimations().forEach((anim) => anim.cancel());
       // Same stale-hit-test-after-cancel concern as below, but for a leftover
@@ -452,12 +395,17 @@ const cardSizeStyle = 'scroll-snap-align:center;';
       // still in its pre-start delay when the carousel is reopened) — flush
       // right away rather than only after this new animation's own finish.
       void card.offsetWidth;
-      const { scale, opacity } = cardVisualState(card, center);
-      const distance = Math.min(Math.abs(i - openedCardIndex), STAGGER_RANGE);
+      const delta = wrappedDelta(i, targetOffset);
+      const { scale, opacity } = cardVisualState(delta);
+      const x = delta * s;
+      const distance = Math.min(Math.abs(delta), STAGGER_RANGE);
       const anim = card.animate(
         [
-          { transform: `translateY(${SLIDE_DISTANCE}px) scale(${scale})`, opacity: 0 },
-          { transform: `translateY(0) scale(${scale})`, opacity },
+          {
+            transform: `translate(-50%, -50%) translateX(${x}px) translateY(${SLIDE_DISTANCE}px) scale(${scale})`,
+            opacity: 0,
+          },
+          { transform: `translate(-50%, -50%) translateX(${x}px) translateY(0) scale(${scale})`, opacity },
         ],
         {
           duration: 600,
@@ -467,9 +415,9 @@ const cardSizeStyle = 'scroll-snap-align:center;';
         }
       );
       // Release the animation once it settles so its fill:forwards effect stops
-      // pinning transform/opacity — otherwise it permanently overrides the live
-      // updates updateCardAppearance() makes as the user scrolls/drags afterward,
-      // and the centered card stops rescaling.
+      // pinning transform/opacity — otherwise it permanently overrides render()
+      // as the user scrolls/drags afterward, and the centered card stops
+      // rescaling.
       anim.finished
         .then(() => {
           anim.cancel();
@@ -486,21 +434,30 @@ const cardSizeStyle = 'scroll-snap-align:center;';
   }
 
   function playCloseAnimation() {
-    if (!track) return;
-    const center = track.scrollLeft + track.clientWidth / 2;
+    const s = step();
     cards.forEach((card, i) => {
       card.getAnimations().forEach((anim) => anim.cancel());
       void card.offsetWidth;
-      const { scale, opacity } = cardVisualState(card, center);
-      const distance = Math.min(Math.abs(i - openedCardIndex), STAGGER_RANGE);
+      const delta = wrappedDelta(i, targetOffset);
+      const { scale, opacity } = cardVisualState(delta);
+      const x = delta * s;
+      const distance = Math.min(Math.abs(delta), STAGGER_RANGE);
       // Reverse of the open stagger: farthest-from-center cards leave first,
       // the centered card leaves last.
       const delay = (STAGGER_RANGE - distance) * STAGGER_MS;
       card.animate(
         [
-          { transform: `translateY(0) scale(${scale})`, opacity, offset: 0 },
-          { transform: `translateY(${SLIDE_DISTANCE}px) scale(${scale})`, opacity, offset: 0.55 },
-          { transform: `translateY(${SLIDE_DISTANCE}px) scale(${scale})`, opacity: 0, offset: 1 },
+          { transform: `translate(-50%, -50%) translateX(${x}px) translateY(0) scale(${scale})`, opacity, offset: 0 },
+          {
+            transform: `translate(-50%, -50%) translateX(${x}px) translateY(${SLIDE_DISTANCE}px) scale(${scale})`,
+            opacity,
+            offset: 0.55,
+          },
+          {
+            transform: `translate(-50%, -50%) translateX(${x}px) translateY(${SLIDE_DISTANCE}px) scale(${scale})`,
+            opacity: 0,
+            offset: 1,
+          },
         ],
         { duration: 700, delay, easing: 'ease-in', fill: 'forwards' }
       );
@@ -508,25 +465,23 @@ const cardSizeStyle = 'scroll-snap-align:center;';
   }
 
   // The just-opened card is still settling into its centered position for a
-  // brief moment after openAt() returns — the scroll-snap suspension above
-  // covers most of it, but real (trusted) clicks landing in this window have
-  // been observed to occasionally hit the track underneath a button instead
-  // of the button itself, which the backdrop-click-to-close handler below
-  // would otherwise read as "clicked outside a card" and close on. Ignoring
-  // backdrop-close clicks for a short settle window after opening means a
-  // mistimed click is just a no-op instead of spuriously closing the carousel.
+  // brief moment after openAt() returns — real (trusted) clicks landing in
+  // this window have been observed to occasionally hit the track underneath
+  // a button instead of the button itself, which the backdrop-click-to-close
+  // handler below would otherwise read as "clicked outside a card" and close
+  // on. Ignoring backdrop-close clicks for a short settle window after
+  // opening means a mistimed click is just a no-op instead of spuriously
+  // closing the carousel.
   const OPEN_SETTLE_MS = 400;
   let openedAt = 0;
 
   function openAt(index: number) {
     setOpen(true);
     openedAt = performance.now();
-    // Open on the middle copy so looping has room to move in both directions.
-    openedCardIndex = Math.floor(REPEAT_COUNT / 2) * setSize + index;
-    liveIndex = openedCardIndex;
-    const card = cards[openedCardIndex];
-    if (card) centerCard(card, false);
-    updateCardAppearance();
+    cancelTween();
+    offset = index;
+    targetOffset = index;
+    render();
     playOpenAnimation();
   }
 
@@ -556,21 +511,13 @@ const cardSizeStyle = 'scroll-snap-align:center;';
   });
 
   document.addEventListener('keydown', (e) => {
-    if (!isOpen() || !track) return;
+    if (!isOpen()) return;
     if (e.key === 'Escape') {
       close();
     } else if (e.key === 'ArrowRight') {
-      const next = cards[liveIndex + 1];
-      if (next) {
-        liveIndex += 1;
-        centerCard(next, true);
-      }
+      animateTo(Math.round(targetOffset) + 1);
     } else if (e.key === 'ArrowLeft') {
-      const prev = cards[liveIndex - 1];
-      if (prev) {
-        liveIndex -= 1;
-        centerCard(prev, true);
-      }
+      animateTo(Math.round(targetOffset) - 1);
     }
   });
 
@@ -586,12 +533,11 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     const card = target.closest<HTMLElement>('[data-service-card]');
     if (!card) return;
     const idx = cards.indexOf(card);
-    if (idx === -1 || idx === liveIndex) return;
-    liveIndex = idx;
-    centerCard(card, true);
+    if (idx === -1) return;
+    const delta = wrappedDelta(idx, targetOffset);
+    if (delta === 0) return; // already centred
+    animateTo(targetOffset + delta);
   });
-
-  track?.addEventListener('scroll', onScroll, { passive: true });
 
   // Swipe-down-to-close, mobile/tablet only (below the desktop breakpoint) —
   // a standard bottom-sheet dismiss gesture, using the same drag-handle pill
@@ -609,72 +555,50 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     return window.innerWidth < 1200;
   }
 
-  // Exactly-one-card-per-gesture: replaces free scroll-and-snap for BOTH
-  // touch swipes and mouse dragging (see the two call sites below) — a
-  // swipe/drag of any length or speed always resolves to exactly the next
-  // or previous card, never several. Previously this was a genuine free
-  // scroll (native momentum for touch, 1:1 drag-to-scroll for mouse) that
-  // scroll-snap would eventually settle, which meant a hard flick could
-  // fly past multiple cards before settling — the opposite of what was
-  // asked for. Still live-follows the pointer during the drag (clamped to
-  // one card's own step distance, so even a huge/fast drag can't visually
-  // pass more than one neighbour) so it keeps the tactile, finger-tracks-
-  // the-card feel rather than jumping straight from gesture to result.
+  // Exactly-one-card-per-gesture: a swipe/drag of any length or speed
+  // always resolves to exactly the next or previous card, never several.
+  // Still live-follows the pointer during the drag (clamped to one card's
+  // own step distance, so even a huge/fast drag can't visually pass more
+  // than one neighbour) so it keeps the tactile, finger-tracks-the-card
+  // feel rather than jumping straight from gesture to result.
   const STEP_COMMIT_THRESHOLD_PX = 10;
 
-  let stepPointerId: number | null = null;
-  let stepStartX = 0;
-  let stepStartScroll = 0;
-  let stepStartIndex = 0;
-  let stepDistance = 0;
-  let stepCaptured = false;
-
-  // Distance between two adjacent card centres — i.e. one full "step" —
-  // recomputed fresh per gesture rather than cached, since the resting
-  // card width (and so this distance) changes at the 1200px breakpoint.
-  function cardStep(): number {
-    if (cards.length < 2) return 0;
-    return cards[1].offsetLeft - cards[0].offsetLeft;
-  }
-
-  let moveRafId = 0;
-  let pendingClientX = 0;
+  let dragPointerId: number | null = null;
+  let dragStartX = 0;
+  let dragStartOffset = 0; // offset's own value at drag start — for live-follow continuity from wherever things visually are right now
+  let dragStartTarget = 0; // targetOffset's value at drag start — the authoritative basis the eventual commit is relative to
+  let dragCaptured = false;
 
   function startCardStep(pointerId: number, clientX: number) {
     if (!track) return;
-    // A new gesture always takes over immediately — cancel any still-
-    // pending throttled move write from a previous gesture (see
-    // moveCardStep) so it can't land after this one has already started.
-    cancelAnimationFrame(moveRafId);
-    moveRafId = 0;
-    stepPointerId = pointerId;
-    stepStartX = clientX;
-    stepStartScroll = track.scrollLeft;
-    // liveIndex (the authoritative "current card" — see its own comment),
-    // not a fresh position-based guess: this can fire before a previous
-    // gesture's centerCard() scrollTo has actually finished (a fast
-    // repeated swipe), when scrollLeft sits ambiguously between two cards
-    // and "closest to centre" could resolve to either one.
-    stepStartIndex = liveIndex;
-    stepDistance = cardStep();
-    stepCaptured = false;
+    // A new gesture always takes over immediately — cancelling any
+    // still-running tween means nothing is left fighting this drag's own
+    // writes to `offset`.
+    cancelTween();
+    dragPointerId = pointerId;
+    dragStartX = clientX;
+    dragStartOffset = offset;
+    dragStartTarget = targetOffset;
+    dragCaptured = false;
   }
 
-  // The actual scrollLeft write is throttled to once per animation frame
+  // The actual offset write is throttled to once per animation frame
   // (below), not once per pointermove — touch in particular can fire
-  // pointermove far faster than the screen can repaint, and scrollLeft is a
-  // forced-synchronous-layout property: writing it on every raw event, each
-  // one also repainting several backdrop-blur'd cards (see .services-card),
-  // was almost certainly the real source of the swipe feeling jerky, not
-  // anything about the eventual commit animation. Batching every event that
-  // arrives within one frame down to a single write is the standard fix.
+  // pointermove far faster than the screen can repaint, and rewriting
+  // transform/opacity on every raw event was almost certainly the real
+  // source of the drag feeling jerky. Batching every event that arrives
+  // within one frame down to a single write is the standard fix.
+  let moveRafId = 0;
+  let pendingClientX = 0;
+
   function moveCardStep(clientX: number) {
-    if (!track || stepPointerId === null || !stepDistance) return;
-    if (!stepCaptured) {
-      stepCaptured = true;
-      track.style.scrollSnapType = 'none';
+    if (dragPointerId === null) return;
+    const s = step();
+    if (!s) return;
+    if (!dragCaptured) {
+      dragCaptured = true;
       try {
-        track.setPointerCapture(stepPointerId);
+        track?.setPointerCapture(dragPointerId);
       } catch {
         // Can legitimately fail if the pointer was already released between
         // startCardStep and this first move (e.g. an extremely quick
@@ -685,10 +609,11 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     if (moveRafId) return;
     moveRafId = requestAnimationFrame(() => {
       moveRafId = 0;
-      if (!track || stepPointerId === null) return;
-      const dx = pendingClientX - stepStartX;
-      const clamped = Math.max(-stepDistance, Math.min(stepDistance, dx));
-      track.scrollLeft = stepStartScroll - clamped;
+      if (dragPointerId === null) return;
+      const dx = pendingClientX - dragStartX;
+      const clampedDx = Math.max(-s, Math.min(s, dx));
+      offset = dragStartOffset - clampedDx / s;
+      render();
     });
   }
 
@@ -698,25 +623,19 @@ const cardSizeStyle = 'scroll-snap-align:center;';
   // pixel or two of jitter), springs back to the card the gesture started
   // on instead of stepping.
   function endCardStep(clientX: number) {
-    if (!track || stepPointerId === null) return;
-    // Drop any throttled move write still waiting for its rAF tick — it
-    // would otherwise land right after centerCard's own scrollTo below and
-    // yank the just-committed position back to a stale drag offset.
+    if (dragPointerId === null) return;
     cancelAnimationFrame(moveRafId);
     moveRafId = 0;
-    const dx = clientX - stepStartX;
-    const wasCaptured = stepCaptured;
-    const startIndex = stepStartIndex;
-    stepPointerId = null;
-    stepCaptured = false;
+    const dx = clientX - dragStartX;
+    const wasCaptured = dragCaptured;
+    const startTarget = dragStartTarget;
+    dragPointerId = null;
+    dragCaptured = false;
     if (!wasCaptured) return;
-    track.style.scrollSnapType = 'x proximity';
-    let targetIndex = startIndex;
-    if (dx <= -STEP_COMMIT_THRESHOLD_PX) targetIndex = startIndex + 1;
-    else if (dx >= STEP_COMMIT_THRESHOLD_PX) targetIndex = startIndex - 1;
-    const target = cards[targetIndex] ?? cards[startIndex];
-    liveIndex = cards[targetIndex] ? targetIndex : startIndex;
-    if (target) centerCard(target, true);
+    let target = Math.round(startTarget);
+    if (dx <= -STEP_COMMIT_THRESHOLD_PX) target = Math.round(startTarget) + 1;
+    else if (dx >= STEP_COMMIT_THRESHOLD_PX) target = Math.round(startTarget) - 1;
+    animateTo(target);
   }
 
   let swipeCard: HTMLElement | null = null;
@@ -747,8 +666,11 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     card.getAnimations().forEach((a) => a.cancel());
     const anim = card.animate(
       [
-        { transform: `scale(${scale}) translateY(${fromY}px)`, opacity: getComputedStyle(card).opacity },
-        { transform: `scale(${scale}) translateY(${fromY + SLIDE_DISTANCE}px)`, opacity: 0 },
+        {
+          transform: `translate(-50%, -50%) scale(${scale}) translateY(${fromY}px)`,
+          opacity: getComputedStyle(card).opacity,
+        },
+        { transform: `translate(-50%, -50%) scale(${scale}) translateY(${fromY + SLIDE_DISTANCE}px)`, opacity: 0 },
       ],
       { duration: 350, easing: 'ease-in', fill: 'forwards' }
     );
@@ -760,7 +682,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     const card = (e.target as HTMLElement).closest<HTMLElement>('[data-service-card]');
     if (!card) return;
     swipeCard = card;
-    swipeScale = cardVisualState(card, track.scrollLeft + track.clientWidth / 2).scale;
+    swipeScale = cardVisualState(wrappedDelta(cards.indexOf(card), targetOffset)).scale;
     swipeStartX = e.clientX;
     swipeStartY = e.clientY;
     swipeStartTime = e.timeStamp;
@@ -781,12 +703,10 @@ const cardSizeStyle = 'scroll-snap-align:center;';
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
       swipeDirection = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal';
       if (swipeDirection === 'vertical') {
-        track.style.scrollSnapType = 'none';
         swipeCard.setPointerCapture(swipePointerId);
       } else {
         // A real horizontal swipe — handed off to the shared exactly-one-
-        // card-per-gesture stepper above instead of native scroll (which
-        // is what used to happen here).
+        // card-per-gesture stepper above.
         startCardStep(swipePointerId, swipeStartX);
       }
     }
@@ -800,7 +720,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     if (swipeDirection !== 'vertical') return;
     e.preventDefault();
     swipeDeltaY = Math.max(0, dy); // downward only — an upward drag is a no-op
-    swipeCard.style.transform = `scale(${swipeScale}) translateY(${swipeDeltaY}px)`;
+    swipeCard.style.transform = `translate(-50%, -50%) scale(${swipeScale}) translateY(${swipeDeltaY}px)`;
     swipeCard.style.opacity = String(Math.max(0.4, 1 - swipeDeltaY / 400));
   });
 
@@ -816,7 +736,6 @@ const cardSizeStyle = 'scroll-snap-align:center;';
       return;
     }
 
-    track.style.scrollSnapType = 'x proximity';
     if (direction !== 'vertical') return;
 
     const elapsed = e.timeStamp - swipeStartTime;
@@ -829,17 +748,23 @@ const cardSizeStyle = 'scroll-snap-align:center;';
       card.getAnimations().forEach((a) => a.cancel());
       const settle = card.animate(
         [
-          { transform: `scale(${swipeScale}) translateY(${swipeDeltaY}px)`, opacity: card.style.opacity },
-          { transform: `scale(${swipeScale}) translateY(-8px)`, opacity: 1, offset: 0.7 },
-          { transform: `scale(${swipeScale}) translateY(0)`, opacity: 1 },
+          {
+            transform: `translate(-50%, -50%) scale(${swipeScale}) translateY(${swipeDeltaY}px)`,
+            opacity: card.style.opacity,
+          },
+          { transform: `translate(-50%, -50%) scale(${swipeScale}) translateY(-8px)`, opacity: 1, offset: 0.7 },
+          { transform: `translate(-50%, -50%) scale(${swipeScale}) translateY(0)`, opacity: 1 },
         ],
         { duration: 380, easing: 'ease-out', fill: 'forwards' }
       );
       settle.finished
         .then(() => {
           settle.cancel();
-          card.style.transform = '';
-          card.style.opacity = '';
+          // Unlike the old flow-layout version, there's no CSS default for
+          // this card to fall back to once the inline style is cleared —
+          // position is 100% JS-driven now, so re-assert its normal resting
+          // transform instead of clearing it to nothing.
+          render();
         })
         .catch(() => {});
     }
@@ -849,26 +774,24 @@ const cardSizeStyle = 'scroll-snap-align:center;';
   track?.addEventListener('pointercancel', endSwipe);
 
   // Mouse drag: same exactly-one-card-per-gesture stepper as the touch
-  // horizontal path above (touch/trackpad already scroll the track
-  // natively otherwise) — pointer capture and scroll-snap suspension are
-  // both deferred to moveCardStep's first real call rather than happening
-  // unconditionally on pointerdown (i.e. on every plain click too), same
-  // reasoning as the swipe-to-close handling above: doing either on a
-  // click with no drag has been observed to make Chrome's compositor-
-  // thread hit-testing briefly resolve the click to the track underneath
-  // instead of the card/button actually under the cursor.
+  // horizontal path above. Pointer capture is deferred to moveCardStep's
+  // first real call rather than happening unconditionally on pointerdown
+  // (i.e. on every plain click too), since doing either on a click with no
+  // drag has been observed to make Chrome's compositor-thread hit-testing
+  // briefly resolve the click to the track underneath instead of the
+  // card/button actually under the cursor.
   track?.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse' || !track) return;
     startCardStep(e.pointerId, e.clientX);
   });
 
   track?.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse' || stepPointerId !== e.pointerId) return;
+    if (e.pointerType !== 'mouse' || dragPointerId !== e.pointerId) return;
     moveCardStep(e.clientX);
   });
 
   function endMouseStep(e: PointerEvent) {
-    if (e.pointerType !== 'mouse' || stepPointerId !== e.pointerId) return;
+    if (e.pointerType !== 'mouse' || dragPointerId !== e.pointerId) return;
     endCardStep(e.clientX);
   }
 
@@ -876,12 +799,10 @@ const cardSizeStyle = 'scroll-snap-align:center;';
   track?.addEventListener('pointercancel', endMouseStep);
 
   // Trackpad/mouse-wheel: same exactly-one-card-per-gesture stepper as
-  // touch and mouse-drag above, not native scrolling — a two-finger
-  // trackpad swipe was still genuinely free-scrolling (and, notably, the
-  // most common way this carousel actually gets used on a Mac), so a fast
-  // swipe could still fly past several cards, on top of scroll-snap
-  // fighting the browser's own momentum curve being a known source of
-  // stutter on its own regardless of that.
+  // touch and mouse-drag above, not free scrolling — a two-finger trackpad
+  // swipe is the most common way this carousel actually gets used on a Mac,
+  // so a fast swipe flying past several cards would be exactly the
+  // "several cards at once" behaviour this whole stepper exists to avoid.
   //
   // Wheel events have no distinct start/end the way pointer events do — a
   // single physical trackpad swipe fires many small 'wheel' events in
@@ -902,7 +823,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
       // horizontal gesture takes over the carousel.
       if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
       // Don't fight an actual touch/mouse-drag gesture already in progress.
-      if (stepPointerId !== null && stepPointerId !== WHEEL_POINTER_ID) return;
+      if (dragPointerId !== null && dragPointerId !== WHEEL_POINTER_ID) return;
       e.preventDefault();
       if (!wheelActive) {
         wheelActive = true;
