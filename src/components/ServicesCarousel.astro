@@ -836,18 +836,31 @@ const { services } = Astro.props;
   track?.addEventListener(
     'wheel',
     (e) => {
-      // Vertical-dominant input (a plain mouse wheel, or a trackpad scroll
-      // that's mostly vertical) is left alone — only a genuinely
-      // horizontal gesture takes over the carousel.
-      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
       // Don't fight an actual touch/mouse-drag gesture already in progress.
       if (dragPointerId !== null && dragPointerId !== WHEEL_POINTER_ID) return;
-      e.preventDefault();
+
       if (!wheelActive) {
+        // Vertical-dominant input (a plain mouse wheel, or a trackpad
+        // scroll that's mostly vertical) is left alone — only a genuinely
+        // horizontal gesture takes over the carousel. But this check is
+        // only meaningful for deciding whether to START a gesture — real
+        // trackpad hardware produces noisy per-event deltas (especially as
+        // a swipe decelerates near its end, where deltaX shrinks toward 0
+        // and deltaY can briefly exceed it even mid-swipe), so re-running
+        // this same check on every event of an already-active gesture
+        // silently dropped some of them entirely — their deltaX never
+        // reached wheelVirtualX below, AND the idle-timeout didn't get
+        // refreshed for them either, which could end the gesture early,
+        // mid-swipe. That's what read as a trackpad swipe sometimes doing
+        // nothing. Once a gesture is active, every event belongs to it
+        // regardless of that event's own delta ratio.
+        if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
         wheelActive = true;
         wheelVirtualX = 0;
         startCardStep(WHEEL_POINTER_ID, 0);
       }
+
+      e.preventDefault();
       // Scrolling "forward" (deltaX > 0, the same direction as swiping left
       // to reveal the next card) has to decrease this virtual position to
       // match — moveCardStep/endCardStep read direction from clientX
