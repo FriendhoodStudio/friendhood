@@ -110,9 +110,9 @@
 </div>
 
 <style>
-  /* Press-and-hold on the image fades every control out for an unobstructed
-     view (see the script's long-press handling), fading back in on
-     release. Redeclaring transition-property here (rather than a plain
+  /* A brief tap on the image fades every control out for an unobstructed
+     view (see the script's tap-toggle handling); tapping again fades them
+     back in. Redeclaring transition-property here (rather than a plain
      `transition: opacity ...` shorthand, which would reset every OTHER
      transition longhand back to its default and silently kill the
      existing transition-[scale] Tailwind utility on these same buttons)
@@ -357,29 +357,24 @@
       else if (e.key === 'ArrowLeft' && multiple) prev();
     });
 
-    // Press-and-hold hides every control (close/prev/next/fullscreen) for
-    // an unobstructed look at the image, fading them back in on release —
-    // a separate set of listeners from the swipe ones below (not nested
-    // inside them) specifically so it still works even with only one image
-    // on the page, where the swipe handlers bail out via
-    // `if (!multiple) return;` before ever running. Cancelled the instant
-    // real movement is detected, so it can never fire mid-swipe — a hold
-    // that turns into a drag is a swipe, not a hold.
-    //
-    // Listens on `overlay`, not `stage` — the four buttons are siblings of
-    // stage, not descendants of it, so a press starting directly ON or near
-    // one (very natural to do — the buttons sit right at the edges of the
-    // image) never bubbled to a stage-scoped listener at all, and nothing
-    // would hide. overlay is the actual common ancestor of both the stage
-    // and every button, so a hold anywhere in the lightbox — image or
-    // button — triggers the same hide/show consistently.
-    const LONG_PRESS_MS = 400;
-    const LONG_PRESS_MOVE_TOLERANCE_PX = 8;
-    let longPressTimeoutId = 0;
-    let longPressPointerId: number | null = null;
-    let longPressStartX = 0;
-    let longPressStartY = 0;
-    let longPressTriggered = false;
+    // A brief tap on the image toggles every control's visibility (per
+    // explicit feedback — a press-and-hold version tried first, but a
+    // quick tap is the expected gesture, not a hold). Scoped to `stage`,
+    // not `overlay`: the four buttons are siblings of stage, so a tap
+    // landing on one of them never reaches this listener at all — which is
+    // the intent here, since a tap on an actual control should just do
+    // that control's own thing (close/prev/next/fullscreen), not ALSO
+    // toggle chrome as a side effect. A separate, always-on listener set
+    // from the swipe ones below (not nested inside them) so it works
+    // regardless of image count or input type — the swipe handlers'
+    // pointerdown bails out early via `if (!multiple && !canSwipeToClose(e))
+    // return;`, which would otherwise silently swallow tap detection too
+    // for e.g. a single-image page on desktop.
+    const TAP_MOVE_TOLERANCE_PX = 8;
+    let tapPointerId: number | null = null;
+    let tapStartX = 0;
+    let tapStartY = 0;
+    let tapMoved = false;
 
     function hideChrome() {
       overlay!.dataset.chromeHidden = 'true';
@@ -387,42 +382,38 @@
     function showChrome() {
       delete overlay!.dataset.chromeHidden;
     }
-    function cancelLongPress() {
-      window.clearTimeout(longPressTimeoutId);
-      longPressTimeoutId = 0;
-      longPressPointerId = null;
+    function toggleChrome() {
+      if (overlay!.dataset.chromeHidden === 'true') showChrome();
+      else hideChrome();
     }
 
-    overlay.addEventListener('pointerdown', (e) => {
-      cancelLongPress();
-      longPressPointerId = e.pointerId;
-      longPressStartX = e.clientX;
-      longPressStartY = e.clientY;
-      longPressTriggered = false;
-      longPressTimeoutId = window.setTimeout(() => {
-        longPressTimeoutId = 0;
-        longPressTriggered = true;
-        hideChrome();
-      }, LONG_PRESS_MS);
+    stage.addEventListener('pointerdown', (e) => {
+      tapPointerId = e.pointerId;
+      tapStartX = e.clientX;
+      tapStartY = e.clientY;
+      tapMoved = false;
     });
 
-    overlay.addEventListener('pointermove', (e) => {
-      if (longPressPointerId !== e.pointerId || !longPressTimeoutId) return;
-      const dx = e.clientX - longPressStartX;
-      const dy = e.clientY - longPressStartY;
-      if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_TOLERANCE_PX) cancelLongPress();
+    stage.addEventListener('pointermove', (e) => {
+      if (tapPointerId !== e.pointerId || tapMoved) return;
+      const dx = e.clientX - tapStartX;
+      const dy = e.clientY - tapStartY;
+      if (Math.hypot(dx, dy) > TAP_MOVE_TOLERANCE_PX) tapMoved = true;
     });
 
-    function endLongPress(e: PointerEvent) {
-      if (longPressPointerId !== e.pointerId) return;
-      const wasTriggered = longPressTriggered;
-      cancelLongPress();
-      longPressTriggered = false;
-      if (wasTriggered) showChrome();
+    function endTap(e: PointerEvent) {
+      if (tapPointerId !== e.pointerId) return;
+      const moved = tapMoved;
+      tapPointerId = null;
+      tapMoved = false;
+      // Any real movement means this was a swipe (image change or
+      // swipe-to-close), not a tap — those already have their own handling
+      // below and shouldn't also toggle chrome as a side effect.
+      if (!moved) toggleChrome();
     }
 
-    overlay.addEventListener('pointerup', endLongPress);
-    overlay.addEventListener('pointercancel', endLongPress);
+    stage.addEventListener('pointerup', endTap);
+    stage.addEventListener('pointercancel', endTap);
 
     // Touch/thumb drag — horizontal live-follows the finger by scrubbing
     // the exact same current/incoming pair goTo() animates, just driven by
