@@ -396,54 +396,134 @@
     stage.addEventListener('pointerup', endLongPress);
     stage.addEventListener('pointercancel', endLongPress);
 
-    // Touch/thumb drag — live-follows the finger by scrubbing the exact
-    // same current/incoming pair goTo() animates, just driven by pointer
-    // position instead of WAAPI, so a real drag and a tap-triggered slide
-    // use the same two elements and always look like one continuous
-    // motion rather than a drag that's disconnected from the "real" slide.
-    // Direction isn't known until the first real move (a few px of
-    // slack), since a swipe can start either way.
+    // Touch/thumb drag — horizontal live-follows the finger by scrubbing
+    // the exact same current/incoming pair goTo() animates, just driven by
+    // pointer position instead of WAAPI, so a real drag and a
+    // tap-triggered slide use the same two elements and always look like
+    // one continuous motion. Vertical (swipe down to close, touch on
+    // mobile/tablet only) drags the whole stage down with a fade, mirroring
+    // the same gesture on the Services carousel cards. Axis isn't known
+    // until the first real move (a few px of slack) — a drag can start
+    // either way, and once resolved it commits to that axis for the rest
+    // of the gesture, so there's no risk of a horizontal page-swipe
+    // suddenly also dragging the image down mid-gesture or vice versa.
     const SWIPE_COMMIT_THRESHOLD_PX = 50;
+    const SWIPE_CLOSE_THRESHOLD_PX = 100;
+    const SWIPE_CLOSE_VELOCITY_PX_MS = 0.5;
+
+    function isMobileOrTablet() {
+      return window.innerWidth < 1200;
+    }
+
+    // Swipe-to-close only makes sense on touch, and only below desktop —
+    // matches the same two-part gate the Services carousel's own vertical
+    // swipe-to-close uses.
+    function canSwipeToClose(e: PointerEvent) {
+      return e.pointerType === 'touch' && isMobileOrTablet();
+    }
+
     let swipePointerId: number | null = null;
     let swipeStartX = 0;
-    let swipeDirection: 1 | -1 | null = null;
+    let swipeStartY = 0;
+    let swipeStartTime = 0;
+    let gestureAxis: 'horizontal' | 'vertical' | null = null;
+    let horizontalDirection: 1 | -1 | null = null;
+    let verticalDeltaY = 0;
 
     stage.addEventListener('pointerdown', (e) => {
-      if (!multiple) return;
+      // Nothing for this pointer to do: no second image to swipe between,
+      // and not eligible for swipe-to-close either.
+      if (!multiple && !canSwipeToClose(e)) return;
       swipePointerId = e.pointerId;
       swipeStartX = e.clientX;
-      swipeDirection = null;
+      swipeStartY = e.clientY;
+      swipeStartTime = e.timeStamp;
+      gestureAxis = null;
+      horizontalDirection = null;
+      verticalDeltaY = 0;
       stage!.setPointerCapture(e.pointerId);
     });
 
     stage.addEventListener('pointermove', (e) => {
       if (swipePointerId !== e.pointerId) return;
       const dx = e.clientX - swipeStartX;
-      if (!swipeDirection) {
-        if (Math.abs(dx) < 4) return;
-        swipeDirection = dx < 0 ? 1 : -1;
-        const upcoming = srcFor((currentIndex + swipeDirection + sources.length) % sources.length);
-        if (!upcoming) return;
-        incomingEl!.style.transition = 'none';
-        incomingEl!.src = upcoming.src;
-        incomingEl!.alt = upcoming.alt;
-        incomingEl!.style.opacity = '1';
-        currentEl!.style.transition = 'none';
+      const dy = e.clientY - swipeStartY;
+
+      if (!gestureAxis) {
+        if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+        if (canSwipeToClose(e) && Math.abs(dy) > Math.abs(dx)) {
+          gestureAxis = 'vertical';
+        } else if (multiple) {
+          gestureAxis = 'horizontal';
+          horizontalDirection = dx < 0 ? 1 : -1;
+          const upcoming = srcFor((currentIndex + horizontalDirection + sources.length) % sources.length);
+          if (!upcoming) {
+            gestureAxis = null;
+            return;
+          }
+          incomingEl!.style.transition = 'none';
+          incomingEl!.src = upcoming.src;
+          incomingEl!.alt = upcoming.alt;
+          incomingEl!.style.opacity = '1';
+          currentEl!.style.transition = 'none';
+        } else {
+          // Wants horizontal (dx-dominant) but there's only one image to
+          // begin with, and this pointer isn't swipe-to-close-eligible
+          // either (desktop, or not touch) — genuinely nothing to do.
+          swipePointerId = null;
+          return;
+        }
       }
-      const clampedDx = Math.max(-stage!.clientWidth, Math.min(stage!.clientWidth, dx));
-      currentEl!.style.translate = `${clampedDx}px 0`;
-      incomingEl!.style.translate = `${clampedDx + swipeDirection * stage!.clientWidth}px 0`;
+
+      if (gestureAxis === 'horizontal') {
+        const clampedDx = Math.max(-stage!.clientWidth, Math.min(stage!.clientWidth, dx));
+        currentEl!.style.translate = `${clampedDx}px 0`;
+        incomingEl!.style.translate = `${clampedDx + horizontalDirection! * stage!.clientWidth}px 0`;
+        return;
+      }
+
+      verticalDeltaY = Math.max(0, dy); // downward only — an upward drag is a no-op
+      stage!.style.translate = `0 ${verticalDeltaY}px`;
+      stage!.style.opacity = String(Math.max(0.3, 1 - verticalDeltaY / 400));
     });
 
     function endSwipe(e: PointerEvent) {
       if (swipePointerId !== e.pointerId) return;
       swipePointerId = null;
-      if (!swipeDirection) return;
+      const axis = gestureAxis;
+      gestureAxis = null;
+      if (!axis) return;
+
+      if (axis === 'vertical') {
+        const elapsed = e.timeStamp - swipeStartTime;
+        const velocity = verticalDeltaY / Math.max(elapsed, 1);
+        if (verticalDeltaY > SWIPE_CLOSE_THRESHOLD_PX || velocity > SWIPE_CLOSE_VELOCITY_PX_MS) {
+          close();
+          // Reset AFTER the overlay's own close fade (transition-opacity
+          // duration-400) finishes, not immediately — resetting right away
+          // would visibly snap the stage back into place while the overlay
+          // is still visible mid-fade.
+          window.setTimeout(() => {
+            stage!.style.translate = '0 0';
+            stage!.style.opacity = '1';
+          }, 400);
+        } else {
+          // Under threshold — spring back.
+          stage!.style.transition = 'translate 300ms ease-out, opacity 300ms ease-out';
+          stage!.style.translate = '0 0';
+          stage!.style.opacity = '1';
+          window.setTimeout(() => {
+            stage!.style.transition = 'none';
+          }, 300);
+        }
+        return;
+      }
+
       const dx = e.clientX - swipeStartX;
+      const direction = horizontalDirection!;
       currentEl!.style.transition = `translate ${SLIDE_MS}ms ${SLIDE_EASING}`;
       incomingEl!.style.transition = `translate ${SLIDE_MS}ms ${SLIDE_EASING}`;
       if (Math.abs(dx) >= SWIPE_COMMIT_THRESHOLD_PX) {
-        const direction = swipeDirection;
         currentEl!.style.translate = `${-direction * 100}% 0`;
         incomingEl!.style.translate = '0 0';
         const nextIndex = (currentIndex + direction + sources.length) % sources.length;
@@ -462,7 +542,7 @@
         }, SLIDE_MS);
       } else {
         currentEl!.style.translate = '0 0';
-        incomingEl!.style.translate = `${swipeDirection * 100}% 0`;
+        incomingEl!.style.translate = `${direction * 100}% 0`;
         window.setTimeout(() => {
           currentEl!.style.transition = 'none';
           incomingEl!.style.transition = 'none';
@@ -470,7 +550,6 @@
           incomingEl!.style.translate = '0 0';
         }, SLIDE_MS);
       }
-      swipeDirection = null;
     }
 
     stage.addEventListener('pointerup', endSwipe);
