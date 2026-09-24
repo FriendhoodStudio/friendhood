@@ -169,19 +169,20 @@ const clients = about?.clients ?? [];
     initScrollRevealGroup(name);
   }
 
-  // Client names light up ONE AT A TIME as you scroll — not by each name's
-  // own line position (an earlier version used a fixed "reading line" and a
-  // per-name rect check, which highlighted whole visual LINES at once,
-  // since every name sharing a wrapped line also shares almost the same
-  // rect.top — that's the "batches" behaviour this replaces). Position on
-  // screen isn't used at all now: a single active index is driven purely by
-  // how far the whole paragraph has scrolled through the viewport (its own
-  // top position, from entering at the bottom to fully exiting at the top),
-  // mapped onto the name list as a timeline independent of how any of them
-  // happen to wrap. That's what guarantees exactly one name is ever active,
-  // regardless of line-wrapping, and it's naturally bidirectional —
-  // scrolling back up walks the same index back down, no reverse-case to
-  // write separately.
+  // Client names build up cumulatively as you scroll, each one joining
+  // INDIVIDUALLY rather than by each name's own line position (an earlier
+  // version used a fixed "reading line" and a per-name rect check, which
+  // highlighted whole visual LINES at once, since every name sharing a
+  // wrapped line also shares almost the same rect.top — that's the
+  // "batches" behaviour this replaces). Position on screen isn't used at
+  // all now: a single active index is driven purely by how far the whole
+  // paragraph has scrolled through the viewport (its own top position, from
+  // entering at the bottom to fully exiting at the top), mapped onto the
+  // name list as a timeline independent of how any of them happen to wrap —
+  // every name up to that index is lit. That's what guarantees names join
+  // one at a time regardless of line-wrapping, and it's naturally
+  // bidirectional — scrolling back up walks the same index back down,
+  // un-lighting the tail of the list, no reverse-case to write separately.
   const clientNames = Array.from(document.querySelectorAll<HTMLElement>('[data-client-name]'));
   const clientsParagraph = clientNames[0]?.closest('p') ?? null;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -204,8 +205,14 @@ const clients = about?.clients ?? [];
       const end = -rect.height;
       const progress = clamp((start - rect.top) / (start - end), 0, 1);
       const activeIndex = Math.min(clientNames.length - 1, Math.floor(progress * clientNames.length));
+      // Cumulative (every name up to and including activeIndex), not just
+      // activeIndex alone — each name lights up individually in its own
+      // turn as the index advances, same as before, but stays lit as later
+      // ones join it rather than handing off. Still fully bidirectional:
+      // scrolling back up lowers activeIndex, which un-lights the tail end
+      // of the list the same way it built up.
       clientNames.forEach((span, i) => {
-        span.classList.toggle('client-name--active', i === activeIndex);
+        span.classList.toggle('client-name--active', i <= activeIndex);
       });
     }
 
