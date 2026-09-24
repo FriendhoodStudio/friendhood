@@ -27,7 +27,11 @@ const clients = about?.clients ?? [];
     <h1 class="reveal-item w-full font-display text-h2 text-front">{introHeading}</h1>
   </div>
 
-  <ImageCarousel images={introImages} />
+  {/* zoomable={false}: this page never mounts a <Lightbox />, unlike the
+      case-study pages that share this same component — without it, the
+      default zoom-in cursor implied a click would open something, when it
+      was actually a dead click. */}
+  <ImageCarousel images={introImages} zoomable={false} />
 </section>
 
 <section class="flex flex-col gap-vertical-l px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-approach">

@@ -3,9 +3,16 @@ import type { CarouselImageItem } from '../types/carousel';
 
 interface Props {
   images: CarouselImageItem[];
+  /** Only case-study pages mount a <Lightbox /> to catch these images'
+   * clicks — the About page's own intro carousel uses this same component
+   * but has no lightbox on the page, so a zoom-in cursor there was a
+   * dead-end affordance implying a click would do something when it never
+   * did. Defaults to true so every existing case-study usage is unaffected;
+   * About.astro is the one place that opts out. */
+  zoomable?: boolean;
 }
 
-const { images } = Astro.props;
+const { images, zoomable = true } = Astro.props;
 ---
 
 {images.length > 0 && (
@@ -19,9 +26,9 @@ const { images } = Astro.props;
           <img
             src={item.url}
             alt={item.alt}
-            class="h-full w-full cursor-zoom-in object-cover"
+            class:list={['h-full w-full object-cover', { 'cursor-zoom-in': zoomable }]}
             loading="lazy"
-            data-lightbox-image
+            data-lightbox-image={zoomable ? true : undefined}
           />
         </div>
       ))}
