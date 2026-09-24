@@ -15,30 +15,51 @@ const { services } = Astro.props;
   data-open="false"
   class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/50 opacity-0 backdrop-blur-[25px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100"
 >
-  {/* Position is now 100% native — a real overflow-x:auto strip with
-      scroll-snap-type:x mandatory, not a JS-owned "offset" fighting or
-      replacing the browser's own scroll. A previous version tried both a
-      hand-rolled transform-position engine AND, before that, native scroll
-      fought by JS on top of it — every input path (touch, trackpad, mouse
-      drag, wheel) needed its own from-scratch reimplementation of
+  {/* Position is native — a real overflow-x:auto strip with scroll-snap,
+      not a JS-owned "offset" fighting or replacing the browser's own
+      scroll. A previous version tried both a hand-rolled transform-position
+      engine AND, before that, native scroll fought by JS on top of it —
+      every input path needed its own from-scratch reimplementation of
       gesture-start/move/end, momentum, and snap, and real devices kept
       surfacing timing/capture edge cases no amount of patching fully
       closed. Handing position and momentum back to the browser removes
-      that whole category outright: touch/trackpad scrolling and
-      snap-to-nearest-card are native and free. touch-action: pan-x still
-      lets native horizontal panning through but leaves the vertical axis
-      free for our own swipe-to-close JS (see script) — the standard way to
-      combine a native scroll axis with a custom gesture on the other one.
-      No infinite loop for now (cards simply clamp at both ends) — that's
-      a deliberate, disclosed scope cut while the core interaction proves
-      itself; the classic scroll-snap way to add it back later is cloning
-      a card at each end, not reintroducing a JS-owned position. */}
+      that whole category outright.
+
+      snap-proximity, not snap-mandatory: mandatory snapping is well known
+      to fight continuous trackpad/wheel input specifically — it tries to
+      force-snap on every tiny pause a trackpad's discrete delta reporting
+      naturally produces mid-gesture, which reads as jerky/fighting-back
+      rather than one smooth motion. Touch scrolling doesn't show this
+      because mobile browsers run touch+snap through a much more
+      aggressively optimised, fully compositor-owned path — the same CSS
+      property, but a genuinely different underlying code path per input
+      type, which is why this was fine on mobile and not on desktop.
+      Proximity only snaps once a scroll actually comes to rest near a
+      point, letting a trackpad swipe flow continuously; a mouse-drag (see
+      script) still always ends up centred because the drag handler's own
+      release logic finishes with an explicit scrollIntoView regardless of
+      how "close" the snap point is. touch-action: pan-x lets native
+      horizontal panning through but leaves the vertical axis free for our
+      own swipe-to-close JS (see script).
+
+      The loop is a real card cloned at each end of the array — three full
+      copies of the service list back-to-back (see the REPEAT map below),
+      not a JS-owned position — nearestIndex/cardDelta/etc. all just work
+      unmodified across the wider array since they're already written in
+      flat-index terms. Two different mechanisms use it: keyboard nav
+      always computes the next LOGICAL index (mod N) and jumps straight to
+      its real (middle-copy) card, so repeated fast presses can never
+      drift into a clone; free scrolling (mouse drag, trackpad, touch)
+      can't be steered that precisely, so it's instead allowed to freely
+      scroll into a clone (pixel-identical to the real card it doubles
+      for) and correctLoopPosition (see script) silently re-centres onto
+      the real one the instant the scroll goes idle. */}
   <div
     data-services-track
-    class="flex w-full snap-x snap-mandatory gap-[var(--spacing-gutter)] overflow-x-auto"
+    class="flex w-full snap-x snap-proximity gap-[var(--spacing-gutter)] overflow-x-auto"
     style="touch-action: pan-x; scrollbar-width: none; user-select: none;"
   >
-    {services.map((service, i) => (
+    {[0, 1, 2].map(() => services.map((service, i) => (
       <div
         class="services-card flex shrink-0 snap-center flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[75px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
         data-service-card
@@ -138,7 +159,7 @@ const { services } = Astro.props;
           </div>
         </div>
       </div>
-    ))}
+    )))}
   </div>
 </div>
 
@@ -247,8 +268,13 @@ const { services } = Astro.props;
 
   const overlay = document.querySelector<HTMLElement>('[data-services-overlay]');
   const track = document.querySelector<HTMLElement>('[data-services-track]');
+  // The markup renders three back-to-back copies of the service list for
+  // the infinite loop (see the top-of-file comment) — `cards` is the full
+  // flat array across all three, `realCards` is just the middle, canonical
+  // copy that openAt/desktop-nav/correctLoopPosition always resolve back to.
   const cards = track ? Array.from(track.querySelectorAll<HTMLElement>('[data-service-card]')) : [];
-  const N = cards.length;
+  const N = cards.length / 3;
+  const realCards = cards.slice(N, 2 * N);
 
   let copyButtons: HTMLButtonElement[] = [];
 
@@ -344,6 +370,39 @@ const { services } = Astro.props;
   track?.addEventListener('scroll', scheduleVisualUpdate, { passive: true });
   updateVisualState();
 
+  // The loop illusion's other half (see the top-of-file comment): once a
+  // native scroll (a mobile momentum swipe, realistically — the only path
+  // that can land here) has carried the centred card into either clone
+  // copy, silently re-point at the pixel-identical real card in the middle
+  // copy the instant scrolling goes idle. Instant (no smooth animation) and
+  // triggered only on true idle is what keeps this imperceptible — doing it
+  // mid-scroll, or animating it, would both be visibly a "jump".
+  function correctLoopPosition() {
+    if (!track) return;
+    const flatIndex = nearestIndex();
+    if (flatIndex >= N && flatIndex < 2 * N) return; // already the real copy
+    const logical = ((flatIndex % N) + N) % N;
+    const real = realCards[logical];
+    track.scrollLeft = real.offsetLeft - (track.clientWidth - real.offsetWidth) / 2;
+    updateVisualState();
+  }
+
+  // Both the modern 'scrollend' event (fires once, right as native scroll
+  // settles — supported in every evergreen browser now) and a manual
+  // idle-timeout fallback are registered; correctLoopPosition is a no-op
+  // once already in the real copy, so the two firing back-to-back is
+  // harmless redundancy, not a double-correction.
+  let scrollIdleTimeoutId = 0;
+  track?.addEventListener(
+    'scroll',
+    () => {
+      window.clearTimeout(scrollIdleTimeoutId);
+      scrollIdleTimeoutId = window.setTimeout(correctLoopPosition, 120);
+    },
+    { passive: true }
+  );
+  track?.addEventListener('scrollend', correctLoopPosition);
+
   // Per the Figma annotation, the carousel "emerges from bottom of page" — driven
   // via WAAPI (not a CSS transition) so it can play per-card, staggered from the
   // centered card outward, and the exact reverse (outward in first, center last)
@@ -431,7 +490,7 @@ const { services } = Astro.props;
   function openAt(index: number) {
     setOpen(true);
     openedAt = performance.now();
-    const card = cards[index];
+    const card = realCards[index];
     if (track && card) {
       // Instant jump, not scrollIntoView({behavior:'smooth'}) — this is the
       // resting position the entrance animation plays FROM, so it must
@@ -463,14 +522,14 @@ const { services } = Astro.props;
   // padding/gap areas around the cards) closes the carousel.
   //
   // setPointerCapture only reroutes POINTER events, not the separate legacy
-  // mouse event stream 'click' belongs to — so a mouse-drag-to-scroll (see
-  // below) that starts on a card but ends over the gap between cards (a
-  // very ordinary drag distance) still gets a real 'click' synthesized on
-  // the gap/backdrop at mouseup, same as a real click would. Recording the
-  // pointerdown position and bailing here if the eventual click is more
-  // than a few px away from it is what actually distinguishes "a drag that
-  // happened to end outside a card" from "a genuine tap/click on the
-  // backdrop to dismiss" — closest()-on-target alone can't tell those apart.
+  // mouse event stream 'click' belongs to — so a touch swipe that starts on
+  // a card but ends over the gap between cards (or a neighbouring card) —
+  // a very ordinary swipe distance — still gets a real 'click' synthesized
+  // at pointerup, same as a real tap would. Recording the pointerdown
+  // position and bailing here if the eventual click is more than a few px
+  // away from it is what actually distinguishes "a swipe that happened to
+  // end outside a card" from "a genuine tap on the backdrop to dismiss" —
+  // closest()-on-target alone can't tell those apart.
   let backdropPointerDownPos: { x: number; y: number } | null = null;
   overlay?.addEventListener('pointerdown', (e) => {
     backdropPointerDownPos = { x: e.clientX, y: e.clientY };
@@ -487,18 +546,27 @@ const { services } = Astro.props;
     close();
   });
 
-  // Clamped at both ends for now — no wraparound (see the top-of-file note
-  // on the dropped infinite loop).
+  // Always resolves to the next/previous LOGICAL card and jumps straight to
+  // its canonical position in the real (middle) copy — never "current flat
+  // position + 1", which is what would let repeated fast presses drift
+  // step by step into a clone copy. Reading the current logical index fresh
+  // from live scroll position (rather than a remembered one) means a new
+  // press always redirects whatever's currently in flight correctly, no
+  // matter how many presses landed before the last one finished animating.
+  function stepToLogical(direction: 1 | -1) {
+    const currentLogical = ((nearestIndex() % N) + N) % N;
+    const nextLogical = ((currentLogical + direction) % N + N) % N;
+    realCards[nextLogical].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+
   document.addEventListener('keydown', (e) => {
     if (!isOpen()) return;
     if (e.key === 'Escape') {
       close();
       return;
     }
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-    const next = nearestIndex() + (e.key === 'ArrowRight' ? 1 : -1);
-    if (next < 0 || next >= N) return;
-    cards[next].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    if (e.key === 'ArrowRight') stepToLogical(1);
+    else if (e.key === 'ArrowLeft') stepToLogical(-1);
   });
 
   // Clicking a peeking (not-yet-centered) card brings it to centre. Same
@@ -584,31 +652,47 @@ const { services } = Astro.props;
     swipePointerId = e.pointerId;
   });
 
-  track?.addEventListener('pointermove', (e) => {
-    if (swipePointerId === null || e.pointerId !== swipePointerId || !swipeCard) return;
-    const dx = e.clientX - swipeStartX;
-    const dy = e.clientY - swipeStartY;
+  // { passive: true } — this listener runs on every touchmove of every
+  // horizontal scroll gesture too (it has to, to detect direction), and a
+  // non-passive pointermove/touchmove listener forces the browser to hold
+  // up its own compositor-thread scrolling until this JS returns on EVERY
+  // frame, for every gesture, whether or not it actually ends up vertical.
+  // That's enough to make native scrolling feel jerky/blocked, which is
+  // exactly what a passive listener promises never to do — declaring it
+  // passive is what actually lets native horizontal scrolling stay smooth.
+  // It costs nothing here: preventDefault was only ever standing in for
+  // touch-action: pan-x (see the track's markup), which already stops
+  // native vertical panning/bounce on this element outright, and the
+  // overlay locks body scroll while open besides — there's no default
+  // browser behaviour left that still needs cancelling.
+  track?.addEventListener(
+    'pointermove',
+    (e) => {
+      if (swipePointerId === null || e.pointerId !== swipePointerId || !swipeCard) return;
+      const dx = e.clientX - swipeStartX;
+      const dy = e.clientY - swipeStartY;
 
-    if (!swipeActive) {
-      // Wait for enough movement to confidently read the gesture's
-      // direction — locking on the first pixel of jitter would misclassify
-      // real horizontal swipes.
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      if (Math.abs(dy) <= Math.abs(dx)) {
-        // Horizontal — hand off entirely to native scroll.
-        swipePointerId = null;
-        swipeCard = null;
-        return;
+      if (!swipeActive) {
+        // Wait for enough movement to confidently read the gesture's
+        // direction — locking on the first pixel of jitter would
+        // misclassify real horizontal swipes.
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (Math.abs(dy) <= Math.abs(dx)) {
+          // Horizontal — hand off entirely to native scroll.
+          swipePointerId = null;
+          swipeCard = null;
+          return;
+        }
+        swipeActive = true;
+        swipeCard.setPointerCapture(swipePointerId);
       }
-      swipeActive = true;
-      swipeCard.setPointerCapture(swipePointerId);
-    }
 
-    e.preventDefault();
-    swipeDeltaY = Math.max(0, dy); // downward only — an upward drag is a no-op
-    swipeCard.style.transform = `scale(${swipeScale}) translateY(${swipeDeltaY}px)`;
-    swipeCard.style.opacity = String(Math.max(0.4, 1 - swipeDeltaY / 400));
-  });
+      swipeDeltaY = Math.max(0, dy); // downward only — an upward drag is a no-op
+      swipeCard.style.transform = `scale(${swipeScale}) translateY(${swipeDeltaY}px)`;
+      swipeCard.style.opacity = String(Math.max(0.4, 1 - swipeDeltaY / 400));
+    },
+    { passive: true }
+  );
 
   function endSwipe(e: PointerEvent) {
     if (swipePointerId === null || e.pointerId !== swipePointerId || !swipeCard) return;
@@ -659,36 +743,57 @@ const { services } = Astro.props;
   // Click-and-drag-to-scroll for plain-mouse desktop users (a trackpad's
   // two-finger swipe already scrolls the track natively via wheel deltaX —
   // this is only for a mouse with no trackpad). Directly drives scrollLeft;
-  // native scroll-snap takes over and animates to the nearest card the
-  // instant the gesture ends, the same as it does after any other scroll —
-  // no custom tween needed here.
+  // snap-proximity (not mandatory — see the top-of-file comment) means this
+  // no longer fights the browser trying to force-snap mid-drag the way it
+  // would have under mandatory. { passive: true } throughout since this
+  // never calls preventDefault — writing scrollLeft has no default browser
+  // action to cancel, and a mouse pointermove listener doesn't carry the
+  // touch-compositor cost a non-passive one would anyway, but there's no
+  // reason not to be explicit about it.
   let mouseDragging = false;
   let mouseDragStartX = 0;
   let mouseDragStartScrollLeft = 0;
   let mouseMoveRafId = 0;
   let pendingMouseClientX = 0;
 
-  track?.addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'mouse' || !track) return;
-    mouseDragging = true;
-    mouseDragStartX = e.clientX;
-    mouseDragStartScrollLeft = track.scrollLeft;
-  });
+  track?.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.pointerType !== 'mouse' || !track) return;
+      mouseDragging = true;
+      mouseDragStartX = e.clientX;
+      mouseDragStartScrollLeft = track.scrollLeft;
+    },
+    { passive: true }
+  );
 
-  track?.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse' || !mouseDragging || !track) return;
-    pendingMouseClientX = e.clientX;
-    if (mouseMoveRafId) return;
-    mouseMoveRafId = requestAnimationFrame(() => {
-      mouseMoveRafId = 0;
-      if (!mouseDragging || !track) return;
-      track.scrollLeft = mouseDragStartScrollLeft - (pendingMouseClientX - mouseDragStartX);
-    });
-  });
+  track?.addEventListener(
+    'pointermove',
+    (e) => {
+      if (e.pointerType !== 'mouse' || !mouseDragging || !track) return;
+      pendingMouseClientX = e.clientX;
+      if (mouseMoveRafId) return;
+      mouseMoveRafId = requestAnimationFrame(() => {
+        mouseMoveRafId = 0;
+        if (!mouseDragging || !track) return;
+        track.scrollLeft = mouseDragStartScrollLeft - (pendingMouseClientX - mouseDragStartX);
+      });
+    },
+    { passive: true }
+  );
 
+  // On release, snap explicitly to the nearest LOGICAL card rather than
+  // just trusting proximity snap to settle on its own — proximity is
+  // deliberately lenient (that's what fixes the trackpad jerkiness), which
+  // means a slow/short mouse drag can legitimately end in a dead zone
+  // between two cards with nothing forcing it to finish centred. Same
+  // clone-safe modulo targeting as keyboard nav.
   function endMouseDrag(e: PointerEvent) {
     if (e.pointerType !== 'mouse') return;
+    if (!mouseDragging) return;
     mouseDragging = false;
+    const logical = ((nearestIndex() % N) + N) % N;
+    realCards[logical].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   }
 
   track?.addEventListener('pointerup', endMouseDrag);
