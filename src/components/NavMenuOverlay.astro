@@ -75,14 +75,34 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
   /* Applied once the WAAPI entrance animation finishes and is cancelled —
      see playEntrance() below. A fill:forwards WAAPI animation keeps
      overriding the `translate` property indefinitely, which would silently
-     defeat the hover nudge below, so control is handed back to plain CSS. */
+     block any future translate change on this element, so control is
+     handed back to plain CSS. (translate, not scale — the press/release
+     overshoot below animates scale instead, a separate property, so the
+     two never fight each other.) */
   .menu-item.is-settled {
     opacity: 1;
     translate: 0 0;
   }
 
+  /* scale, not translate, and press/release overshoot to match every other
+     button on the site (copy-email, reel trigger, lightbox controls) —
+     replaces the earlier hover-only translate nudge, which had no press
+     feedback at all. Shallow amounts (0.95 press / 1.1 hover), matching the
+     established "wide element" convention (reel-trigger-btn, footer
+     buttons) rather than the deeper 0.82/1.12 one used for small round
+     icon buttons — these are large headline-sized text links, not icons. */
   .menu-link {
-    transition: translate 300ms ease-out;
+    transition: translate 300ms ease-out, scale 300ms ease-out;
+  }
+  .menu-link:hover {
+    scale: 1.1;
+  }
+  .menu-link.is-pressed {
+    scale: 0.95;
+    transition: scale 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .menu-link.is-settling {
+    transition: none;
   }
 
   /* Same trial Heavy weight as the Hero H1 (see global.css's @font-face
@@ -92,10 +112,6 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
      file is ever pulled, rather than dropping to the generic sans-serif. */
   .nav-menu-page-link {
     font-family: "Greed Extended Heavy Trial", "Greed Extended", sans-serif;
-  }
-
-  .menu-link:hover {
-    translate: 16px 0;
   }
 </style>
 
@@ -126,8 +142,8 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
       });
       // Once the entrance settles, cancel the WAAPI animations (which would
       // otherwise keep pinning `translate` via fill:forwards) and apply the
-      // same resting state via a plain CSS class, so the hover nudge on
-      // .menu-link can take over `translate` normally.
+      // same resting state via a plain CSS class, so nothing is left
+      // fighting a future translate change on this element.
       Promise.all([opacityAnim.finished, translateAnim.finished])
         .then(() => {
           opacityAnim.cancel();
@@ -170,5 +186,52 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
         copyLabel.textContent = original;
       }, 1500);
     });
+  });
+
+  // Press/release overshoot for every menu link (page links and contact
+  // links alike, since they share this class) — quick firm press-in via
+  // the CSS transition on .is-pressed, then a springy overshoot-past-rest
+  // on release driven by WAAPI so it can go past scale(1) before settling.
+  // Same shallow amounts as the reel trigger/footer buttons (see the CSS
+  // comment above), animating the standalone `scale` property rather than
+  // `transform` to match how this component already treats `translate` as
+  // its own independent property elsewhere (the entrance animation).
+  const menuLinks = overlay ? Array.from(overlay.querySelectorAll<HTMLElement>('.menu-link')) : [];
+
+  menuLinks.forEach((link) => {
+    let settleAnim: Animation | null = null;
+
+    link.addEventListener('pointerdown', () => {
+      settleAnim?.cancel();
+      link.classList.remove('is-settling');
+      link.classList.add('is-pressed');
+    });
+
+    const releasePress = () => {
+      if (!link.classList.contains('is-pressed')) return;
+      settleAnim = link.animate(
+        [
+          { scale: 0.95 },
+          { scale: 1.04, offset: 0.55 },
+          { scale: 0.99, offset: 0.8 },
+          { scale: 1 },
+        ],
+        { duration: 380, easing: 'ease-out', fill: 'forwards' }
+      );
+      link.classList.add('is-settling');
+      link.classList.remove('is-pressed');
+
+      const anim = settleAnim;
+      anim.finished
+        .then(() => {
+          anim.cancel();
+          link.classList.remove('is-settling');
+        })
+        .catch(() => {});
+    };
+
+    link.addEventListener('pointerup', releasePress);
+    link.addEventListener('pointerleave', releasePress);
+    link.addEventListener('pointercancel', releasePress);
   });
 </script>
