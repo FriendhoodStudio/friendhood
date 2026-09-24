@@ -9,7 +9,6 @@ export interface ApproachCard {
 
 export interface AboutData {
   introLabel: string;
-  introLabelMuted: string;
   introHeading: string;
   introImages: CarouselImageItem[];
   servicesLabel: string;

@@ -13,13 +13,6 @@ export default defineType({
       validation: (rule) => rule.required(),
     }),
     defineField({
-      name: 'introLabelMuted',
-      title: 'Intro label (muted continuation)',
-      description: 'Greyed-out rest of the label, e.g. "Built to change your world."',
-      type: 'string',
-      validation: (rule) => rule.required(),
-    }),
-    defineField({
       name: 'introHeading',
       title: 'Intro heading',
       type: 'text',

@@ -195,7 +195,6 @@ export async function fetchLinkCards(): Promise<LinkCardsData | null> {
 
 const ABOUT_QUERY = `*[_type == "about"][0]{
   introLabel,
-  introLabelMuted,
   introHeading,
   introImages[]{
     _key,

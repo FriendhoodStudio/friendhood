@@ -343,7 +343,6 @@ export interface RawCarouselImage {
 
 export interface RawAbout {
   introLabel: string;
-  introLabelMuted: string;
   introHeading: string;
   introImages: RawCarouselImage[];
   servicesLabel: string;
@@ -358,7 +357,6 @@ export interface RawAbout {
 export function toAboutData(raw: RawAbout): AboutData {
   return {
     introLabel: raw.introLabel,
-    introLabelMuted: raw.introLabelMuted,
     introHeading: raw.introHeading,
     // Same incomplete-mid-edit-draft tolerance as the case-study carousel
     // block below — a freshly-added array entry with no image uploaded yet

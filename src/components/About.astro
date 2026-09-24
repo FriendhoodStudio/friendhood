@@ -5,7 +5,6 @@ import ImageCarousel from './ImageCarousel.astro';
 const about = await fetchAbout();
 
 const introLabel = about?.introLabel ?? 'Who we are.';
-const introLabelMuted = about?.introLabelMuted ?? 'Built to change your world.';
 const introHeading =
   about?.introHeading ??
   "We're a strategic branding studio built to help you understand now and make what's coming next. Creative expertise and guidance for people looking to build and change things, for good.";
@@ -22,7 +21,7 @@ const clients = about?.clients ?? [];
 <section class="flex flex-col gap-vertical-l px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-intro">
   <div class="flex w-full flex-col items-start gap-vertical-s">
     <p class="reveal-item font-tag text-detail text-grey-300">
-      {introLabel} <span class="text-services">{introLabelMuted}</span>
+      {introLabel}
     </p>
     <h1 class="reveal-item w-full font-display text-h2 text-front">{introHeading}</h1>
   </div>
