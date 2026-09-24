@@ -108,6 +108,23 @@
 </div>
 
 <style>
+  /* Press-and-hold on the image fades every control out for an unobstructed
+     view (see the script's long-press handling), fading back in on
+     release. Redeclaring transition-property here (rather than a plain
+     `transition: opacity ...` shorthand, which would reset every OTHER
+     transition longhand back to its default and silently kill the
+     existing transition-[scale] Tailwind utility on these same buttons)
+     adds opacity alongside scale without disturbing it. */
+  .lightbox-btn {
+    transition-property: scale, opacity;
+    transition-duration: 300ms;
+    transition-timing-function: ease-out;
+  }
+  [data-lightbox-overlay][data-chrome-hidden='true'] .lightbox-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   .lightbox-btn.is-pressed {
     transform: scale(0.82);
     transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -213,6 +230,20 @@
       });
     }
 
+    // "Mobile" here means phone-CLASS device, not literally "narrow" —
+    // checking matchMedia('(max-width: 767px)') directly was the actual
+    // bug behind the button never showing on a real phone: width and
+    // height swap on rotation, and most modern phones' landscape WIDTH
+    // (their portrait height) comfortably exceeds 767px — e.g. an iPhone
+    // 13/14 is 390x844 in portrait, 844x390 in landscape, and 844 > 767
+    // fails the check right when landscape is exactly when this button
+    // needs to appear. The shorter of the two axes is what actually stays
+    // roughly constant across a rotation (it's the device's real physical
+    // narrow dimension), so checking that instead is orientation-proof.
+    function isPhoneClassViewport() {
+      return Math.min(window.innerWidth, window.innerHeight) <= 767;
+    }
+
     // The manual button only ever needs to exist where the automatic
     // attempt above can actually fail and matter: open, mobile, landscape.
     // Elsewhere the fixed inset-0 overlay already reads as "full screen"
@@ -220,14 +251,14 @@
     function updateFullscreenButtonVisibility() {
       const eligible =
         overlay!.dataset.open === 'true' &&
-        window.matchMedia('(max-width: 767px)').matches &&
+        isPhoneClassViewport() &&
         window.matchMedia('(orientation: landscape)').matches;
       fullscreenBtn!.hidden = !eligible;
     }
 
     function handleLightboxOrientationChange() {
       updateFullscreenButtonVisibility();
-      if (!window.matchMedia('(max-width: 767px)').matches) return;
+      if (!isPhoneClassViewport()) return;
       if (window.matchMedia('(orientation: landscape)').matches) {
         enterLightboxFullscreen();
       }
@@ -262,6 +293,7 @@
       overlay!.removeAttribute('inert');
       lockBodyScroll();
       lightboxWentFullscreen = false;
+      showChrome();
       // Covers opening the lightbox while the phone is already lying
       // landscape, not just tilting into landscape after the fact.
       handleLightboxOrientationChange();
@@ -273,6 +305,7 @@
       unlockBodyScroll();
       if (document.fullscreenElement === overlay) document.exitFullscreen().catch(() => {});
       updateFullscreenButtonVisibility();
+      showChrome();
     }
 
     function next() {
@@ -303,6 +336,65 @@
       else if (e.key === 'ArrowRight' && multiple) next();
       else if (e.key === 'ArrowLeft' && multiple) prev();
     });
+
+    // Press-and-hold on the image hides every control (close/prev/next/
+    // fullscreen) for an unobstructed look at it, fading them back in on
+    // release — a separate set of listeners from the swipe ones above
+    // (not nested inside them) specifically so it still works even with
+    // only one image on the page, where the swipe handlers bail out via
+    // `if (!multiple) return;` before ever running. Cancelled the instant
+    // real movement is detected, so it can never fire mid-swipe — a hold
+    // that turns into a drag is a swipe, not a hold.
+    const LONG_PRESS_MS = 400;
+    const LONG_PRESS_MOVE_TOLERANCE_PX = 8;
+    let longPressTimeoutId = 0;
+    let longPressPointerId: number | null = null;
+    let longPressStartX = 0;
+    let longPressStartY = 0;
+    let longPressTriggered = false;
+
+    function hideChrome() {
+      overlay!.dataset.chromeHidden = 'true';
+    }
+    function showChrome() {
+      delete overlay!.dataset.chromeHidden;
+    }
+    function cancelLongPress() {
+      window.clearTimeout(longPressTimeoutId);
+      longPressTimeoutId = 0;
+      longPressPointerId = null;
+    }
+
+    stage.addEventListener('pointerdown', (e) => {
+      cancelLongPress();
+      longPressPointerId = e.pointerId;
+      longPressStartX = e.clientX;
+      longPressStartY = e.clientY;
+      longPressTriggered = false;
+      longPressTimeoutId = window.setTimeout(() => {
+        longPressTimeoutId = 0;
+        longPressTriggered = true;
+        hideChrome();
+      }, LONG_PRESS_MS);
+    });
+
+    stage.addEventListener('pointermove', (e) => {
+      if (longPressPointerId !== e.pointerId || !longPressTimeoutId) return;
+      const dx = e.clientX - longPressStartX;
+      const dy = e.clientY - longPressStartY;
+      if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_TOLERANCE_PX) cancelLongPress();
+    });
+
+    function endLongPress(e: PointerEvent) {
+      if (longPressPointerId !== e.pointerId) return;
+      const wasTriggered = longPressTriggered;
+      cancelLongPress();
+      longPressTriggered = false;
+      if (wasTriggered) showChrome();
+    }
+
+    stage.addEventListener('pointerup', endLongPress);
+    stage.addEventListener('pointercancel', endLongPress);
 
     // Touch/thumb drag — live-follows the finger by scrubbing the exact
     // same current/incoming pair goTo() animates, just driven by pointer
