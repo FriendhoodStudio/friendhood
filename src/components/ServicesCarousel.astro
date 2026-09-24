@@ -59,7 +59,7 @@ const { services } = Astro.props;
     class="flex w-full snap-x snap-proximity gap-[var(--spacing-gutter)] overflow-x-auto"
     style="touch-action: pan-x; scrollbar-width: none; user-select: none;"
   >
-    {[0, 1, 2].map(() => services.map((service, i) => (
+    {[0, 1, 2].map((copyIndex) => services.map((service, i) => (
       <div
         class="services-card flex shrink-0 snap-center flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[75px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
         data-service-card
@@ -68,9 +68,24 @@ const { services } = Astro.props;
       >
         <div class="flex w-full flex-col items-start gap-[20px]">
           <div class="relative aspect-square w-full overflow-hidden">
-            {/* Eager, not lazy — this carousel is hidden until opened, so
-                lazy-loading buys nothing on initial page load. */}
-            <img src={service.imageUrl} alt="" class="h-full w-full object-cover" loading="eager" />
+            {/* Only the middle copy (the real, initially-centred set) is
+                eager — lazy-loading buys nothing for THOSE since the
+                carousel is hidden until opened, same reasoning as before.
+                But the loop's two clone copies (see the top-of-file
+                comment) tripled the image count from 6 to 18, all
+                eager, all decoding at once — plausibly the actual source
+                of the "blank cards while scrolling" report, not the
+                scroll mechanics themselves. Clone images now lazy-load
+                instead, which the browser fetches/decodes once they
+                scroll near the visible area — well ahead of when they're
+                actually needed, since a card is already peeking into view
+                before it's centred. */}
+            <img
+              src={service.imageUrl}
+              alt=""
+              class="h-full w-full object-cover"
+              loading={copyIndex === 1 ? 'eager' : 'lazy'}
+            />
             {/* Gradiating darkness + blur behind the two controls below —
                 a plain flat scrim would read as a hard-edged box sitting on
                 the photo; fading both the tint and the blur strength itself
