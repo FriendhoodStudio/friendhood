@@ -167,6 +167,38 @@
         .catch(() => {});
     }
 
+    // Tilting the phone to landscape while the lightbox is open reads as
+    // "give me the whole screen for this" — the same reasoning as the Hero
+    // showreel's own tilt-to-fullscreen (see there). Unlike that video
+    // modal, exiting fullscreen here (rotating back, the browser's own
+    // fullscreen-exit control) does NOT close the lightbox — there's no
+    // "swipe to dismiss" gesture tied to fullscreen the way the video
+    // reel's iOS player has, so the more natural reading is "stop being
+    // fullscreen", not "stop viewing images". It only resets the flag so
+    // tilting to landscape again can re-trigger it.
+    let lightboxWentFullscreen = false;
+
+    function enterLightboxFullscreen() {
+      if (lightboxWentFullscreen || overlay!.dataset.open !== 'true') return;
+      if (document.fullscreenElement) return;
+      lightboxWentFullscreen = true;
+      overlay!.requestFullscreen?.().catch(() => {
+        lightboxWentFullscreen = false;
+      });
+    }
+
+    function handleLightboxOrientationChange() {
+      if (!window.matchMedia('(max-width: 767px)').matches) return;
+      if (window.matchMedia('(orientation: landscape)').matches) {
+        enterLightboxFullscreen();
+      }
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) lightboxWentFullscreen = false;
+    });
+    window.matchMedia('(orientation: landscape)').addEventListener('change', handleLightboxOrientationChange);
+
     function open(index: number) {
       currentIndex = index;
       const source = srcFor(index);
@@ -179,12 +211,17 @@
       overlay!.dataset.open = 'true';
       overlay!.removeAttribute('inert');
       lockBodyScroll();
+      lightboxWentFullscreen = false;
+      // Covers opening the lightbox while the phone is already lying
+      // landscape, not just tilting into landscape after the fact.
+      handleLightboxOrientationChange();
     }
 
     function close() {
       overlay!.dataset.open = 'false';
       overlay!.setAttribute('inert', '');
       unlockBodyScroll();
+      if (document.fullscreenElement === overlay) document.exitFullscreen().catch(() => {});
     }
 
     function next() {
