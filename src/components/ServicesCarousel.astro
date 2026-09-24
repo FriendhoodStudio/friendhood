@@ -60,8 +60,19 @@ const { services } = Astro.props;
     style="touch-action: pan-x; scrollbar-width: none; user-select: none;"
   >
     {[0, 1, 2].map((copyIndex) => services.map((service, i) => (
+      /* No backdrop-blur here any more — it used to carry backdrop-blur-
+         [25px], on up to 18 simultaneous card elements (the loop's clone
+         copies), every one of them moving every scroll frame. Confirmed via
+         a live DevTools test (disabling it made scrolling immediately,
+         noticeably smoother) as the actual cost behind the jerkiness this
+         whole thread of fixes was chasing — every other change this
+         session touched the scroll/position mechanics, never this, which
+         is exactly why none of them moved the needle. bg-accent-yellow/90
+         is already 90% opaque, so the blur was also doing very little
+         visible work to begin with — there's barely any of the photo
+         underneath left to blur through. */
       <div
-        class="services-card flex shrink-0 snap-center flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[75px] shadow-[0_0_4px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
+        class="services-card flex shrink-0 snap-center flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[75px] shadow-[0_0_4px_rgba(0,0,0,0.3)]"
         data-service-card
         data-index={i}
         data-name={service.name}
