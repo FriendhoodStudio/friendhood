@@ -39,8 +39,16 @@
      but it broke the Hero word-cycle's h-[1em] overflow-hidden clip box,
      which relies on ascent/descent to place a word's baseline sensibly
      within a fixed-height box. Overridden to close to the font's real ink
-     bounds (measured across the full hero word list, plus a small margin):
-     tallest ascender ~70.5% of the em, deepest descender ~20.8%. */
+     bounds (measured across the full hero word list): tallest ascender
+     ~70.5% of the em, deepest descender ~20.8%.
+     Note this doesn't fully solve the word-cycle's clipping — "orgs"/"govs"
+     ("g" followed immediately by another letter) still flat-clip their
+     descender's tail regardless of this value (confirmed live: raising
+     descent-override well past the ink bound had zero visual effect). The
+     window's h-[1em] box is a literal `1 x font-size` length, independent
+     of these overrides, and its clip-path clips flush to that fixed box —
+     the actual fix for the tail-clipping is there (see the clip-path
+     comment in Hero.astro), not here. */
   ascent-override: 72%;
   descent-override: 22%;
   line-gap-override: 0%;

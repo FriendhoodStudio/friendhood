@@ -106,11 +106,26 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
               deliberately NOT done by padding the window's actual WIDTH
               (tried first): that adds dead space only on the right, making
               the gap to "thinking" visibly bigger than the gap from "For"
-              on the left. clip-path is paint-only, so it can't do that. */}
+              on the left. clip-path is paint-only, so it can't do that.
+              Bottom inset is likewise NOT flush (-6px, not 0) — confirmed
+              live that "orgs"/"govs" ("g" followed immediately by another
+              letter) flat-clip their descender's tail right at the window's
+              own 1em box edge otherwise. That box height is a literal
+              `1 x font-size` length, unrelated to the font-face's
+              ascent-override/descent-override (tried raising
+              descent-override first — zero visual effect, since those
+              metrics place the baseline within the line box but don't
+              change the box's own fixed height that clip-path clips flush
+              to). The -6px gives the descender real paint room instead,
+              same idea as the right-edge fix above. Widened the track's
+              gap-[0.15em] to gap-[0.25em] to compensate — that gap is also
+              the roll overshoot's safety margin (see playWordRoll), and
+              eating 6px of it here would have reopened the exact
+              adjacent-word show-through bug that gap was added to fix. */}
           {headlineBefore}<span
             class="hero-word-window-clip relative inline-block h-[1em] align-bottom overflow-visible"
             data-hero-word-window
-          ><span class="flex flex-col items-start gap-[0.15em]" data-hero-word-track>
+          ><span class="flex flex-col items-start gap-[0.25em]" data-hero-word-track>
             {loopWords.map((word, i) => (
               <span
                 class="block h-[1em] whitespace-nowrap leading-none"
@@ -248,7 +263,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
      regardless of what clip-path says. Top/bottom stay flush (0) — that
      axis is already handled by the font-face's ascent/descent-override. */
   .hero-word-window-clip {
-    clip-path: inset(0 -8px 0 0);
+    clip-path: inset(0 -8px -6px 0);
   }
 
   /* Colour stops derived from the reference gradient (Figma node
