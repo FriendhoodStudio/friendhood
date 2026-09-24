@@ -27,10 +27,12 @@
   {/* Rotating to landscape already TRIES to enter fullscreen on its own
       (see the script) — but the Fullscreen API only ever grants that from
       a genuine, direct user gesture (a tap), never from an orientation-
-      change event, so most mobile browsers (Safari especially) silently
-      refuse the automatic attempt and the browser's own chrome stays
-      visible. This button is the reliable fallback: a real tap, shown
-      only when it's actually relevant (open, mobile, landscape). */}
+      change event, so most mobile browsers silently refuse the automatic
+      attempt and the browser's own chrome stays visible. This button is
+      the reliable fallback for those: a real tap, shown only when it's
+      actually relevant (open, mobile, landscape). Confirmed NOT relevant
+      on iOS specifically, though — see isIOS() in the script — so it's
+      excluded there rather than shown as a dead-looking control. */}
   <button
     type="button"
     data-lightbox-fullscreen
@@ -244,6 +246,23 @@
       return Math.min(window.innerWidth, window.innerHeight) <= 767;
     }
 
+    // iOS Safari's Element.requestFullscreen() (used for anything that
+    // isn't a <video>) doesn't hide Safari's own browser chrome the way
+    // the same API does on Chrome/Android, or the way native video
+    // fullscreen does on iOS itself — a long-standing WebKit behaviour
+    // difference, confirmed directly: the button was visible and tappable,
+    // but tapping it did nothing, because there was no browser UI left for
+    // it to hide once the already-fixed-inset-0 overlay was covering the
+    // same space. Every iOS browser is required to use WebKit under Apple's
+    // platform rules (not just the actual Safari app), so this checks for
+    // iOS generally, not literally the Safari app. No code fix changes this
+    // — it's a platform limitation, so the button (and the automatic
+    // tilt-to-fullscreen attempt below, which would fail the exact same
+    // way) simply don't offer themselves there.
+    function isIOS() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
     // The manual button only ever needs to exist where the automatic
     // attempt above can actually fail and matter: open, mobile, landscape.
     // Elsewhere the fixed inset-0 overlay already reads as "full screen"
@@ -252,13 +271,14 @@
       const eligible =
         overlay!.dataset.open === 'true' &&
         isPhoneClassViewport() &&
+        !isIOS() &&
         window.matchMedia('(orientation: landscape)').matches;
       fullscreenBtn!.hidden = !eligible;
     }
 
     function handleLightboxOrientationChange() {
       updateFullscreenButtonVisibility();
-      if (!isPhoneClassViewport()) return;
+      if (!isPhoneClassViewport() || isIOS()) return;
       if (window.matchMedia('(orientation: landscape)').matches) {
         enterLightboxFullscreen();
       }
