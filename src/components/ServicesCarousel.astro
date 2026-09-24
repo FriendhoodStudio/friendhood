@@ -269,6 +269,23 @@ const cardSizeStyle = 'scroll-snap-align:center;';
 
   let copyButtons: HTMLButtonElement[] = [];
 
+  // The authoritative "current card" — set exactly once at every commit
+  // point (a step/click/key resolves, or handleLoop silently shifts the
+  // strip by one repeated set) rather than re-derived from scroll position
+  // on demand. A previous version found "current" by checking which card's
+  // centre was closest to the track's current centre — correct at rest,
+  // but AMBIGUOUS while a previous centerCard() scrollTo({behavior:
+  // 'smooth'}) is still mid-flight (a fast/repeated swipe or key-press
+  // doesn't wait for it to finish): scrollLeft sits somewhere between the
+  // old and new card, and "closest card" can resolve to either one,
+  // non-deterministically. Every navigation (keyboard, click-to-jump, the
+  // drag stepper) re-ran that same position-based check on each call, so
+  // two swipes in quick succession could each independently roll the dice
+  // on that ambiguity and land on the wrong neighbour — exactly what read
+  // as "unresponsive and unpredictable". Tracking the intended index
+  // directly removes the ambiguity instead of trying to resolve it.
+  let liveIndex = 0;
+
   function isOpen() {
     return overlay?.dataset.open === 'true';
   }
@@ -295,21 +312,6 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     track.scrollTo({ left: targetLeft, behavior: smooth ? 'smooth' : 'instant' });
   }
 
-  function currentIndex(): number {
-    if (!track) return 0;
-    const center = track.scrollLeft + track.clientWidth / 2;
-    let closest = 0;
-    let closestDist = Infinity;
-    cards.forEach((card, i) => {
-      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
-      const dist = Math.abs(cardCenter - center);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closest = i;
-      }
-    });
-    return closest;
-  }
 
   // Scale/fade cards by distance from the track's visual center — the closer
   // to center, the larger and more opaque, per the Figma annotation calling for
@@ -395,8 +397,15 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     const dead = setWidth * 1.5;
     if (track.scrollLeft < dead) {
       track.scrollLeft += setWidth;
+      // liveIndex tracks a specific flat card element (0-29), not "which
+      // service is showing" — shifting the strip by one repeated set
+      // changes which element is actually centred (to an identical-
+      // looking copy) even though nothing looks different, so it has to
+      // move by the same one-set amount or it silently goes stale.
+      liveIndex += setSize;
     } else if (track.scrollLeft > track.scrollWidth - dead) {
       track.scrollLeft -= setWidth;
+      liveIndex -= setSize;
     }
   }
 
@@ -514,6 +523,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     openedAt = performance.now();
     // Open on the middle copy so looping has room to move in both directions.
     openedCardIndex = Math.floor(REPEAT_COUNT / 2) * setSize + index;
+    liveIndex = openedCardIndex;
     const card = cards[openedCardIndex];
     if (card) centerCard(card, false);
     updateCardAppearance();
@@ -550,11 +560,17 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     if (e.key === 'Escape') {
       close();
     } else if (e.key === 'ArrowRight') {
-      const next = cards[currentIndex() + 1];
-      if (next) centerCard(next, true);
+      const next = cards[liveIndex + 1];
+      if (next) {
+        liveIndex += 1;
+        centerCard(next, true);
+      }
     } else if (e.key === 'ArrowLeft') {
-      const prev = cards[currentIndex() - 1];
-      if (prev) centerCard(prev, true);
+      const prev = cards[liveIndex - 1];
+      if (prev) {
+        liveIndex -= 1;
+        centerCard(prev, true);
+      }
     }
   });
 
@@ -570,7 +586,8 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     const card = target.closest<HTMLElement>('[data-service-card]');
     if (!card) return;
     const idx = cards.indexOf(card);
-    if (idx === -1 || idx === currentIndex()) return;
+    if (idx === -1 || idx === liveIndex) return;
+    liveIndex = idx;
     centerCard(card, true);
   });
 
@@ -633,7 +650,12 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     stepPointerId = pointerId;
     stepStartX = clientX;
     stepStartScroll = track.scrollLeft;
-    stepStartIndex = currentIndex();
+    // liveIndex (the authoritative "current card" — see its own comment),
+    // not a fresh position-based guess: this can fire before a previous
+    // gesture's centerCard() scrollTo has actually finished (a fast
+    // repeated swipe), when scrollLeft sits ambiguously between two cards
+    // and "closest to centre" could resolve to either one.
+    stepStartIndex = liveIndex;
     stepDistance = cardStep();
     stepCaptured = false;
   }
@@ -693,6 +715,7 @@ const cardSizeStyle = 'scroll-snap-align:center;';
     if (dx <= -STEP_COMMIT_THRESHOLD_PX) targetIndex = startIndex + 1;
     else if (dx >= STEP_COMMIT_THRESHOLD_PX) targetIndex = startIndex - 1;
     const target = cards[targetIndex] ?? cards[startIndex];
+    liveIndex = cards[targetIndex] ? targetIndex : startIndex;
     if (target) centerCard(target, true);
   }
 
