@@ -131,11 +131,33 @@ const clients = about?.clients ?? [];
       flex: 1 1 0%;
     }
   }
+
+  /* Resting/active states for the scroll-driven client-name highlight (see
+     script) — a plain color transition, not opacity, so a name reads as
+     "lighting up" rather than fading in/out of existence. */
+  .client-name {
+    color: #5c5c5c;
+    transition: color 300ms ease-out;
+  }
+  .client-name--active {
+    color: var(--color-front);
+  }
 </style>
 
 <section class="flex flex-col gap-vertical-s px-[var(--page-margin)] pt-vertical-xl" data-reveal-group="about-clients">
   <p class="reveal-item font-tag text-detail text-grey-300">{clientsLabel}</p>
-  <p class="reveal-item w-full font-heading text-h3 text-[#5c5c5c]">{clients.join(' • ')}</p>
+  {/* Each name its own span (not the old single joined-string <p>) so JS
+      can highlight them individually as a "reading line" sweeps down the
+      viewport on scroll (see the script) — separators are plain text
+      between spans, not part of any name's own highlight state. */}
+  <p class="reveal-item w-full font-heading text-h3">
+    {clients.map((name, i) => (
+      <>
+        <span class="client-name" data-client-name>{name}</span>
+        {i < clients.length - 1 && ' • '}
+      </>
+    ))}
+  </p>
 </section>
 
 <script>
@@ -143,6 +165,43 @@ const clients = about?.clients ?? [];
 
   for (const name of ['about-intro', 'about-approach', 'about-clients']) {
     initScrollRevealGroup(name);
+  }
+
+  // Client names light up in sequence as you scroll — driven by a fixed
+  // "reading line" partway down the viewport (65%, past the point most
+  // reading focus naturally sits) rather than an index-based split of the
+  // list: a name's own live position is what decides whether it's been
+  // "read" yet, the same geometry-driven philosophy initScrollReveal above
+  // uses. That's what makes this correct regardless of how many names wrap
+  // onto each line at a given viewport width, and naturally bidirectional —
+  // scrolling back up un-highlights names the same way scrolling down lit
+  // them, with no separate reverse-case to write.
+  const clientNames = Array.from(document.querySelectorAll<HTMLElement>('[data-client-name]'));
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (clientNames.length && !reduceMotion) {
+    const READING_LINE_VH = 0.65;
+
+    function updateClientHighlight() {
+      const lineY = window.innerHeight * READING_LINE_VH;
+      clientNames.forEach((span) => {
+        const rect = span.getBoundingClientRect();
+        const center = rect.top + rect.height / 2;
+        span.classList.toggle('client-name--active', center < lineY);
+      });
+    }
+
+    let clientRafId = 0;
+    const onClientScroll = () => {
+      if (clientRafId) return;
+      clientRafId = requestAnimationFrame(() => {
+        updateClientHighlight();
+        clientRafId = 0;
+      });
+    };
+    updateClientHighlight();
+    window.addEventListener('scroll', onClientScroll, { passive: true });
+    window.addEventListener('resize', onClientScroll);
   }
 
   // Intro image carousel controls — only rendered once a third image makes
