@@ -629,8 +629,23 @@ const { services } = Astro.props;
     const dx = clientX - dragStartX;
     const wasCaptured = dragCaptured;
     const startTarget = dragStartTarget;
+    const endedPointerId = dragPointerId;
     dragPointerId = null;
     dragCaptured = false;
+    // Explicit release rather than relying solely on the implicit release a
+    // pointerup/pointercancel is supposed to trigger on its own — real
+    // mobile browsers have known inconsistencies here, and a stale capture
+    // left on the track can affect how the NEXT touch's events are
+    // delivered to it, which is consistent with swipes only working every
+    // other attempt (an intervening tap/click elsewhere was what actually
+    // cleared it, not anything this code was doing).
+    if (wasCaptured) {
+      try {
+        track?.releasePointerCapture(endedPointerId);
+      } catch {
+        // Already released/invalid — nothing to clean up.
+      }
+    }
     if (!wasCaptured) return;
     let target = Math.round(startTarget);
     if (dx <= -STEP_COMMIT_THRESHOLD_PX) target = Math.round(startTarget) + 1;
@@ -744,8 +759,24 @@ const { services } = Astro.props;
     if (swipePointerId === null || e.pointerId !== swipePointerId || !track) return;
     const card = swipeCard;
     const direction = swipeDirection;
+    const endedPointerId = swipePointerId;
     swipeCard = null;
     swipeDirection = null;
+    // Explicit reset/release rather than leaning on the next pointerdown to
+    // overwrite these — see the matching comment in endCardStep. Real
+    // mobile browsers don't always fire the implicit pointer-capture
+    // release as reliably as the spec implies, and a stale capture left on
+    // the card can affect the NEXT swipe's own events, which matches
+    // swipes only working every other attempt (an intervening tap/click
+    // elsewhere was what actually cleared it, not this code).
+    swipePointerId = null;
+    if (direction === 'vertical' && card) {
+      try {
+        card.releasePointerCapture(endedPointerId);
+      } catch {
+        // Already released/invalid — nothing to clean up.
+      }
+    }
 
     if (direction === 'horizontal') {
       endCardStep(e.clientX);
