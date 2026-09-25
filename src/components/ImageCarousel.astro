@@ -164,6 +164,44 @@ const { images, zoomable = true } = Astro.props;
   // usage) gets its own independent prev/next controls and disabled-state
   // tracking.
   document.querySelectorAll<HTMLElement>('[data-image-carousel]').forEach((row) => {
+    // Trackpad scroll gestures rarely land purely on one axis — a two-finger
+    // swipe meant to scroll the PAGE past this row still reports a small
+    // residual deltaX alongside the dominant deltaY. Since this row can
+    // actually consume that deltaX (it's horizontally scrollable), Safari/
+    // Chrome lock the whole gesture to horizontal once they see it, so
+    // nothing ever reaches the page — confirmed live (hovering the carousel
+    // at the top of /about and trying to scroll down did nothing). Axis is
+    // decided once per gesture (from the first event's own delta ratio) and
+    // held until the gesture goes idle for GESTURE_IDLE_MS, matching how
+    // trackpad momentum scrolling already groups events — re-deciding every
+    // event would flip mid-swipe on the natural noise in deltaX/deltaY.
+    const GESTURE_IDLE_MS = 200;
+    let wheelAxis: 'x' | 'y' | null = null;
+    let wheelAxisResetTimer: number | undefined;
+    row.addEventListener(
+      'wheel',
+      (e) => {
+        if (wheelAxis === null) {
+          wheelAxis = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? 'y' : 'x';
+        }
+        window.clearTimeout(wheelAxisResetTimer);
+        wheelAxisResetTimer = window.setTimeout(() => {
+          wheelAxis = null;
+        }, GESTURE_IDLE_MS);
+
+        if (wheelAxis === 'y') {
+          // Vertical-intent gesture: drive the page's own scroll directly
+          // and stop the row from consuming any of it, rather than letting
+          // the browser decide (which is the behaviour being worked around).
+          e.preventDefault();
+          window.scrollBy(0, e.deltaY);
+        }
+        // Horizontal-intent gestures fall through to the row's native
+        // scroll, unchanged.
+      },
+      { passive: false }
+    );
+
     const controls = row.parentElement?.querySelector<HTMLElement>('[data-image-carousel-controls]');
     const prevBtn = controls?.querySelector<HTMLButtonElement>('[data-image-carousel-prev]');
     const nextBtn = controls?.querySelector<HTMLButtonElement>('[data-image-carousel-next]');
