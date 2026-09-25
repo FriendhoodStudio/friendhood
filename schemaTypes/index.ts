@@ -10,6 +10,7 @@ import featuredWork from './featuredWork';
 import logoCarousel from './logoCarousel';
 import linkCards from './linkCards';
 import carouselImage from './carouselImage';
+import siteSettings from './siteSettings';
 
 export const schemaTypes = [
   project,
@@ -24,4 +25,5 @@ export const schemaTypes = [
   logoCarousel,
   linkCards,
   carouselImage,
+  siteSettings,
 ];

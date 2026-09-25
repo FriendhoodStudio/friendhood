@@ -14,6 +14,8 @@ import {
   type RawLinkCards,
   type RawCaseStudy,
   type RawAbout,
+  toSiteSettingsData,
+  type RawSiteSettings,
 } from './adapters';
 import type { ProjectCardData } from '../../types/project';
 import type { FooterData } from '../../types/footer';
@@ -25,6 +27,7 @@ import type { LogoCarouselData } from '../../types/logoCarousel';
 import type { LinkCardsData } from '../../types/linkCards';
 import type { CaseStudyData } from '../../types/caseStudy';
 import type { AboutData } from '../../types/about';
+import type { SiteSettingsData } from '../../types/siteSettings';
 
 // Dev-only: reads drafts-over-published (Sanity's `drafts` perspective
 // resolves to the draft when one exists, falling back to published
@@ -213,4 +216,16 @@ const ABOUT_QUERY = `*[_type == "about"][0]{
 export async function fetchAbout(): Promise<AboutData | null> {
   const raw = await sanityClient.fetch<RawAbout | null>(ABOUT_QUERY);
   return raw ? toAboutData(raw) : null;
+}
+
+const SITE_SETTINGS_QUERY = `*[_type == "siteSettings"][0]{
+  favicon,
+  title,
+  description,
+  ogImage
+}`;
+
+export async function fetchSiteSettings(): Promise<SiteSettingsData | null> {
+  const raw = await sanityClient.fetch<RawSiteSettings | null>(SITE_SETTINGS_QUERY);
+  return raw ? toSiteSettingsData(raw) : null;
 }

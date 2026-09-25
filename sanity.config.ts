@@ -4,7 +4,15 @@ import { visionTool } from '@sanity/vision';
 import { orderableDocumentListDeskItem } from '@sanity/orderable-document-list';
 import { schemaTypes } from './schemaTypes';
 
-const SINGLETON_TYPES = new Set(['footer', 'navMenu', 'hero', 'services', 'featuredWork', 'about']);
+const SINGLETON_TYPES = new Set([
+  'footer',
+  'navMenu',
+  'hero',
+  'services',
+  'featuredWork',
+  'about',
+  'siteSettings',
+]);
 const ORDERABLE_TYPES = new Set(['project']);
 
 // This file is bundled for the browser (the embedded Studio runs client-side),
@@ -55,6 +63,10 @@ export default defineConfig({
               .title('Footer')
               .id('footer')
               .child(S.document().schemaType('footer').documentId('footer')),
+            S.listItem()
+              .title('Site Settings')
+              .id('siteSettings')
+              .child(S.document().schemaType('siteSettings').documentId('siteSettings')),
             S.divider(),
             orderableDocumentListDeskItem({ type: 'project', title: 'Project', S, context }),
             ...S.documentTypeListItems().filter(

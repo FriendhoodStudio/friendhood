@@ -3,23 +3,33 @@ import '../styles/global.css';
 import NavBar from '../components/NavBar.astro';
 import Footer from '../components/Footer.astro';
 import BackSoon from '../components/BackSoon.astro';
+import { fetchSiteSettings } from '../lib/sanity/queries';
 
 interface Props {
+  /** Falls back to Site Settings' default title (Sanity) when a page doesn't set its own. */
   title?: string;
-  /** ~150-160 chars ideally — shown in search results and link previews. */
+  /** ~150-160 chars ideally — shown in search results and link previews. Falls back to Site Settings' default description when a page doesn't set its own. */
   description?: string;
-  /** Absolute or root-relative URL for social share previews (og:image/twitter:image). Omitted entirely when not set, rather than falling back to something generic like the favicon. */
+  /** Absolute or root-relative URL for social share previews (og:image/twitter:image). Falls back to Site Settings' default share image; omitted entirely if neither is set. */
   image?: string;
   /** For pages that should never be indexed regardless of the SITE_LOCKED gate — e.g. the 404 page. */
   noindex?: boolean;
 }
 
-const {
-  title = 'Friendhood',
-  description = 'Friendhood — a creative consultancy for people thinking about tomorrow.',
-  image,
-  noindex = false,
-} = Astro.props;
+const { title, description, image, noindex = false } = Astro.props;
+
+const siteSettings = await fetchSiteSettings();
+const resolvedTitle = title ?? siteSettings?.title ?? 'Friendhood';
+const resolvedDescription =
+  description ??
+  siteSettings?.description ??
+  'Friendhood — a creative consultancy for people thinking about tomorrow.';
+const resolvedImage = image ?? siteSettings?.ogImageUrl;
+// Static file fallback so the site still has a working favicon before an
+// editor has ever filled in Site Settings (a brand-new Sanity dataset, or
+// this document just not existing yet) — same "?? default" pattern as
+// every other Sanity-backed section on the site.
+const faviconUrl = siteSettings?.faviconUrl ?? '/favicon.svg';
 
 // Site-wide gate: set SITE_LOCKED=true only on the Production environment
 // (host's project settings, not this file) to show "Back soon" on the real
@@ -34,30 +44,34 @@ const isLocked = import.meta.env.SITE_LOCKED === 'true';
 // build absolute canonical/OG URLs regardless of what domain actually
 // served this request (preview deployments, localhost, etc).
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const absoluteImage = image ? new URL(image, Astro.site).toString() : undefined;
+const absoluteImage = resolvedImage ? new URL(resolvedImage, Astro.site).toString() : undefined;
 ---
 
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    {siteSettings ? (
+      <link rel="icon" href={faviconUrl} />
+    ) : (
+      <link rel="icon" type="image/svg+xml" href={faviconUrl} />
+    )}
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
-    <title>{title}</title>
-    <meta name="description" content={description} />
+    <title>{resolvedTitle}</title>
+    <meta name="description" content={resolvedDescription} />
     <link rel="canonical" href={canonicalURL} />
     {(isLocked || noindex) && <meta name="robots" content="noindex" />}
 
     <meta property="og:site_name" content="Friendhood" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content={title} />
-    <meta property="og:description" content={description} />
+    <meta property="og:title" content={resolvedTitle} />
+    <meta property="og:description" content={resolvedDescription} />
     <meta property="og:url" content={canonicalURL} />
     {absoluteImage && <meta property="og:image" content={absoluteImage} />}
 
     <meta name="twitter:card" content={absoluteImage ? 'summary_large_image' : 'summary'} />
-    <meta name="twitter:title" content={title} />
-    <meta name="twitter:description" content={description} />
+    <meta name="twitter:title" content={resolvedTitle} />
+    <meta name="twitter:description" content={resolvedDescription} />
     {absoluteImage && <meta name="twitter:image" content={absoluteImage} />}
   </head>
   <body class="bg-back">

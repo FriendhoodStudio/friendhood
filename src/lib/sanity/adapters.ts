@@ -8,6 +8,7 @@ import type { LinkCardItem, LinkCardsData } from '../../types/linkCards';
 import type { CaseStudyBlock, CaseStudyData, CaseStudyMediaItem } from '../../types/caseStudy';
 import type { ApproachCard, AboutData } from '../../types/about';
 import type { CarouselImageItem } from '../../types/carousel';
+import type { SiteSettingsData } from '../../types/siteSettings';
 
 const projectId = import.meta.env.PUBLIC_SANITY_PROJECT_ID;
 const dataset = import.meta.env.PUBLIC_SANITY_DATASET || 'production';
@@ -387,5 +388,27 @@ export function toAboutData(raw: RawAbout): AboutData {
     ),
     clientsLabel: raw.clientsLabel,
     clients: raw.clients,
+  };
+}
+
+export interface RawSiteSettings {
+  favicon: SanityImageSource;
+  title: string;
+  description: string;
+  ogImage?: SanityImageSource;
+}
+
+export function toSiteSettingsData(raw: RawSiteSettings): SiteSettingsData {
+  return {
+    // Square crop regardless of the source image's own aspect ratio — a
+    // browser tab icon has no room to letterbox. 180px covers the highest-
+    // density case any consumer actually requests (Apple's touch-icon size);
+    // browsers needing a literal 16/32px favicon downscale it themselves.
+    faviconUrl: urlFor(raw.favicon).width(180).height(180).fit('crop').url(),
+    title: raw.title,
+    description: raw.description,
+    ogImageUrl: raw.ogImage
+      ? urlFor(raw.ogImage).width(IMAGE_WIDTH.md).fit('max').url()
+      : undefined,
   };
 }
