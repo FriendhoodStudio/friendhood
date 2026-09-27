@@ -242,24 +242,17 @@ const { services } = Astro.props;
     cursor: grabbing;
   }
 
-  /* Square on mobile only now (confirmed via direct measurement — the image
-     itself was never actually the wrong ratio), landscape 5:4 from tablet
-     up. A shorter image directly shortens the whole card (height is just
-     natural flex-column sizing now, no fixed formula to update in lockstep)
-     — originally 5:4 was desktop-only, tuned for a card taller than a
-     shorter/non-maximised desktop browser window (the modal overlay has no
-     scroll mechanism to recover from that); tablet cards were reported too
-     tall for the same reason, so the threshold moved down to the shared
-     768px tablet tier instead of staying desktop-exclusive. Mobile keeps
-     the square crop — that's a full-screen-ish surface where the height
-     budget was never the issue. */
+  /* Landscape 5:4 at every tier now (confirmed via direct measurement — the
+     image itself was never actually the wrong ratio). A shorter image
+     directly shortens the whole card (height is just natural flex-column
+     sizing now, no fixed formula to update in lockstep) — originally 5:4
+     was desktop-only, tuned for a card taller than a shorter/non-maximised
+     desktop browser window (the modal overlay has no scroll mechanism to
+     recover from that); tablet, then mobile, were both reported too tall
+     for the same reason, so the square crop that used to sit below 768px
+     was dropped rather than kept as a "full-screen-ish surface" exception. */
   .services-card-image {
-    aspect-ratio: 1;
-  }
-  @media (min-width: 768px) {
-    .services-card-image {
-      aspect-ratio: 5 / 4;
-    }
+    aspect-ratio: 5 / 4;
   }
 
   /* Doubled on mobile specifically (20px vs the 10px the *1.25 formula
