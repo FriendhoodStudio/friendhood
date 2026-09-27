@@ -806,7 +806,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 
     // Auto-advances on a timer on every screen, not just touch/no-hover
     // devices — desktop visitors who never hover the word still see it cycle.
-    window.setInterval(advance, 2200);
+    window.setInterval(advance, 1500);
 
     let resizeRafId = 0;
     window.addEventListener('resize', () => {
