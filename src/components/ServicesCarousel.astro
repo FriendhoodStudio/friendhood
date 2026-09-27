@@ -242,19 +242,21 @@ const { services } = Astro.props;
     cursor: grabbing;
   }
 
-  /* Square below desktop (confirmed via direct measurement — the image
-     itself was never actually the wrong ratio), landscape 5:4 at 1200px+
-     specifically. A shorter image directly shortens the whole card (height
-     is just natural flex-column sizing now, no fixed formula to update in
-     lockstep) — the concern being addressed is a card taller than a
-     shorter/non-maximised desktop browser window, which the modal overlay
-     has no scroll mechanism to recover from if it happens. Mobile/tablet
-     keep the square crop; that's a full-screen-ish surface where the
-     height budget was never the issue. */
+  /* Square on mobile only now (confirmed via direct measurement — the image
+     itself was never actually the wrong ratio), landscape 5:4 from tablet
+     up. A shorter image directly shortens the whole card (height is just
+     natural flex-column sizing now, no fixed formula to update in lockstep)
+     — originally 5:4 was desktop-only, tuned for a card taller than a
+     shorter/non-maximised desktop browser window (the modal overlay has no
+     scroll mechanism to recover from that); tablet cards were reported too
+     tall for the same reason, so the threshold moved down to the shared
+     768px tablet tier instead of staying desktop-exclusive. Mobile keeps
+     the square crop — that's a full-screen-ish surface where the height
+     budget was never the issue. */
   .services-card-image {
     aspect-ratio: 1;
   }
-  @media (min-width: 1200px) {
+  @media (min-width: 768px) {
     .services-card-image {
       aspect-ratio: 5 / 4;
     }
@@ -271,6 +273,18 @@ const { services } = Astro.props;
   @media (min-width: 768px) {
     .services-card-text {
       padding-inline: calc(var(--spacing-horizontal-m) * 1.25);
+    }
+  }
+  /* --spacing-horizontal-m itself steps up at 768px (8px -> 10px) then again
+     at 1200px (10px -> 20px) — the *1.25 formula above tracks that fine
+     from 1200px up (20 * 1.25 = 25px), but in between it actually dips
+     BELOW mobile's own 20px (10 * 1.25 = 12.5px), reported live as
+     noticeably-too-tight card padding specifically on tablet. Pinned to the
+     same 20px mobile ends up at instead of trying to patch the shared
+     formula for one tier in between two others it already works for. */
+  @media (min-width: 768px) and (max-width: 1199px) {
+    .services-card-text {
+      padding-inline: 20px;
     }
   }
 
