@@ -156,28 +156,25 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
     )}
   </div>
 
-  {/* The actual cross-fade: a dedicated element (no real content of its
-      own) overlapping the grid's first 100vh via margin-bottom: -100vh,
-      painting in front of it (z-index) — same overlap shape as the two
-      previous broken attempts, but this time the thing that changes with
-      scroll is its OPACITY, not a static cover. Its own script (below)
-      fades it from fully opaque to fully transparent AND disables its
-      pointer-events once faded, tracking its own position across the
-      whole time it's on screen — so at every scroll position some
-      DEFINITE amount of the grid underneath is genuinely visible/
-      reachable (opacity 0 = invisible AND unclickable, letting real
-      clicks through to the grid), never a fixed permanently-hidden zone
-      like before.
-      A flat, uniformly-opaque rectangle fading as one solid block reads
-      as exactly that — a flat rectangle, hard-edged against the crisp
-      case-study content directly above it — confirmed live: "just a
-      faded black patch sitting over the grid", not a dissolve. The
-      mask-image gradient below (same technique as the services card's
-      own top-fade scrim) makes the cover soft-edged at all times —
-      opaque near its own top, already fading to transparent toward its
-      bottom before the scroll-driven opacity even starts moving — so
-      what's revealed is a soft vignette blending into the grid, not a
-      geometric block popping in and out. */}
+  {/* The reveal itself: a dedicated element (no real content of its own)
+      overlapping the grid's first 100vh via margin-bottom: -100vh,
+      painting in front of it (z-index) — the grid's real content (filter
+      bar, first row of cards) sits directly behind this the whole time,
+      already fully rendered and positioned, needing no further scrolling
+      of its own to reach.
+      Went through two wrong models before this one: a STATIC z-index
+      overlap (permanently hides whatever grid content falls behind it —
+      real bug, fixed by reverting), then a continuous scroll-position-
+      driven opacity cross-fade (technically correct, but read as "a flat
+      dark patch sitting over the grid" — a slow uniform-opacity blend
+      just doesn't look like a reveal). The actual reference (a screen
+      recording of pglang.com) turned out to be neither: it's a quick,
+      ONE-SHOT dismiss — a product overlay shrinks and fades in ~500ms the
+      moment you scroll to it, revealing a page that was already fully
+      rendered underneath, not something scrubbed continuously with
+      scroll position. This element's own script (below) reproduces that:
+      a single threshold crossing toggles a class, and a plain CSS
+      transition (not per-frame JS) handles the animation. */}
   <div
     data-reveal-fade-cover
     aria-hidden="true"
@@ -205,18 +202,28 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
 </Layout>
 
 <style>
-  /* Solid colour (so it genuinely covers case-study/grid content it
-     overlaps) shaped into a soft top-to-bottom vignette by mask-image —
-     opaque near its own top edge (right where the real case study content
-     above it ends, so there's no visible seam), fading to fully
-     transparent toward its bottom (already easing into the grid before
-     the scroll-driven JS opacity in [slug].astro's own script even starts
-     moving it). Same masked-gradient-scrim technique as the services
-     card's own top-fade. */
+  /* Solid colour (so it genuinely covers whatever grid content it
+     overlaps while at rest) shaped into a soft top-to-bottom vignette by
+     mask-image — opaque near its own top edge (right where the real case
+     study content above it ends, so there's no visible seam), fading to
+     fully transparent toward its bottom. Same masked-gradient-scrim
+     technique as the services card's own top-fade.
+     opacity/transform are what the script below actually animates — a
+     single CSS transition or the trigger, not a per-frame JS value like
+     the previous version. scale(0.97) on dismiss echoes the reference's
+     own product-overlay shrinking away, not just fading in place. */
   .reveal-fade-cover {
     background-color: var(--color-back);
     mask-image: linear-gradient(to bottom, black, transparent);
     -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+    opacity: 1;
+    transform: scale(1);
+    transition: opacity 500ms ease-out, transform 500ms ease-out;
+  }
+  .reveal-fade-cover.is-dismissed {
+    opacity: 0;
+    transform: scale(0.97);
+    pointer-events: none;
   }
 
   /* Narrower still at desktop — 6 columns rather than 8, same as the
@@ -335,27 +342,29 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
 </script>
 
 <script>
-  // The cross-fade itself — see the markup comment above
-  // data-reveal-fade-cover. Fades linearly across the ENTIRE time the
-  // cover is anywhere on screen (from its top entering at the viewport's
-  // bottom edge, to its top leaving past the viewport's top edge) — a
-  // smooth dissolve the whole way through, not a snap at either end.
-  // pointer-events is dropped once it's almost fully transparent so a
-  // click in that area reaches the (by then visible) card underneath
-  // instead of hitting this invisible-but-still-there div.
+  // The reveal itself — see the markup comment above data-reveal-fade-cover
+  // for why this is a threshold-triggered toggle, not a per-frame computed
+  // opacity: the reference is a quick, one-shot dismiss (~500ms, played
+  // once you reach it), not something scrubbed continuously with scroll
+  // position. Same crossing rule as the sentinel/URL-swap script (own top
+  // edge above the viewport's vertical centre) so the "you've arrived at
+  // Work" URL swap and the visual reveal happen at the same moment — but
+  // this is its own independent check on the cover's own element, kept
+  // decoupled from that script rather than sharing state with it.
+  // is-dismissed is reversible (toggles back on if you scroll back up past
+  // the threshold) — CSS transition duration is what makes it read as a
+  // deliberate animation rather than a snap, in either direction.
   const fadeCover = document.querySelector<HTMLElement>('[data-reveal-fade-cover]');
 
   if (fadeCover) {
     const cover = fadeCover;
+    let dismissed = false;
 
     function update() {
-      const rect = cover.getBoundingClientRect();
-      const total = window.innerHeight + rect.height;
-      const traveled = window.innerHeight - rect.top;
-      const progress = Math.min(Math.max(traveled / total, 0), 1);
-      const opacity = 1 - progress;
-      cover.style.opacity = String(opacity);
-      cover.style.pointerEvents = opacity < 0.02 ? 'none' : '';
+      const shouldDismiss = cover.getBoundingClientRect().top < window.innerHeight / 2;
+      if (shouldDismiss === dismissed) return;
+      dismissed = shouldDismiss;
+      cover.classList.toggle('is-dismissed', dismissed);
     }
 
     let rafId = 0;
