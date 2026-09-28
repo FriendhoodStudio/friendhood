@@ -29,26 +29,17 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
   description={caseStudy.openingStatement}
   image={caseStudy.heroImageUrl}
 >
-  {/* case-study-layer + work-grid-layer: reverted the z-index + negative-
-      margin "overlap" attempt (see git history) — that technique creates a
-      STATIC document-space relationship, not a scroll-reactive one. Two
-      overlapping boxes with different z-index have a fixed winner at
-      every position, permanently, regardless of scroll — so whatever grid
-      content fell inside the overlapped region (its filter bar and first
-      row of cards) was hidden behind the case study forever, at every
-      scroll position, not just during a transition. Confirmed live twice
-      (once as literally-unreachable content, once — after trying to patch
-      it with extra padding — as the exact same bug moved to a different
-      pixel range). Plain succession already delivers what the user's own
-      reference showed: by the time you've scrolled to where the grid's
-      filter bar and first row of cards are fully in view, the case
-      study's own tail end naturally occupies only the remaining sliver of
-      the screen below them, because that's just how two stacked blocks of
-      content behave when you scroll through their shared boundary. No
-      overlap trick needed for that part — only a genuine simultaneous
-      cross-fade (both layers visible at once, one sliding faster than
-      scroll) would need one, and that requires a real scroll-driven
-      transform, not a static one. */}
+  {/* case-study-layer: plain, untouched normal flow — no overlap, no
+      z-index, no negative margin. The two previous attempts at a "layered"
+      reveal both applied a STATIC z-index+overlap directly to this layer,
+      which is a fixed document-space relationship, not a scroll-reactive
+      one — whatever grid content fell inside the overlap was hidden
+      behind it permanently, at every scroll position, not just during a
+      transition (confirmed live, twice). The actual cross-fade now lives
+      entirely in the dedicated .reveal-fade-cover element below instead,
+      whose OPACITY (not just its position) is scroll-driven — see its own
+      comment. Keeping this layer itself untouched means the real case
+      study content is never at risk of the same bug recurring here. */}
   <div class="case-study-layer flex flex-col gap-vertical-xl px-[var(--page-margin)] pt-vertical-xl">
     <div class="flex w-full flex-col items-start gap-vertical-l" data-reveal-group="case-study-header">
       <div class="reveal-item flex w-full flex-col items-start gap-[21px]">
@@ -165,13 +156,32 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
     )}
   </div>
 
+  {/* The actual cross-fade: a dedicated element (no real content of its
+      own) overlapping the grid's first 100vh via margin-bottom: -100vh,
+      painting in front of it (z-index) — same overlap shape as the two
+      previous broken attempts, but this time the thing that changes with
+      scroll is its OPACITY, not a static cover. Its own script (below)
+      fades it from fully opaque to fully transparent AND disables its
+      pointer-events once faded, tracking its own position across the
+      whole time it's on screen — so at every scroll position some
+      DEFINITE amount of the grid underneath is genuinely visible/
+      reachable (opacity 0 = invisible AND unclickable, letting real
+      clicks through to the grid), never a fixed permanently-hidden zone
+      like before. Reads as the case study's last frame dissolving to
+      reveal the grid that was already sitting there, rather than a hard
+      cut between two sections. */}
+  <div
+    data-reveal-fade-cover
+    aria-hidden="true"
+    class="relative z-[2] h-[100vh] -mb-[100vh] bg-back"
+  ></div>
+
   {/* Replaces the old curated "Discover more" related-projects strip —
-      scrolling past the case study's own content runs straight into the
-      real Work page's grid, embedded here in full (see WorkGrid.astro).
-      Plain normal-flow succession, no overlap trick (see case-study-layer's
-      own comment for why one was tried and reverted) — every pixel of the
-      grid is reachable at some scroll position, guaranteed, since nothing
-      about its layout is touched. The URL/tab title quietly swap to match
+      scrolling past the case study's own content (and the fade-cover
+      above) runs straight into the real Work page's grid, embedded here
+      in full (see WorkGrid.astro) — completely normal flow itself, no
+      overlap of its own, so every pixel of it is reachable exactly as it
+      is on the real /work page. The URL/tab title quietly swap to match
       once the grid is actually what's dominating the screen (see the
       script below), then swap back on scrolling back up. Still a fully
       static, complete page either way (no JS = you just see the case
@@ -286,6 +296,44 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
 
     function update() {
       setRevealed(marker.getBoundingClientRect().top < window.innerHeight / 2);
+    }
+
+    let rafId = 0;
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        update();
+        rafId = 0;
+      });
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+  }
+</script>
+
+<script>
+  // The cross-fade itself — see the markup comment above
+  // data-reveal-fade-cover. Fades linearly across the ENTIRE time the
+  // cover is anywhere on screen (from its top entering at the viewport's
+  // bottom edge, to its top leaving past the viewport's top edge) — a
+  // smooth dissolve the whole way through, not a snap at either end.
+  // pointer-events is dropped once it's almost fully transparent so a
+  // click in that area reaches the (by then visible) card underneath
+  // instead of hitting this invisible-but-still-there div.
+  const fadeCover = document.querySelector<HTMLElement>('[data-reveal-fade-cover]');
+
+  if (fadeCover) {
+    const cover = fadeCover;
+
+    function update() {
+      const rect = cover.getBoundingClientRect();
+      const total = window.innerHeight + rect.height;
+      const traveled = window.innerHeight - rect.top;
+      const progress = Math.min(Math.max(traveled / total, 0), 1);
+      const opacity = 1 - progress;
+      cover.style.opacity = String(opacity);
+      cover.style.pointerEvents = opacity < 0.02 ? 'none' : '';
     }
 
     let rafId = 0;
