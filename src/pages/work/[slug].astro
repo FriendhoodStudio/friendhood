@@ -167,13 +167,21 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
       DEFINITE amount of the grid underneath is genuinely visible/
       reachable (opacity 0 = invisible AND unclickable, letting real
       clicks through to the grid), never a fixed permanently-hidden zone
-      like before. Reads as the case study's last frame dissolving to
-      reveal the grid that was already sitting there, rather than a hard
-      cut between two sections. */}
+      like before.
+      A flat, uniformly-opaque rectangle fading as one solid block reads
+      as exactly that — a flat rectangle, hard-edged against the crisp
+      case-study content directly above it — confirmed live: "just a
+      faded black patch sitting over the grid", not a dissolve. The
+      mask-image gradient below (same technique as the services card's
+      own top-fade scrim) makes the cover soft-edged at all times —
+      opaque near its own top, already fading to transparent toward its
+      bottom before the scroll-driven opacity even starts moving — so
+      what's revealed is a soft vignette blending into the grid, not a
+      geometric block popping in and out. */}
   <div
     data-reveal-fade-cover
     aria-hidden="true"
-    class="relative z-[2] h-[100vh] -mb-[100vh] bg-back"
+    class="reveal-fade-cover relative z-[2] h-[100vh] -mb-[100vh]"
   ></div>
 
   {/* Replaces the old curated "Discover more" related-projects strip —
@@ -197,6 +205,20 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
 </Layout>
 
 <style>
+  /* Solid colour (so it genuinely covers case-study/grid content it
+     overlaps) shaped into a soft top-to-bottom vignette by mask-image —
+     opaque near its own top edge (right where the real case study content
+     above it ends, so there's no visible seam), fading to fully
+     transparent toward its bottom (already easing into the grid before
+     the scroll-driven JS opacity in [slug].astro's own script even starts
+     moving it). Same masked-gradient-scrim technique as the services
+     card's own top-fade. */
+  .reveal-fade-cover {
+    background-color: var(--color-back);
+    mask-image: linear-gradient(to bottom, black, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+  }
+
   /* Narrower still at desktop — 6 columns rather than 8, same as the
      Home page's Services paragraph, once there's enough width that 8
      columns of body copy reads as too wide a measure. Matches the same
