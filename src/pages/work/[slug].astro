@@ -2,9 +2,9 @@
 import Layout from '../../layouts/Layout.astro';
 import CategoryTag from '../../components/CategoryTag.astro';
 import DividerSmall from '../../components/DividerSmall.astro';
-import ProjectGallery from '../../components/ProjectGallery.astro';
 import ImageCarousel from '../../components/ImageCarousel.astro';
 import Lightbox from '../../components/Lightbox.astro';
+import WorkGrid from '../../components/WorkGrid.astro';
 import { fetchProjectSlugs, fetchCaseStudy } from '../../lib/sanity/queries';
 
 export async function getStaticPaths() {
@@ -29,7 +29,18 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
   description={caseStudy.openingStatement}
   image={caseStudy.heroImageUrl}
 >
-  <div class="flex flex-col gap-vertical-xl px-[var(--page-margin)] pt-vertical-xl">
+  {/* case-study-layer + work-grid-layer below: the "reveal" isn't just
+      content succession any more (case study ends, grid begins) — the grid
+      sits directly behind the case study's own tail end (pulled up via
+      margin-bottom: -100vh on this layer, so its box physically overlaps
+      the grid's for one viewport-height's worth of scroll) and is only
+      hidden because this layer paints in front (higher z-index) with an
+      opaque bg-back. Scrolling through that overlap therefore looks like
+      this layer lifting away to reveal the grid that was already sitting
+      there underneath, rather than one section handing off to the next —
+      confirmed against the user's own reference (a pinned/stationary
+      layer being uncovered, not a new one sliding up to cover the old). */}
+  <div class="case-study-layer relative flex flex-col gap-vertical-xl bg-back px-[var(--page-margin)] pt-vertical-xl">
     <div class="flex w-full flex-col items-start gap-vertical-l" data-reveal-group="case-study-header">
       <div class="reveal-item flex w-full flex-col items-start gap-[21px]">
         <h1 class="font-tag text-detail text-grey-300">{caseStudy.title}</h1>
@@ -145,19 +156,43 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
     )}
   </div>
 
-  {caseStudy.relatedProjects.length > 0 && (
-    <div class="flex flex-col gap-vertical-s pt-vertical-xl">
-      <div class="px-[var(--page-margin)]">
-        <DividerSmall label="Discover more" />
-      </div>
-      <ProjectGallery projects={caseStudy.relatedProjects} showCaption={true} layout="grid" />
-    </div>
-  )}
+  {/* Experimental: replaces the old curated "Discover more" related-
+      projects strip. Sits BEHIND case-study-layer above (see its own
+      comment) — position/z-index here just needs to lose the stacking
+      fight, the actual overlap is that layer's negative margin pulling
+      this one up underneath it. The sentinel is the first thing inside
+      this layer specifically so its measured position reflects that same
+      pulled-up overlap; the URL/tab title quietly swap to match once the
+      grid is actually what's dominating the screen (see the script
+      below), then swap back on scrolling back up. Still a fully static,
+      complete page either way (no JS = you just see the case study
+      followed by the full Work grid, nothing missing) — the swap is a
+      progressive-enhancement affordance, not how the content actually
+      gets there. */}
+  <div class="work-grid-layer relative">
+    <div data-parent-reveal-sentinel aria-hidden="true"></div>
+    <WorkGrid />
+  </div>
 
   <Lightbox />
 </Layout>
 
 <style>
+  /* The overlap itself — see the markup comments above both layers for
+     why. -100vh is a full screen's worth of transition, tuned by eye:
+     enough to read as a deliberate reveal, not so much that most of a
+     typical case study's own tail content is spent under the fold before
+     you even reach it. z-index needs no big number here (nav is z-50,
+     modals/overlays are z-[60]/z-[70]) — these two only need to win
+     against EACH OTHER. */
+  .case-study-layer {
+    z-index: 2;
+    margin-bottom: -100vh;
+  }
+  .work-grid-layer {
+    z-index: 1;
+  }
+
   /* Narrower still at desktop — 6 columns rather than 8, same as the
      Home page's Services paragraph, once there's enough width that 8
      columns of body copy reads as too wide a measure. Matches the same
@@ -212,5 +247,63 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
 
   for (const name of ['case-study-header', 'case-study-body', 'case-study-footer']) {
     initScrollRevealGroup(name);
+  }
+</script>
+
+<script>
+  // Experimental "reveal the parent page" scroll behaviour — see the markup
+  // comment above data-parent-reveal-sentinel. The sentinel sits at the
+  // exact seam between this case study's own content and the embedded Work
+  // grid; once its own top edge has scrolled above the vertical CENTRE of
+  // the viewport, the Work grid — not the case study — is what's actually
+  // dominating what someone's looking at, so the URL/title swap to match.
+  // history.replaceState (not pushState) on purpose: this is scroll
+  // position reasserting what's already genuinely on screen, not a real
+  // navigation, so it must not spam the back button with an entry per
+  // crossing.
+  //
+  // Plain rAF-throttled scroll listener + getBoundingClientRect, same
+  // technique as the hero's scroll-scrubbed invert effect — not
+  // IntersectionObserver. Tried that first: with a sentinel that has no
+  // real height (nothing to render, it's a pure position marker) and a
+  // rootMargin collapsing the root to a single line, the intersection
+  // ratio the browser computes is undefined for a zero-area target, and in
+  // practice the callback only ever fired once and then stopped updating —
+  // confirmed directly, not a guess. Measuring the position ourselves on
+  // every scroll tick has no such edge case.
+  const sentinel = document.querySelector<HTMLElement>('[data-parent-reveal-sentinel]');
+
+  if (sentinel) {
+    // Rebind to a non-null local: TS narrowing from the outer if-check
+    // doesn't persist into the update()/onScroll closures defined below.
+    const marker = sentinel;
+    const caseStudyPath = window.location.pathname;
+    const caseStudyTitle = document.title;
+    const WORK_PATH = '/work';
+    const WORK_TITLE = 'Work | Friendhood';
+    let revealed = false;
+
+    function setRevealed(next: boolean) {
+      if (next === revealed) return;
+      revealed = next;
+      document.title = next ? WORK_TITLE : caseStudyTitle;
+      history.replaceState(history.state, '', next ? WORK_PATH : caseStudyPath);
+    }
+
+    function update() {
+      setRevealed(marker.getBoundingClientRect().top < window.innerHeight / 2);
+    }
+
+    let rafId = 0;
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        update();
+        rafId = 0;
+      });
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
   }
 </script>
