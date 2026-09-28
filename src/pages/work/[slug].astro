@@ -2,9 +2,9 @@
 import Layout from '../../layouts/Layout.astro';
 import CategoryTag from '../../components/CategoryTag.astro';
 import DividerSmall from '../../components/DividerSmall.astro';
+import ProjectGallery from '../../components/ProjectGallery.astro';
 import ImageCarousel from '../../components/ImageCarousel.astro';
 import Lightbox from '../../components/Lightbox.astro';
-import WorkGrid from '../../components/WorkGrid.astro';
 import { fetchProjectSlugs, fetchCaseStudy } from '../../lib/sanity/queries';
 
 export async function getStaticPaths() {
@@ -29,18 +29,7 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
   description={caseStudy.openingStatement}
   image={caseStudy.heroImageUrl}
 >
-  {/* case-study-layer: plain, untouched normal flow — no overlap, no
-      z-index, no negative margin. The two previous attempts at a "layered"
-      reveal both applied a STATIC z-index+overlap directly to this layer,
-      which is a fixed document-space relationship, not a scroll-reactive
-      one — whatever grid content fell inside the overlap was hidden
-      behind it permanently, at every scroll position, not just during a
-      transition (confirmed live, twice). The actual cross-fade now lives
-      entirely in the dedicated .reveal-fade-cover element below instead,
-      whose OPACITY (not just its position) is scroll-driven — see its own
-      comment. Keeping this layer itself untouched means the real case
-      study content is never at risk of the same bug recurring here. */}
-  <div class="case-study-layer flex flex-col gap-vertical-xl px-[var(--page-margin)] pt-vertical-xl">
+  <div class="flex flex-col gap-vertical-xl px-[var(--page-margin)] pt-vertical-xl">
     <div class="flex w-full flex-col items-start gap-vertical-l" data-reveal-group="case-study-header">
       <div class="reveal-item flex w-full flex-col items-start gap-[21px]">
         <h1 class="font-tag text-detail text-grey-300">{caseStudy.title}</h1>
@@ -156,76 +145,19 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
     )}
   </div>
 
-  {/* The reveal itself: a dedicated element (no real content of its own)
-      overlapping the grid's first 100vh via margin-bottom: -100vh,
-      painting in front of it (z-index) — the grid's real content (filter
-      bar, first row of cards) sits directly behind this the whole time,
-      already fully rendered and positioned, needing no further scrolling
-      of its own to reach.
-      Went through two wrong models before this one: a STATIC z-index
-      overlap (permanently hides whatever grid content falls behind it —
-      real bug, fixed by reverting), then a continuous scroll-position-
-      driven opacity cross-fade (technically correct, but read as "a flat
-      dark patch sitting over the grid" — a slow uniform-opacity blend
-      just doesn't look like a reveal). The actual reference (a screen
-      recording of pglang.com) turned out to be neither: it's a quick,
-      ONE-SHOT dismiss — a product overlay shrinks and fades in ~500ms the
-      moment you scroll to it, revealing a page that was already fully
-      rendered underneath, not something scrubbed continuously with
-      scroll position. This element's own script (below) reproduces that:
-      a single threshold crossing toggles a class, and a plain CSS
-      transition (not per-frame JS) handles the animation. */}
-  <div
-    data-reveal-fade-cover
-    aria-hidden="true"
-    class="reveal-fade-cover relative z-[2] h-[100vh] -mb-[100vh]"
-  ></div>
-
-  {/* Replaces the old curated "Discover more" related-projects strip —
-      scrolling past the case study's own content (and the fade-cover
-      above) runs straight into the real Work page's grid, embedded here
-      in full (see WorkGrid.astro) — completely normal flow itself, no
-      overlap of its own, so every pixel of it is reachable exactly as it
-      is on the real /work page. The URL/tab title quietly swap to match
-      once the grid is actually what's dominating the screen (see the
-      script below), then swap back on scrolling back up. Still a fully
-      static, complete page either way (no JS = you just see the case
-      study followed by the full Work grid, nothing missing) — the swap is
-      a progressive-enhancement affordance, not how the content actually
-      gets there. */}
-  <div class="work-grid-layer">
-    <div data-parent-reveal-sentinel aria-hidden="true"></div>
-    <WorkGrid />
-  </div>
+  {caseStudy.relatedProjects.length > 0 && (
+    <div class="flex flex-col gap-vertical-s pt-vertical-xl">
+      <div class="px-[var(--page-margin)]">
+        <DividerSmall label="Discover more" />
+      </div>
+      <ProjectGallery projects={caseStudy.relatedProjects} showCaption={true} layout="grid" />
+    </div>
+  )}
 
   <Lightbox />
 </Layout>
 
 <style>
-  /* Solid colour (so it genuinely covers whatever grid content it
-     overlaps while at rest) shaped into a soft top-to-bottom vignette by
-     mask-image — opaque near its own top edge (right where the real case
-     study content above it ends, so there's no visible seam), fading to
-     fully transparent toward its bottom. Same masked-gradient-scrim
-     technique as the services card's own top-fade.
-     opacity/transform are what the script below actually animates — a
-     single CSS transition or the trigger, not a per-frame JS value like
-     the previous version. scale(0.97) on dismiss echoes the reference's
-     own product-overlay shrinking away, not just fading in place. */
-  .reveal-fade-cover {
-    background-color: var(--color-back);
-    mask-image: linear-gradient(to bottom, black, transparent);
-    -webkit-mask-image: linear-gradient(to bottom, black, transparent);
-    opacity: 1;
-    transform: scale(1);
-    transition: opacity 500ms ease-out, transform 500ms ease-out;
-  }
-  .reveal-fade-cover.is-dismissed {
-    opacity: 0;
-    transform: scale(0.97);
-    pointer-events: none;
-  }
-
   /* Narrower still at desktop — 6 columns rather than 8, same as the
      Home page's Services paragraph, once there's enough width that 8
      columns of body copy reads as too wide a measure. Matches the same
@@ -280,103 +212,5 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
 
   for (const name of ['case-study-header', 'case-study-body', 'case-study-footer']) {
     initScrollRevealGroup(name);
-  }
-</script>
-
-<script>
-  // Experimental "reveal the parent page" scroll behaviour — see the markup
-  // comment above data-parent-reveal-sentinel. The sentinel sits at the
-  // exact seam between this case study's own content and the embedded Work
-  // grid; once its own top edge has scrolled above the vertical CENTRE of
-  // the viewport, the Work grid — not the case study — is what's actually
-  // dominating what someone's looking at, so the URL/title swap to match.
-  // history.replaceState (not pushState) on purpose: this is scroll
-  // position reasserting what's already genuinely on screen, not a real
-  // navigation, so it must not spam the back button with an entry per
-  // crossing.
-  //
-  // Plain rAF-throttled scroll listener + getBoundingClientRect, same
-  // technique as the hero's scroll-scrubbed invert effect — not
-  // IntersectionObserver. Tried that first: with a sentinel that has no
-  // real height (nothing to render, it's a pure position marker) and a
-  // rootMargin collapsing the root to a single line, the intersection
-  // ratio the browser computes is undefined for a zero-area target, and in
-  // practice the callback only ever fired once and then stopped updating —
-  // confirmed directly, not a guess. Measuring the position ourselves on
-  // every scroll tick has no such edge case.
-  const sentinel = document.querySelector<HTMLElement>('[data-parent-reveal-sentinel]');
-
-  if (sentinel) {
-    // Rebind to a non-null local: TS narrowing from the outer if-check
-    // doesn't persist into the update()/onScroll closures defined below.
-    const marker = sentinel;
-    const caseStudyPath = window.location.pathname;
-    const caseStudyTitle = document.title;
-    const WORK_PATH = '/work';
-    const WORK_TITLE = 'Work | Friendhood';
-    let revealed = false;
-
-    function setRevealed(next: boolean) {
-      if (next === revealed) return;
-      revealed = next;
-      document.title = next ? WORK_TITLE : caseStudyTitle;
-      history.replaceState(history.state, '', next ? WORK_PATH : caseStudyPath);
-    }
-
-    function update() {
-      setRevealed(marker.getBoundingClientRect().top < window.innerHeight / 2);
-    }
-
-    let rafId = 0;
-    const onScroll = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        update();
-        rafId = 0;
-      });
-    };
-    update();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-  }
-</script>
-
-<script>
-  // The reveal itself — see the markup comment above data-reveal-fade-cover
-  // for why this is a threshold-triggered toggle, not a per-frame computed
-  // opacity: the reference is a quick, one-shot dismiss (~500ms, played
-  // once you reach it), not something scrubbed continuously with scroll
-  // position. Same crossing rule as the sentinel/URL-swap script (own top
-  // edge above the viewport's vertical centre) so the "you've arrived at
-  // Work" URL swap and the visual reveal happen at the same moment — but
-  // this is its own independent check on the cover's own element, kept
-  // decoupled from that script rather than sharing state with it.
-  // is-dismissed is reversible (toggles back on if you scroll back up past
-  // the threshold) — CSS transition duration is what makes it read as a
-  // deliberate animation rather than a snap, in either direction.
-  const fadeCover = document.querySelector<HTMLElement>('[data-reveal-fade-cover]');
-
-  if (fadeCover) {
-    const cover = fadeCover;
-    let dismissed = false;
-
-    function update() {
-      const shouldDismiss = cover.getBoundingClientRect().top < window.innerHeight / 2;
-      if (shouldDismiss === dismissed) return;
-      dismissed = shouldDismiss;
-      cover.classList.toggle('is-dismissed', dismissed);
-    }
-
-    let rafId = 0;
-    const onScroll = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        update();
-        rafId = 0;
-      });
-    };
-    update();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
   }
 </script>
