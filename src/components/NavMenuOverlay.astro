@@ -87,15 +87,18 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
   /* scale, not translate, and press/release overshoot to match every other
      button on the site (copy-email, reel trigger, lightbox controls) —
      replaces the earlier hover-only translate nudge, which had no press
-     feedback at all. Shallow amounts (0.95 press / 1.1 hover), matching the
-     established "wide element" convention (reel-trigger-btn, footer
-     buttons) rather than the deeper 0.82/1.12 one used for small round
-     icon buttons — these are large headline-sized text links, not icons. */
+     feedback at all. Shallow press (0.95), matching the established "wide
+     element" convention (reel-trigger-btn, footer buttons) rather than the
+     deeper 0.82/1.12 one used for small round icon buttons — these are
+     large headline-sized text links, not icons. Hover itself is tuned
+     down further still (1.04, not 1.1) — at this text size (text-h1/h3)
+     even the "wide element" hover amount read as too much movement,
+     reported live as needing to be more subtle. */
   .menu-link {
     transition: translate 300ms ease-out, scale 300ms ease-out;
   }
   .menu-link:hover {
-    scale: 1.1;
+    scale: 1.04;
   }
   .menu-link.is-pressed {
     scale: 0.95;
