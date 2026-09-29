@@ -87,13 +87,12 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
   /* scale, not translate, and press/release overshoot to match every other
      button on the site (copy-email, reel trigger, lightbox controls) —
      replaces the earlier hover-only translate nudge, which had no press
-     feedback at all. Shallow press (0.95), matching the established "wide
-     element" convention (reel-trigger-btn, footer buttons) rather than the
-     deeper 0.82/1.12 one used for small round icon buttons — these are
-     large headline-sized text links, not icons. Hover itself is tuned
-     down further still (1.04, not 1.1) — at this text size (text-h1/h3)
-     even the "wide element" hover amount read as too much movement,
-     reported live as needing to be more subtle. */
+     feedback at all. Both hover (1.04) and press (0.98) are tuned down
+     further than the established "wide element" convention (1.1/0.95,
+     used by reel-trigger-btn, footer buttons) — at this text size
+     (text-h1/h3) even that amount read as too much movement, reported
+     live as needing to be more subtle. The release overshoot keyframes
+     below are scaled down to match (see the <script> block). */
   .menu-link {
     transition: translate 300ms ease-out, scale 300ms ease-out;
   }
@@ -101,7 +100,7 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
     scale: 1.04;
   }
   .menu-link.is-pressed {
-    scale: 0.95;
+    scale: 0.98;
     transition: scale 120ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   .menu-link.is-settling {
@@ -195,10 +194,12 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
   // links alike, since they share this class) — quick firm press-in via
   // the CSS transition on .is-pressed, then a springy overshoot-past-rest
   // on release driven by WAAPI so it can go past scale(1) before settling.
-  // Same shallow amounts as the reel trigger/footer buttons (see the CSS
-  // comment above), animating the standalone `scale` property rather than
-  // `transform` to match how this component already treats `translate` as
-  // its own independent property elsewhere (the entrance animation).
+  // Overshoot keyframes are scaled down to match the toned-down press/hover
+  // amounts (see the CSS comment above) rather than the deeper reel
+  // trigger/footer button values, animating the standalone `scale`
+  // property rather than `transform` to match how this component already
+  // treats `translate` as its own independent property elsewhere (the
+  // entrance animation).
   const menuLinks = overlay ? Array.from(overlay.querySelectorAll<HTMLElement>('.menu-link')) : [];
 
   menuLinks.forEach((link) => {
@@ -214,9 +215,9 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
       if (!link.classList.contains('is-pressed')) return;
       settleAnim = link.animate(
         [
-          { scale: 0.95 },
-          { scale: 1.04, offset: 0.55 },
-          { scale: 0.99, offset: 0.8 },
+          { scale: 0.98 },
+          { scale: 1.015, offset: 0.55 },
+          { scale: 0.995, offset: 0.8 },
           { scale: 1 },
         ],
         { duration: 380, easing: 'ease-out', fill: 'forwards' }
