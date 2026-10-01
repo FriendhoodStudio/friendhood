@@ -416,11 +416,30 @@ const { services } = Astro.props;
   // transform/opacity don't themselves affect layout, so this was never
   // full forced-synchronous-layout thrashing, but interleaving 18 reads and
   // 18 writes per frame is still needlessly more work than two flat passes.
+  //
+  // atFloor[] skips the write for cards that were already sitting at the
+  // floor scale/opacity (cardVisualState clamps at |delta| >= 1) and still
+  // are — at any given moment only ~3 of the 18 loop-copy cards are
+  // actually within one step of centre and changing; the rest are already
+  // pinned at the floor and rewriting the same transform/opacity string
+  // into them every single scroll frame is pure waste. Reported live as
+  // intermittent jank during scroll ("sometimes smooth, sometimes really
+  // slow") rather than constant slowness — consistent with a per-frame
+  // cost that's usually inside the frame budget but tips over it under any
+  // incidental load (GC, image decode, etc.), which this directly cuts by
+  // only touching the handful of cards actually in transition each frame.
+  const atFloor: boolean[] = cards.map(() => false);
+
   function updateVisualState() {
-    const states = cards.map((card) => cardVisualState(cardDelta(card)));
+    const deltas = cards.map((card) => cardDelta(card));
     cards.forEach((card, i) => {
-      card.style.transform = `scale(${states[i].scale})`;
-      card.style.opacity = String(states[i].opacity);
+      const delta = deltas[i];
+      const isFloor = Math.abs(delta) >= 1;
+      if (isFloor && atFloor[i]) return;
+      const { scale, opacity } = cardVisualState(delta);
+      card.style.transform = `scale(${scale})`;
+      card.style.opacity = String(opacity);
+      atFloor[i] = isFloor;
     });
   }
 
