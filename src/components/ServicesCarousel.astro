@@ -234,9 +234,20 @@ const { services } = Astro.props;
     }
   }
 
+  /* will-change promotes each card to its own stable compositor layer up
+     front. Without it, a rounded-corner + overflow-hidden box whose
+     transform/opacity is rewritten via inline style every scroll frame (see
+     updateVisualState in the script below) gets re-rasterized on the fly —
+     reported live as both intermittent scroll jank AND a visible seam in
+     the rounded corner/shadow mid-transform (a stale rasterization of the
+     clip briefly not matching the live-scaled box). Pinning the layer
+     ahead of time, rather than letting the browser promote/demote it
+     reactively on every write, is the standard fix for both symptoms at
+     once. */
   .services-card {
     width: var(--services-card-image-size);
     cursor: grab;
+    will-change: transform, opacity;
   }
   .services-card:active {
     cursor: grabbing;
