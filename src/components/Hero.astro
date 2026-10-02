@@ -74,12 +74,12 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       nudges it down slightly for nav clearance. */}
   <div class="flex min-h-[76dvh] w-full items-center justify-center" style="margin-top:var(--nav-menu-height)">
     <h1
-      class="hero-fade-in hero-headline-shadow hero-headline-trial-font relative z-20 max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front pointer-events-none"
+      class="hero-fade-in hero-headline-shadow hero-headline-heavy-font relative z-20 max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front pointer-events-none"
     >
       {loopWords.length > 0 ? (
         <Fragment>
           {/* The cycling word sits inside a plain h-[1em] window, same as
-              the static headline text's own line box — the Heavy trial
+              the static headline text's own line box — the Heavy
               weight's top/bottom clipping traced back to the font FILE's
               own declared ascent/descent metrics running well past its
               actual ink, fixed at the font-face level (see the
@@ -244,18 +244,18 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 )}
 
 <style>
-  /* Experimental — trying Greed Extended's Heavy trial weight for just
-     this headline, not the rest of the site (see the @font-face comment
-     in global.css for why it's a separate family name rather than a
-     font-weight on the existing one). Falls back to the licensed Regular
-     weight, then sans-serif, if the trial file fails to load. */
-  .hero-headline-trial-font {
-    font-family: "Greed Extended Heavy Trial", "Greed Extended", sans-serif;
+  /* Greed Extended's licensed Heavy weight, used for just this headline,
+     not the rest of the site (see the @font-face comment in global.css for
+     why it's a separate family name rather than a font-weight on the
+     existing one). Falls back to the Regular weight, then sans-serif, if
+     the Heavy file fails to load. */
+  .hero-headline-heavy-font {
+    font-family: "Greed Extended Heavy", "Greed Extended", sans-serif;
   }
 
   /* See the markup comment by data-hero-word-window for why this exists —
      expands the window's paint region a few px past its right edge so the
-     Heavy trial weight's rounded terminals aren't clipped there, without
+     Heavy weight's rounded terminals aren't clipped there, without
      padding the window's actual layout width (which would visibly unbalance
      the "For [word] thinking" spacing either side). `overflow-visible` on
      the window (see markup) is what gives clip-path room to paint past the
@@ -643,7 +643,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     // captured once — otherwise the box keeps its stale desktop/mobile size
     // after the viewport crosses a breakpoint.
     //
-    // Deliberately NOT padded to cover the Heavy trial weight's rounded
+    // Deliberately NOT padded to cover the Heavy weight's rounded
     // terminals painting slightly past their own advance-width box on the
     // right (confirmed live: a Range over the text node measures flush with
     // the window's edge, but the "s" in "orgs" was still visibly clipped

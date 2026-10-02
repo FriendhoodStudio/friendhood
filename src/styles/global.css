@@ -17,38 +17,25 @@
   font-display: swap;
 }
 
-/* Experimental — trial weight, scoped via a font-family override to
-   specific elements that opt in (currently the hero H1 in Hero.astro, and
-   the nav menu's page links in NavMenuOverlay.astro), not swapped in as
-   the site-wide font-display. A separate family name from "Greed
-   Extended" above rather than a heavier font-weight on that one, since
-   trial/production files for the same family can't safely share one
-   @font-face without risking the wrong file winning at a given weight.
-   Would need the licensed (non-trial) Heavy file before this could ship
-   for real — every scoped usage is a deliberate, explicit exception in
-   the meantime, not a default. */
+/* Licensed Heavy weight (replaces the earlier trial export — see git
+   history) — scoped via its own font-family override to specific elements
+   that opt in (currently the hero H1 in Hero.astro, and the nav menu's
+   page links in NavMenuOverlay.astro), not swapped in as the site-wide
+   font-display. Kept as a separate family name from "Greed Extended"
+   above rather than a heavier font-weight on that one, matching how every
+   other weight in this family is handled. */
 @font-face {
-  font-family: "Greed Extended Heavy Trial";
-  src: url("../assets/fonts/GreedExtended-Heavy-TRIAL.woff2") format("woff2");
+  font-family: "Greed Extended Heavy";
+  src:
+    url("../assets/fonts/GreedExtended-Heavy.woff2") format("woff2"),
+    url("../assets/fonts/GreedExtended-Heavy.woff") format("woff");
   font-weight: 400 900;
   font-style: normal;
   font-display: swap;
-  /* This trial export's own declared ascent/descent run well past its
-     actual ink (measured live: e.g. "people" inks at 55.5px inside a 63px
-     em box, but renders as if it needed ~77.5px) — harmless in normal flow,
-     but it broke the Hero word-cycle's h-[1em] overflow-hidden clip box,
-     which relies on ascent/descent to place a word's baseline sensibly
-     within a fixed-height box. Overridden to close to the font's real ink
-     bounds (measured across the full hero word list): tallest ascender
-     ~70.5% of the em, deepest descender ~20.8%.
-     Note this doesn't fully solve the word-cycle's clipping — "orgs"/"govs"
-     ("g" followed immediately by another letter) still flat-clip their
-     descender's tail regardless of this value (confirmed live: raising
-     descent-override well past the ink bound had zero visual effect). The
-     window's h-[1em] box is a literal `1 x font-size` length, independent
-     of these overrides, and its clip-path clips flush to that fixed box —
-     the actual fix for the tail-clipping is there (see the clip-path
-     comment in Hero.astro), not here. */
+  /* Carried over from the trial @font-face — confirmed live that the
+     licensed file has the same declared ascent/descent running well past
+     its actual ink (trials and full exports share metrics tables). See git
+     history for the original measurement this was based on. */
   ascent-override: 72%;
   descent-override: 22%;
   line-gap-override: 0%;
