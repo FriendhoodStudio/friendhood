@@ -47,9 +47,18 @@ const serviceList: ServiceItem[] =
   <div class="col-grid w-full gap-gutter">
     {serviceList.map((service, i) => (
       <div class="reveal-item group relative">
+        {/* will-change: filter — the conic-gradient's `from` angle is driven
+            by an animated custom property (see --glow-angle below), which
+            repaints and re-blurs this element every frame for as long as
+            it's hovered (the spin is infinite). Reported live as the glow
+            developing sharp edges the longer you hover — a continuously
+            re-blurred GPU layer that isn't pinned ahead of time can fall
+            back to a cheaper, harder-edged blur approximation over a
+            sustained animation. Pinning the layer up front keeps it on the
+            proper GPU blur path instead. */}
         <div
           class="services-glow pointer-events-none absolute -inset-1 -z-10 rounded-card opacity-0 blur-md transition-opacity duration-500 ease-out group-hover:opacity-70"
-          style="background: conic-gradient(from var(--glow-angle, 0deg), #EB8FB5, #E4552E, #B1B7EB, #889C3C, #EB8FB5);"
+          style="background: conic-gradient(from var(--glow-angle, 0deg), #EB8FB5, #E4552E, #B1B7EB, #889C3C, #EB8FB5); will-change: filter;"
         />
         <button
           type="button"
