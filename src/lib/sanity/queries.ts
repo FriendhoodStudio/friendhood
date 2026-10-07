@@ -157,6 +157,7 @@ const HERO_QUERY = `*[_type == "hero"][0]{
   heroImage,
   "heroVideoUrl": heroVideo.asset->url,
   videoPoster,
+  "heroVideoMobileUrl": heroVideoMobile.asset->url,
   "reelVideoUrl": reelVideo.asset->url
 }`;
 

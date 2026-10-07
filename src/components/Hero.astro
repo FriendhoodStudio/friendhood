@@ -8,6 +8,10 @@ const headlineSwapWord = hero?.headlineSwapWord ?? 'people';
 const headlineHoverWords = hero?.headlineHoverWords ?? ['places', 'brands', 'orgs'];
 const tagline = hero?.tagline ?? 'Create your neighbourhood';
 const media = hero?.media;
+// Optional purpose-shot 4:5 portrait crop of `media`'s video — see the
+// heroVideoMobile field description in the Sanity schema. Undefined falls
+// back to the existing CSS object-fit crop of the 16:9 source.
+const heroVideoMobileUrl = hero?.heroVideoMobileUrl;
 // Separate from `media` above (a short muted loop) on purpose — see the
 // reelVideo field description in the Sanity schema. The trigger/modal only
 // render once this is actually set, rather than falling back to replaying
@@ -170,14 +174,25 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       >
         {media.type === 'video' ? (
           <video
-            src={media.url}
             poster={media.posterUrl}
             class="h-full w-full object-cover"
             autoplay
             muted
             loop
             playsinline
-          />
+          >
+            {/* <source media> is only evaluated once, when the browser first
+                runs resource selection — not reactively on resize/rotate,
+                same one-time-pick tradeoff as e.g. responsive <picture>
+                sources. Acceptable here since the aspect-ratio breakpoint
+                this pairs with (.hero-media-aspect below) is itself a
+                load-time viewport check, not something that needs to react
+                live either. Listed first: the browser uses the first
+                matching <source>, falling through to the plain 16:9 file
+                below whenever no mobile-specific clip has been uploaded. */}
+            {heroVideoMobileUrl && <source src={heroVideoMobileUrl} media="(max-width: 767px)" />}
+            <source src={media.url} />
+          </video>
         ) : (
           <img src={media.url} alt={media.alt} class="h-full w-full object-cover" loading="eager" />
         )}
@@ -416,7 +431,11 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
      once there's room either side of it (tablet/desktop), too squeezed to
      read as a real hero moment on a narrow phone screen. 4:5 (portrait)
      on mobile only, matching the ratio already used for Work case study
-     media elsewhere on the site rather than introducing a one-off. */
+     media elsewhere on the site rather than introducing a one-off. This box
+     stays the same regardless of which video source actually loads — when
+     no heroVideoMobile clip is uploaded (see above), object-cover crops the
+     centre of the 16:9 frame into it; when one is uploaded, a real 4:5
+     clip just fills it natively with nothing cropped. */
   .hero-media-aspect {
     aspect-ratio: 4 / 5;
   }

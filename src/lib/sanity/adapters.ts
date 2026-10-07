@@ -237,6 +237,7 @@ export interface RawHero extends RawMedia {
   headlineSwapWord?: string;
   headlineHoverWords?: string[];
   tagline: string;
+  heroVideoMobileUrl?: string;
   reelVideoUrl?: string;
 }
 
@@ -247,6 +248,7 @@ export function toHeroData(raw: RawHero): HeroData {
     headlineHoverWords: raw.headlineHoverWords,
     tagline: raw.tagline,
     media: toMedia(raw, raw.headline),
+    heroVideoMobileUrl: raw.heroVideoMobileUrl,
     reelVideoUrl: raw.reelVideoUrl,
   };
 }

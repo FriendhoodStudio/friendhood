@@ -90,6 +90,15 @@ export default defineType({
         }),
     }),
     defineField({
+      name: 'heroVideoMobile',
+      title: 'Hero video (mobile 4:5 crop)',
+      description:
+        'Optional. A separate, purpose-shot 4:5 portrait clip swapped in on mobile in place of the video above, which otherwise just gets centre-cropped by CSS from its native 16:9 frame — fine on tablet/desktop where there\'s room either side, too tight a crop on a narrow phone screen to reliably keep the subject in frame. Leave blank to keep the automatic crop.',
+      type: 'file',
+      options: { accept: 'video/*' },
+      hidden: ({ parent }) => parent?.mediaType !== 'video',
+    }),
+    defineField({
       name: 'reelVideo',
       title: 'Showreel video (full)',
       description:
