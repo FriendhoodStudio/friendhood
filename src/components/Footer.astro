@@ -9,6 +9,7 @@ const headline = footer?.headline ?? "If you're thinking about tomorrow, talk to
 const links: FooterLink[] = footer?.links ?? [
   { label: 'Email us', href: 'mailto:hello@friendhood.co.uk' },
 ];
+const descriptor = footer?.descriptor || 'Friendhood - a global design and strategy agency from the UK.';
 
 // This is a static build (output: "static"), so this only reflects the
 // year at the last deploy, not "now" for every visitor — correct for most
@@ -80,7 +81,7 @@ const year = new Date().getFullYear();
   </div>
 
   <div class="footer-legal-row flex w-full flex-col items-start gap-[8px]">
-    <p class="footer-legal font-body text-front">Friendhood - a global design and strategy agency from the UK.</p>
+    <p class="footer-legal font-body text-front">{descriptor}</p>
     <p class="footer-legal font-body text-front">All rights reserved &copy;<span data-footer-year>{year}</span></p>
   </div>
 </footer>

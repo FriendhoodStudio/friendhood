@@ -137,7 +137,7 @@ export async function fetchFeaturedProjects(): Promise<ProjectCardData[]> {
   return toProjectCardDataList(raw);
 }
 
-const FOOTER_QUERY = `*[_type == "footer"][0]{ headline, links }`;
+const FOOTER_QUERY = `*[_type == "footer"][0]{ headline, links, descriptor }`;
 
 export async function fetchFooter(): Promise<FooterData | null> {
   return sanityClient.fetch<FooterData | null>(FOOTER_QUERY);

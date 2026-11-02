@@ -6,4 +6,5 @@ export interface FooterLink {
 export interface FooterData {
   headline: string;
   links: FooterLink[];
+  descriptor?: string;
 }

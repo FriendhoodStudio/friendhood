@@ -43,6 +43,12 @@ export default defineType({
       ],
       validation: (rule) => rule.required().min(1),
     }),
+    defineField({
+      name: 'descriptor',
+      title: 'Descriptor',
+      description: 'Short line about Friendhood in the bottom corner, above the copyright.',
+      type: 'string',
+    }),
   ],
   preview: {
     prepare() {
