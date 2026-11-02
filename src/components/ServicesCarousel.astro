@@ -172,7 +172,15 @@ const { services } = Astro.props;
               continuous block with title→overview at 20px and
               overview→modules at 36px, rather than ruled-off sections. */}
           <div class="services-card-text flex w-full flex-col items-start gap-[20px]">
-            <h3 class="font-heading text-h3 text-back">{service.cardTitle}</h3>
+            {/* Service name as a small label above the title — the card
+                titles are descriptive ("Made properly") rather than the
+                service name, so this keeps it clear which service a card
+                is once you've swiped away from the one you opened. Same
+                style as the "Example Modules" label below. */}
+            <div class="flex w-full flex-col items-start gap-[8px]">
+              <p class="font-tag text-categories text-[#5c5c5c]">{service.name}</p>
+              <h3 class="font-heading text-h3 text-back">{service.cardTitle}</h3>
+            </div>
             <div class="flex w-full flex-col items-start gap-[36px]">
               <p class="font-tag text-detail text-back">{service.overview}</p>
               <div class="flex w-full flex-col items-start gap-[10px]">
