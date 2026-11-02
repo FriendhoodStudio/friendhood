@@ -130,12 +130,25 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
             class="hero-word-window-clip relative inline-block h-[1em] align-bottom overflow-visible"
             data-hero-word-window
           ><span class="flex flex-col items-start gap-[0.25em]" data-hero-word-track>
-            {loopWords.map((word, i) => (
-              <span
-                class="block h-[1em] whitespace-nowrap leading-none"
-                data-hero-word
-              >{word}</span>
-            ))}
+            {/* Only the resting word (frame 0) is real text. The rest paint
+                their word via CSS (::before + data-word, see the style
+                block) so the H1's actual text content — what Google and
+                screen readers read — is just the plain headline, not every
+                alternate word run together ("For peopleplacesbrands…").
+                Pseudo-element text still contributes to each frame's box,
+                so the script's width/height measurements are unaffected. */}
+            {loopWords.map((word, i) =>
+              i === 0 ? (
+                <span class="block h-[1em] whitespace-nowrap leading-none" data-hero-word>{word}</span>
+              ) : (
+                <span
+                  class="block h-[1em] whitespace-nowrap leading-none"
+                  data-hero-word
+                  data-word={word}
+                  aria-hidden="true"
+                ></span>
+              )
+            )}
           </span></span><br class="hero-mobile-break" />{headlineAfter}
         </Fragment>
       ) : (
@@ -279,6 +292,12 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
      axis is already handled by the font-face's ascent/descent-override. */
   .hero-word-window-clip {
     clip-path: inset(0 -8px -6px 0);
+  }
+
+  /* Paints the alternate headline words — see the markup comment by
+     data-hero-word for why they're CSS content rather than real text. */
+  [data-hero-word][data-word]::before {
+    content: attr(data-word);
   }
 
   /* Colour stops derived from the reference gradient (Figma node
