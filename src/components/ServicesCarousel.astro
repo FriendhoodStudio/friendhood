@@ -178,13 +178,13 @@ const { services } = Astro.props;
                 is once you've swiped away from the one you opened. Same
                 style as the "Example Modules" label below. */}
             <div class="flex w-full flex-col items-start gap-[8px]">
-              <p class="font-tag text-categories text-[#5c5c5c]">{service.name}</p>
+              <p class="font-tag text-categories text-back/70">{service.name}</p>
               <h3 class="font-heading text-h3 text-back">{service.cardTitle}</h3>
             </div>
             <div class="flex w-full flex-col items-start gap-[36px]">
               <p class="font-tag text-detail text-back">{service.overview}</p>
               <div class="flex w-full flex-col items-start gap-[10px]">
-                <p class="font-tag text-categories text-[#5c5c5c]">Example Modules</p>
+                <p class="font-tag text-categories text-back/70">Example Modules</p>
                 <div class="flex flex-wrap gap-1">
                   {service.modules.map((moduleName) => <ModuleTag label={moduleName} />)}
                 </div>
