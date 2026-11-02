@@ -110,7 +110,8 @@ const CASE_STUDY_QUERY = `*[_type == "project" && slug.current == $slug][0]{
     cardImage,
     "cardVideoUrl": cardVideo.asset->url,
     cardVideoPoster
-  }
+  },
+  seo
 }`;
 
 export async function fetchCaseStudy(slug: string): Promise<CaseStudyData | null> {
@@ -211,7 +212,8 @@ const ABOUT_QUERY = `*[_type == "about"][0]{
   approachHeading,
   approachCards[]{ title, text, image },
   clientsLabel,
-  clients
+  clients,
+  seo
 }`;
 
 export async function fetchAbout(): Promise<AboutData | null> {
@@ -223,7 +225,9 @@ const SITE_SETTINGS_QUERY = `*[_type == "siteSettings"][0]{
   favicon,
   title,
   description,
-  ogImage
+  ogImage,
+  homeSeo,
+  socialProfiles
 }`;
 
 export async function fetchSiteSettings(): Promise<SiteSettingsData | null> {

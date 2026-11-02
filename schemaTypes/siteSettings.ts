@@ -40,6 +40,21 @@ export default defineType({
       type: 'image',
       options: { hotspot: true },
     }),
+    defineField({
+      name: 'homeSeo',
+      title: 'Homepage SEO',
+      description:
+        'Search title/description for the homepage specifically. Left blank, the homepage uses "Global Branding Agency | UK-Based Strategy & Design | Friendhood" (from the SEO keyword research) rather than the default title above.',
+      type: 'seo',
+    }),
+    defineField({
+      name: 'socialProfiles',
+      title: 'Social profiles',
+      description:
+        'Full URLs of Friendhood\'s official profiles (LinkedIn, Instagram, etc.). Not shown on the page — tells Google these accounts belong to Friendhood.',
+      type: 'array',
+      of: [{ type: 'url' }],
+    }),
   ],
   preview: {
     prepare() {

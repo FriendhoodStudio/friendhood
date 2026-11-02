@@ -110,6 +110,11 @@ export default defineType({
       of: [{ type: 'string' }],
       validation: (rule) => rule.required().min(1),
     }),
+    defineField({
+      name: 'seo',
+      title: 'SEO',
+      type: 'seo',
+    }),
   ],
   preview: {
     prepare() {

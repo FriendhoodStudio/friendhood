@@ -7,12 +7,20 @@ import ProjectGallery from '../components/ProjectGallery.astro';
 import LogoCarousel from '../components/LogoCarousel.astro';
 import LinkCards from '../components/LinkCards.astro';
 import type { ProjectCardData } from '../types/project';
-import { fetchFeaturedProjects } from '../lib/sanity/queries';
+import { fetchFeaturedProjects, fetchSiteSettings } from '../lib/sanity/queries';
 
 const projects: ProjectCardData[] = await fetchFeaturedProjects();
+const homeSeo = (await fetchSiteSettings())?.homeSeo;
+// Defaults come from the SEO keyword research (Oct 2026): lead with
+// "global branding agency" + "UK" rather than Scotland. Editable per-field
+// in Site Settings → Homepage SEO.
+const title = homeSeo?.title ?? 'Global Branding Agency | UK-Based Strategy & Design | Friendhood';
+const description =
+  homeSeo?.description ??
+  'Friendhood is a global branding agency based in the UK. Brand strategy, identity, rebranding and campaigns for people thinking about tomorrow.';
 ---
 
-<Layout>
+<Layout title={title} description={description} image={homeSeo?.imageUrl}>
   <Hero />
   <Services />
   <SectionFeature />

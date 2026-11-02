@@ -15,7 +15,11 @@ const description =
 const ogImage = about?.introImages.find((image) => image.wide)?.url ?? about?.introImages[0]?.url;
 ---
 
-<Layout title="About | Friendhood" description={description} image={ogImage}>
+<Layout
+  title={about?.seo?.title ?? 'About | Friendhood'}
+  description={about?.seo?.description ?? description}
+  image={about?.seo?.imageUrl ?? ogImage}
+>
   <About>
     <Services slot="services" descriptor={servicesLabel} heading={servicesHeading} headingVariant="display" />
   </About>

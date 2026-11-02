@@ -9,6 +9,7 @@ import type { CaseStudyBlock, CaseStudyData, CaseStudyMediaItem } from '../../ty
 import type { ApproachCard, AboutData } from '../../types/about';
 import type { CarouselImageItem } from '../../types/carousel';
 import type { SiteSettingsData } from '../../types/siteSettings';
+import type { SeoData } from '../../types/seo';
 
 const projectId = import.meta.env.PUBLIC_SANITY_PROJECT_ID;
 const dataset = import.meta.env.PUBLIC_SANITY_DATASET || 'production';
@@ -148,6 +149,23 @@ export interface RawCaseStudyFooter {
   quote?: { text: string; attributionName: string; attributionCompany?: string };
 }
 
+export interface RawSeo {
+  title?: string;
+  description?: string;
+  image?: SanityImageSource & { asset?: unknown };
+}
+
+// Empty strings count as unset, so clearing a field in Studio falls back to
+// the page's default rather than rendering a blank <title>.
+function toSeoData(raw?: RawSeo | null): SeoData | undefined {
+  if (!raw) return undefined;
+  return {
+    title: raw.title?.trim() || undefined,
+    description: raw.description?.trim() || undefined,
+    imageUrl: raw.image?.asset ? urlFor(raw.image).width(1200).height(630).fit('crop').url() : undefined,
+  };
+}
+
 export interface RawCaseStudy {
   title: string;
   slug: string;
@@ -158,6 +176,7 @@ export interface RawCaseStudy {
   body?: RawCaseStudyBlock[];
   footer?: RawCaseStudyFooter;
   relatedProjects?: RawProject[];
+  seo?: RawSeo;
 }
 
 export function toCaseStudyData(raw: RawCaseStudy): CaseStudyData {
@@ -229,6 +248,7 @@ export function toCaseStudyData(raw: RawCaseStudy): CaseStudyData {
       quote: raw.footer?.quote,
     },
     relatedProjects: toProjectCardDataList(raw.relatedProjects ?? []),
+    seo: toSeoData(raw.seo),
   };
 }
 
@@ -355,6 +375,7 @@ export interface RawAbout {
   approachCards: RawApproachCard[];
   clientsLabel: string;
   clients: string[];
+  seo?: RawSeo;
 }
 
 export function toAboutData(raw: RawAbout): AboutData {
@@ -390,6 +411,7 @@ export function toAboutData(raw: RawAbout): AboutData {
     ),
     clientsLabel: raw.clientsLabel,
     clients: raw.clients,
+    seo: toSeoData(raw.seo),
   };
 }
 
@@ -398,6 +420,8 @@ export interface RawSiteSettings {
   title: string;
   description: string;
   ogImage?: SanityImageSource;
+  homeSeo?: RawSeo;
+  socialProfiles?: string[];
 }
 
 export function toSiteSettingsData(raw: RawSiteSettings): SiteSettingsData {
@@ -407,10 +431,13 @@ export function toSiteSettingsData(raw: RawSiteSettings): SiteSettingsData {
     // density case any consumer actually requests (Apple's touch-icon size);
     // browsers needing a literal 16/32px favicon downscale it themselves.
     faviconUrl: urlFor(raw.favicon).width(180).height(180).fit('crop').url(),
+    logoUrl: urlFor(raw.favicon).width(512).height(512).fit('crop').format('png').url(),
     title: raw.title,
     description: raw.description,
     ogImageUrl: raw.ogImage
       ? urlFor(raw.ogImage).width(IMAGE_WIDTH.md).fit('max').url()
       : undefined,
+    homeSeo: toSeoData(raw.homeSeo),
+    socialProfiles: raw.socialProfiles ?? [],
   };
 }

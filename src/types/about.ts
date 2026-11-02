@@ -1,4 +1,5 @@
 import type { CarouselImageItem } from './carousel';
+import type { SeoData } from './seo';
 
 export interface ApproachCard {
   title: string;
@@ -18,4 +19,5 @@ export interface AboutData {
   approachCards: ApproachCard[];
   clientsLabel: string;
   clients: string[];
+  seo?: SeoData;
 }

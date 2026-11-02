@@ -25,9 +25,9 @@ const showMore = (footer.showCollaborators && footer.collaborators.length > 0) |
 ---
 
 <Layout
-  title={`${caseStudy.title} | Friendhood`}
-  description={caseStudy.openingStatement}
-  image={caseStudy.heroImageUrl}
+  title={caseStudy.seo?.title ?? `${caseStudy.title} | Friendhood`}
+  description={caseStudy.seo?.description ?? caseStudy.openingStatement}
+  image={caseStudy.seo?.imageUrl ?? caseStudy.heroImageUrl}
 >
   <div class="flex flex-col gap-vertical-xl px-[var(--page-margin)] pt-vertical-xl">
     <div class="flex w-full flex-col items-start gap-vertical-l" data-reveal-group="case-study-header">

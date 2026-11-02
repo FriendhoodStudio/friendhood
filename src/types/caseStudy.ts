@@ -1,5 +1,6 @@
 import type { Category, ProjectCardData } from './project';
 import type { CarouselImageItem } from './carousel';
+import type { SeoData } from './seo';
 
 export type CaseStudyMediaItem = { type: 'image'; url: string; alt: string } | { type: 'video'; url: string };
 
@@ -62,4 +63,5 @@ export interface CaseStudyData {
   body: CaseStudyBlock[];
   footer: CaseStudyFooter;
   relatedProjects: ProjectCardData[];
+  seo?: SeoData;
 }

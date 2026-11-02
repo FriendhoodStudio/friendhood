@@ -393,6 +393,13 @@ export default defineType({
       ],
       validation: (rule) => rule.max(3).unique(),
     }),
+    defineField({
+      name: 'seo',
+      title: 'SEO',
+      description:
+        'Optional. Left blank, the search title is "<Title> | Friendhood" and the description is the opening statement. Naming the sector and the work helps, e.g. "Fintech brand identity for X".',
+      type: 'seo',
+    }),
   ],
   preview: {
     select: {

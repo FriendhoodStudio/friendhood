@@ -45,6 +45,48 @@ const isLocked = import.meta.env.SITE_LOCKED === 'true';
 // served this request (preview deployments, localhost, etc).
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const absoluteImage = resolvedImage ? new URL(resolvedImage, Astro.site).toString() : undefined;
+
+// Structured data (schema.org JSON-LD) — invisible on the page, tells
+// Google who Friendhood is: a UK organisation based in Scotland, working
+// worldwide, plus the official social profiles from Site Settings. Feeds
+// the knowledge panel, the site name shown in results, and AI answers that
+// cite the site. knowsAbout uses the buyer-facing service names from the
+// SEO keyword research (Oct 2026), not the Services carousel's short grid
+// labels ("Brand", "Digital"), which say little to a search engine.
+const siteUrl = new URL('/', Astro.site).toString();
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${siteUrl}#organization`,
+      name: 'Friendhood',
+      url: siteUrl,
+      description:
+        'A global branding agency based in the UK: brand strategy, identity, rebranding and campaigns for people thinking about tomorrow.',
+      ...(siteSettings && { logo: siteSettings.logoUrl }),
+      address: { '@type': 'PostalAddress', addressRegion: 'Scotland', addressCountry: 'GB' },
+      areaServed: 'Worldwide',
+      knowsAbout: [
+        'Brand strategy',
+        'Brand identity',
+        'Rebranding',
+        'Digital design',
+        'Creative campaigns',
+        'Creative engagement',
+        'Creative production',
+      ],
+      ...(siteSettings?.socialProfiles.length && { sameAs: siteSettings.socialProfiles }),
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${siteUrl}#website`,
+      name: 'Friendhood',
+      url: siteUrl,
+      publisher: { '@id': `${siteUrl}#organization` },
+    },
+  ],
+};
 ---
 
 <html lang="en">
@@ -73,6 +115,8 @@ const absoluteImage = resolvedImage ? new URL(resolvedImage, Astro.site).toStrin
     <meta name="twitter:title" content={resolvedTitle} />
     <meta name="twitter:description" content={resolvedDescription} />
     {absoluteImage && <meta name="twitter:image" content={absoluteImage} />}
+
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   </head>
   <body class="bg-back">
     {isLocked ? (

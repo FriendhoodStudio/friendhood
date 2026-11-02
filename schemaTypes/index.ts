@@ -11,6 +11,7 @@ import logoCarousel from './logoCarousel';
 import linkCards from './linkCards';
 import carouselImage from './carouselImage';
 import siteSettings from './siteSettings';
+import seo from './seo';
 
 export const schemaTypes = [
   project,
@@ -26,4 +27,5 @@ export const schemaTypes = [
   linkCards,
   carouselImage,
   siteSettings,
+  seo,
 ];
