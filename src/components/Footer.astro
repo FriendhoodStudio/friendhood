@@ -1,5 +1,6 @@
 ---
 import { fetchFooter } from '../lib/sanity/queries';
+import { externalLinkAttrs } from '../lib/links';
 import type { FooterLink } from '../types/footer';
 
 const footer = await fetchFooter();
@@ -68,6 +69,7 @@ const year = new Date().getFullYear();
         ) : (
           <a
             href={link.href}
+            {...externalLinkAttrs(link.href)}
             class="footer-btn reveal-item font-display inline-flex items-center justify-center rounded-card bg-front px-btn-x py-btn-y text-h1 text-back transition-colors duration-700 ease-in-out hover:bg-accent-yellow active:bg-accent-yellow/70"
           >
             {link.label}
