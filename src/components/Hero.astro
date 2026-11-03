@@ -179,7 +179,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
 
   {/* gap reduced from gap-vertical-s to gap-vertical-xs — brings the
       tagline right up close to the showreel below it. */}
-    <p class="absolute inset-x-0 bottom-[28px] z-20 text-center font-tag text-detail text-front" data-hero-tagline>
+    <p class="absolute inset-x-0 bottom-[28px] z-40 text-center font-tag text-detail text-front" data-hero-tagline>
       <span class="hero-tagline-shadow relative z-20 inline-flex items-baseline pointer-events-none">
         {tagline}
         <svg
@@ -697,6 +697,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const REEL_LANDED_AT = 0.56;
     const REEL_LEAVES_AT = 0.66;
     const STATEMENT_ARRIVES_AT = 0.72;
+    // How strongly the reel stays on behind the statement, and how far into
+    // the normal scroll afterwards (as a share of the screen) it's all faded.
+    const REEL_BACKDROP_OPACITY = 0.45;
+    const AFTER_FADE = 0.5;
     // How much the headline grows as it passes the viewer.
     const LINE_GROW = 1.6;
     // On phones, where it zooms as one block instead — kept gentle, as the
@@ -719,13 +723,21 @@ const afterParts = headlineAfter.split(/(\s+)/);
       const into = easeOut(clamp((q - 0.4) / 0.6, 0, 1));
       const darken = clamp((q - 0.15) / 0.3, 0, 1);
       const reelOut = easeIn(clamp((p - REEL_LEAVES_AT) / (1 - REEL_LEAVES_AT - 0.04), 0, 1));
-      const statementIn = easeOut(clamp((p - STATEMENT_ARRIVES_AT) / (1 - STATEMENT_ARRIVES_AT), 0, 1));
+      // Fully in a little before the stage ends, so it rests there in focus.
+      const statementIn = easeOut(clamp((p - STATEMENT_ARRIVES_AT) / (0.95 - STATEMENT_ARRIVES_AT), 0, 1));
+      // Once the stage is through and the page scrolls on, the statement,
+      // its tagline and the blurred reel behind them all fade away over
+      // the first part of that scroll, so the step down to the next
+      // section doesn't read as a big empty gap.
+      const scrolledPast = travel > 0 ? -stage.getBoundingClientRect().top - travel : 0;
+      const after = clamp(scrolledPast / (window.innerHeight * AFTER_FADE), 0, 1);
 
       if (overlay) overlay.style.opacity = String(1 - darken);
       if (headline) headline.style.color = mix(darken);
       if (tagline) {
         tagline.style.color = mix(darken);
-        tagline.style.opacity = String(1 - clamp(q / 0.12, 0, 1));
+        // Fades at the start, and comes back under the statement.
+        tagline.style.opacity = String(Math.max(1 - clamp(q / 0.12, 0, 1), statementIn) * (1 - after));
       }
       const wasUnderway = stageUnderway;
       stageUnderway = p > 0.002;
@@ -733,11 +745,13 @@ const afterParts = headlineAfter.split(/(\s+)/);
       popups?.setPaused(p > 0.02);
 
       if (reel) {
-        reel.style.opacity = String(clamp(into * 1.6, 0, 1) * (1 - reelOut));
+        // It doesn't vanish as it zooms past: it settles back as a dimmed,
+        // blurred, still-playing backdrop behind the statement.
+        reel.style.opacity = String(clamp(into * 1.6, 0, 1) * (1 - reelOut * (1 - REEL_BACKDROP_OPACITY)) * (1 - after));
         // Only clickable (the "Watch our showreel" button) while it's landed.
         reel.style.pointerEvents = into > 0.95 && reelOut < 0.05 ? 'auto' : 'none';
       }
-      if (statement) statement.style.opacity = String(statementIn);
+      if (statement) statement.style.opacity = String(statementIn * (1 - after));
 
       if (reduceMotion) {
         if (headline) headline.style.opacity = String(1 - out);
