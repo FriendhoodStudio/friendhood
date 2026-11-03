@@ -749,9 +749,9 @@ const afterParts = headlineAfter.split(/(\s+)/);
       if (headline) headline.style.color = mix(darken);
       if (tagline) {
         tagline.style.color = mix(darken);
-        // Fades at the start, comes back under the statement, and scrolls
-        // away with it at the end.
-        tagline.style.opacity = String(Math.max(1 - clamp(q / 0.12, 0, 1), statementIn));
+        // Fades at the start, comes back under the statement, and fades
+        // again early in the hand-over as it scrolls away.
+        tagline.style.opacity = String(Math.max(1 - clamp(q / 0.12, 0, 1), statementIn) * (1 - clamp(after / 0.3, 0, 1)));
         tagline.style.translate = after ? `0 ${-after * fadePx}px` : '';
       }
       const wasUnderway = stageUnderway;
