@@ -80,8 +80,8 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
   <div class="relative flex min-h-[76dvh] w-full items-center justify-center" style="margin-top:var(--nav-menu-height)">
     {/* Project images that roll up around the headline as the word changes
         — filled in by initHeroPopups (see the script below). In front of
-        the headline (z-30 vs its z-20): they hug its edges and briefly pass
-        over the text. Decorative, so hidden from screen readers. */}
+        the headline (z-30 vs its z-20): two frame it closely and the third
+        can briefly pass over the text. Decorative, so hidden from screen readers. */}
     {popUpImages.length > 1 && (
       <Fragment>
         <div class="pointer-events-none absolute inset-0 z-30 overflow-hidden" aria-hidden="true" data-hero-popups></div>
@@ -782,7 +782,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
           { transform: `translateY(${settlePx}px)`, offset: 0.88 },
           { transform: `translateY(${targetPx}px)` },
         ],
-        { duration: 650, easing: 'ease-out', fill: 'forwards' }
+        { duration: 750, easing: 'ease-out', fill: 'forwards' }
       );
       const anim = rollAnim;
       anim.finished
@@ -836,7 +836,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
           { width: `${settle}px`, offset: 0.85 },
           { width: `${targetWidth}px` },
         ],
-        { duration: 650, easing: 'ease-out', fill: 'forwards' }
+        { duration: 750, easing: 'ease-out', fill: 'forwards' }
       );
       const anim = widthAnim;
       anim.finished
@@ -882,7 +882,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 
     // Auto-advances on a timer on every screen, not just touch/no-hover
     // devices — desktop visitors who never hover the word still see it cycle.
-    window.setInterval(advance, 1500);
+    window.setInterval(advance, 2000);
 
     let resizeRafId = 0;
     window.addEventListener('resize', () => {

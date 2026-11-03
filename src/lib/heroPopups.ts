@@ -6,12 +6,15 @@ import type { HeroPopUpImage } from '../types/hero';
  * set belongs to exactly one word. Images come from a shuffled deck
  * (every image shows once before any repeats). */
 
-// Delays after the word starts rolling (its own roll is 650ms, peaking at
-// ~455ms): the first image lands just behind the word, the others follow.
-const SPAWN_DELAYS_MS = [250, 400, 550];
+// Delays after the word starts rolling (its own roll is 750ms, peaking at
+// ~525ms): the first image lands just behind the word, the others follow.
+const SPAWN_DELAYS_MS = [300, 450, 600];
 // One continuous grow, overshoot, settle and fade — no hold — short enough
-// that both images are gone before the next word (every 1500ms) arrives.
-const LIFETIME_MS = 950;
+// that all three are gone before the next word (every 2000ms) arrives.
+const LIFETIME_MS = 1250;
+// Gap between the headline and the two images framing it.
+const EDGE_GAP_MIN_PX = 8;
+const EDGE_GAP_MAX_PX = 40;
 const SHRINK_OUT_MS = 250;
 
 type Slot = 'top' | 'bottom' | 'anywhere';
@@ -58,15 +61,14 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   function popupHeight(layerRect: DOMRect) {
     const mobile = layerRect.width < 768;
     return mobile
-      ? Math.min(150, Math.max(96, layerRect.height * 0.17))
-      : Math.min(260, Math.max(150, layerRect.height * 0.27));
+      ? Math.min(172, Math.max(110, layerRect.height * 0.2))
+      : Math.min(300, Math.max(172, layerRect.height * 0.31));
   }
 
-  // The first two of each set are composed rather than scattered: one hugging the top
-  // edge of the headline, one the bottom edge, on opposite sides (which side
-  // alternates each word), so it reads as a balanced diagonal. Each overlaps
-  // the headline's edge by a random amount and sits in front of the text —
-  // they're only fully visible for a moment, so it never blocks it for long.
+  // The first two of each set are composed rather than scattered: one just
+  // above the headline, one just below, on opposite sides (which side
+  // alternates each word), so it reads as a balanced diagonal. The third
+  // lands anywhere, so it's the one that can pass over the text.
   // Positions are layer-relative.
   function place(width: number, height: number, slot: Slot, side: 'left' | 'right'): DOMRect {
     const layerRect = layer.getBoundingClientRect();
@@ -89,12 +91,12 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       side === 'left'
         ? left - width * 0.25 + Math.random() * (h.width * 0.45)
         : left + h.width * 0.55 + Math.random() * (h.width * 0.45 + width * 0.25);
-    // Between half on and fully off the headline's top/bottom edge.
-    const reach = height * (0.1 + Math.random() * 0.4);
-    const centreY = slot === 'top' ? top - reach : top + h.height + reach;
+    // Just clear of the headline's top/bottom edge, by a small random gap.
+    const gap = EDGE_GAP_MIN_PX + Math.random() * (EDGE_GAP_MAX_PX - EDGE_GAP_MIN_PX);
+    const y0 = slot === 'top' ? top - height - gap : top + h.height + gap;
 
     const x = Math.min(Math.max(centreX - width / 2, 0), layerRect.width - width);
-    const y = Math.min(Math.max(centreY - height / 2, 0), layerRect.height - height);
+    const y = Math.min(Math.max(y0, 0), layerRect.height - height);
     return new DOMRect(x, y, width, height);
   }
 
