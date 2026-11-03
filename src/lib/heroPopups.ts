@@ -1,27 +1,34 @@
 import type { HeroPopUpImage } from '../types/hero';
 
-/** Three project images grow in around the hero headline just after each
- * word change — two hugging its edges, one anywhere — with the same overshoot-and-settle as the site's buttons and the
- * word's own width change, then shrink and fade straight back out — so each
- * set belongs to exactly one word. Images come from a shuffled deck
- * (every image shows once before any repeats). */
+/** A loose field of project images floats around the hero headline, blurred
+ * and faded back. On each word change one of them pops forward — sharpening
+ * and growing past full size with the site's overshoot-and-settle — then
+ * sinks back into the blur. Every few words one floating image dissolves and
+ * a new one drifts in elsewhere, so the set slowly changes. Images come from
+ * a shuffled deck (every image shows once before any repeats), and nothing
+ * ever overlaps the headline or another image. */
 
-// Delays after the word starts rolling (its own roll is 750ms, peaking at
-// ~525ms): the first image lands just behind the word, the others follow.
-const SPAWN_DELAYS_MS = [300, 450, 600];
-// One continuous grow, overshoot, settle and fade — no hold — short enough
-// that all three are gone before the next word (every 2000ms) arrives.
-const LIFETIME_MS = 1250;
-// Minimum space kept between an image and the headline, and between images.
-const HEADLINE_CLEARANCE_PX = 16;
-const IMAGE_GAP_PX = 12;
-const PLACEMENT_ATTEMPTS = 40;
-const SHRINK_OUT_MS = 250;
+const FLOAT_COUNT_DESKTOP = 6;
+const FLOAT_COUNT_MOBILE = 4;
+// The pop starts just behind the word's own 750ms roll (which peaks at
+// ~525ms) and is back in the blur before the next word (every 2000ms).
+const REVEAL_DELAY_MS = 300;
+const REVEAL_MS = 1600;
+// One floating image is swapped for a new one every this many words.
+const SWAP_EVERY_WORDS = 3;
+const FADE_IN_MS = 1200;
+const FADE_OUT_MS = 800;
+// Minimum space kept between an image and the headline, and between images
+// — generous, since each one also drifts a little around its spot.
+const HEADLINE_CLEARANCE_PX = 24;
+const IMAGE_GAP_PX = 24;
+const PLACEMENT_ATTEMPTS = 60;
 
-type Slot = 'top' | 'bottom' | 'anywhere';
+const RESTING: Keyframe = { transform: 'scale(0.92)', opacity: 0.45, filter: 'blur(14px)' };
 
-interface Popup {
-  el: HTMLElement;
+interface Floater {
+  wrap: HTMLElement;
+  card: HTMLElement;
   rect: DOMRect;
 }
 
@@ -30,9 +37,13 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
 
   let deck: HeroPopUpImage[] = [];
   const preloaded = new Map<string, HTMLImageElement>();
-  const visible: Popup[] = [];
+  let floaters: Floater[] = [];
+  // Spots still held by images that are dissolving away, so a new one can't
+  // land on top of them mid-fade.
+  let fading: Floater[] = [];
+  let lastRevealed: Floater | null = null;
+  let wordCount = 0;
   let heroInView = true;
-  let topSide: 'left' | 'right' = Math.random() < 0.5 ? 'left' : 'right';
 
   function shuffle() {
     deck = [...images];
@@ -45,8 +56,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   function draw(): HeroPopUpImage {
     if (deck.length === 0) shuffle();
     const next = deck.pop()!;
-    // Warm the following set so they've decoded by the next word change.
-    deck.slice(-3).forEach((image) => preload(image));
+    // Warm the next one so it's decoded by the next swap.
+    if (deck.length > 0) preload(deck[deck.length - 1]);
     return next;
   }
 
@@ -59,135 +70,170 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     return img;
   }
 
-  function popupHeight(layerRect: DOMRect) {
+  function imageHeight(layerRect: DOMRect) {
     const mobile = layerRect.width < 768;
-    return mobile
-      ? Math.min(172, Math.max(110, layerRect.height * 0.2))
-      : Math.min(300, Math.max(172, layerRect.height * 0.31));
+    const base = mobile
+      ? Math.min(150, Math.max(96, layerRect.height * 0.17))
+      : Math.min(250, Math.max(140, layerRect.height * 0.26));
+    // Varied a little so the field doesn't read as a grid of equal tiles.
+    return base * (0.75 + Math.random() * 0.25);
   }
 
   function intersects(a: DOMRect, b: DOMRect, gap: number) {
     return a.left < b.right + gap && b.left < a.right + gap && a.top < b.bottom + gap && b.top < a.bottom + gap;
   }
 
-  // The first two of each set are composed rather than scattered: one in the
-  // space above the headline, one in the space below, on opposite halves
-  // (which side alternates each word), so it reads as a balanced diagonal.
-  // The third lands anywhere. The exact spot is random so it still feels
-  // loose, but no image ever overlaps the headline or another image — a
-  // spot that can't be found after a few tries is skipped for that word.
-  // Positions are layer-relative.
-  function place(width: number, height: number, slot: Slot, side: 'left' | 'right'): DOMRect | null {
+  // A random spot anywhere in the hero that's clear of the headline and of
+  // every other floating image. Null if there's no room left. Positions are
+  // layer-relative.
+  function place(width: number, height: number): DOMRect | null {
     const layerRect = layer.getBoundingClientRect();
     const h = headline.getBoundingClientRect();
     const headlineRect = new DOMRect(h.left - layerRect.left, h.top - layerRect.top, h.width, h.height);
-
-    let [minX, maxX] = [0, layerRect.width - width];
-    let [minY, maxY] = [0, layerRect.height - height];
-    if (slot !== 'anywhere') {
-      const half = layerRect.width / 2;
-      [minX, maxX] = side === 'left' ? [0, Math.max(0, half - width)] : [Math.min(half, maxX), maxX];
-      [minY, maxY] =
-        slot === 'top'
-          ? [0, headlineRect.top - HEADLINE_CLEARANCE_PX - height]
-          : [headlineRect.bottom + HEADLINE_CLEARANCE_PX, maxY];
-    }
-    if (maxX < minX || maxY < minY) return null;
+    const maxX = layerRect.width - width;
+    const maxY = layerRect.height - height;
+    if (maxX < 0 || maxY < 0) return null;
 
     for (let i = 0; i < PLACEMENT_ATTEMPTS; i++) {
-      const rect = new DOMRect(minX + Math.random() * (maxX - minX), minY + Math.random() * (maxY - minY), width, height);
+      const rect = new DOMRect(Math.random() * maxX, Math.random() * maxY, width, height);
       if (intersects(rect, headlineRect, HEADLINE_CLEARANCE_PX)) continue;
-      if (visible.some((p) => intersects(rect, p.rect, IMAGE_GAP_PX))) continue;
+      if ([...floaters, ...fading].some((f) => intersects(rect, f.rect, IMAGE_GAP_PX))) continue;
       return rect;
     }
     return null;
   }
 
-  // Safety net for a set still fading when the next word starts (e.g. a
-  // slow image decode delayed it): finishes it off quickly.
-  function clearVisible() {
-    visible.splice(0).forEach(({ el }) => {
-      el.getAnimations().forEach((anim) => anim.commitStyles?.());
-      el.getAnimations().forEach((anim) => anim.cancel());
-      el.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(0.85)', opacity: 0 }], {
-        duration: SHRINK_OUT_MS,
-        easing: 'ease-in',
-        fill: 'forwards',
-      })
-        .finished.then(() => el.remove())
-        .catch(() => el.remove());
-    });
-  }
-
-  async function spawn(slot: Slot, side: 'left' | 'right') {
+  async function addFloater(delay = 0) {
     const image = draw();
     const source = preload(image);
     try {
       await source.decode();
     } catch {
-      return; // Failed or still loading on a slow connection — skip this one.
+      return; // Failed or still loading on a slow connection — skip it.
     }
 
     const layerRect = layer.getBoundingClientRect();
-    const h = headline.getBoundingClientRect();
-    // The framing images shrink to fit if the space above/below is short.
-    const band = slot === 'top' ? h.top - layerRect.top : slot === 'bottom' ? layerRect.bottom - h.bottom : Infinity;
-    const height = Math.min(popupHeight(layerRect), band - HEADLINE_CLEARANCE_PX);
+    const height = imageHeight(layerRect);
     // Clamped so very tall or panoramic images still read as photos.
     const width = height * Math.min(1.6, Math.max(0.7, image.aspectRatio));
-    const rect = place(width, height, slot, side);
+    const rect = place(width, height);
     if (!rect) return;
 
-    const el = document.createElement('div');
-    el.className = 'hero-popup';
-    el.style.cssText = `left:${rect.x}px;top:${rect.y}px;width:${width}px;height:${height}px`;
+    // Two layers: the outer one drifts (a slow CSS loop with its own random
+    // direction and speed), the inner card blurs, fades and pops — so the
+    // reveal never fights the drift.
+    const wrap = document.createElement('div');
+    wrap.className = 'hero-float';
+    wrap.style.cssText =
+      `left:${rect.x}px;top:${rect.y}px;width:${width}px;height:${height}px;` +
+      `--drift-x:${(Math.random() * 2 - 1) * 12}px;--drift-y:${(Math.random() * 2 - 1) * 12}px;` +
+      `--drift-duration:${8 + Math.random() * 6}s;animation-delay:${-Math.random() * 8}s`;
+    const card = document.createElement('div');
+    card.className = 'hero-popup';
     const img = document.createElement('img');
     img.src = image.url;
     img.alt = '';
-    el.appendChild(img);
-    layer.appendChild(el);
-    visible.push({ el, rect });
+    card.appendChild(img);
+    wrap.appendChild(card);
+    layer.appendChild(wrap);
+    const floater = { wrap, card, rect };
+    floaters.push(floater);
 
-    // Grows past full size (the same overshoot as the headline word's width
-    // change and the nav/footer button release), then keeps shrinking
-    // straight on into the fade — never resting at full size, so it's always
-    // moving. Blurred at both ends so the fades read soft, not as a cut.
-    const anim = el.animate(
-      [
-        { transform: 'scale(0.4)', opacity: 0, filter: 'blur(12px)', easing: 'ease-out' },
-        { transform: 'scale(1.06)', opacity: 1, filter: 'blur(0px)', offset: 0.38, easing: 'ease-in' },
-        { transform: 'scale(0.98)', opacity: 1, filter: 'blur(0px)', offset: 0.62, easing: 'linear' },
-        { transform: 'scale(0.8)', opacity: 0, filter: 'blur(12px)' },
-      ],
-      { duration: LIFETIME_MS, fill: 'both' }
-    );
-    anim.finished
-      .then(() => {
-        const index = visible.findIndex((p) => p.el === el);
-        if (index >= 0) visible.splice(index, 1);
-        el.remove();
+    card.animate([{ transform: 'scale(0.8)', opacity: 0, filter: 'blur(24px)' }, RESTING], {
+      duration: FADE_IN_MS,
+      delay,
+      easing: 'ease-out',
+      fill: 'both',
+    });
+  }
+
+  function removeFloater(floater: Floater) {
+    floaters = floaters.filter((f) => f !== floater);
+    fading.push(floater);
+    if (lastRevealed === floater) lastRevealed = null;
+    const done = () => {
+      floater.wrap.remove();
+      fading = fading.filter((f) => f !== floater);
+    };
+    floater.card
+      .animate([RESTING, { transform: 'scale(0.85)', opacity: 0, filter: 'blur(24px)' }], {
+        duration: FADE_OUT_MS,
+        easing: 'ease-in',
+        fill: 'forwards',
       })
+      .finished.then(done)
+      .catch(done);
+  }
+
+  // Sharpens and grows past full size (the same overshoot as the headline
+  // word's width change and the nav/footer button release), holds for a
+  // beat, then sinks back into the blur.
+  function reveal() {
+    const candidates = floaters.filter((f) => f !== lastRevealed);
+    if (candidates.length === 0) return;
+    const floater = candidates[Math.floor(Math.random() * candidates.length)];
+    lastRevealed = floater;
+    floater.wrap.style.zIndex = '1';
+    floater.card
+      .animate(
+        [
+          { ...RESTING, easing: 'ease-out' },
+          { transform: 'scale(1.08)', opacity: 1, filter: 'blur(0px)', offset: 0.28, easing: 'ease-in-out' },
+          { transform: 'scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0.42 },
+          { transform: 'scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0.62, easing: 'ease-in-out' },
+          RESTING,
+        ],
+        { duration: REVEAL_MS }
+      )
+      .finished.then(() => (floater.wrap.style.zIndex = ''))
       .catch(() => {});
   }
 
-  // Pauses while the hero is scrolled away or the tab is hidden, so sets
-  // don't pile up off-screen.
+  function build() {
+    [...floaters, ...fading].forEach((f) => f.wrap.remove());
+    floaters = [];
+    fading = [];
+    lastRevealed = null;
+    const count = layer.getBoundingClientRect().width < 768 ? FLOAT_COUNT_MOBILE : FLOAT_COUNT_DESKTOP;
+    for (let i = 0; i < count; i++) addFloater(i * 150);
+  }
+
+  // Pauses reveals and swaps while the hero is scrolled away or the tab is
+  // hidden; the field itself just keeps drifting.
   new IntersectionObserver(([entry]) => {
     heroInView = entry.isIntersecting;
   }).observe(layer);
 
-  shuffle();
-  deck.slice(-3).forEach((image) => preload(image));
+  // Laid out once the real fonts are in, so the headline's box (which the
+  // field keeps clear of) is its final size; rebuilt after a resize settles,
+  // since the free space around the headline changes with it.
+  document.fonts.ready.then(build);
+  let resizeTimer = 0;
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    // Mobile browsers fire resize as the URL bar shows/hides; only a real
+    // width change moves the headline enough to matter.
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(build, 300);
+  });
 
   return {
     onWordAdvance() {
-      clearVisible();
       if (!heroInView || document.hidden) return;
-      topSide = topSide === 'left' ? 'right' : 'left';
-      const bottomSide = topSide === 'left' ? 'right' : 'left';
-      window.setTimeout(() => spawn('top', topSide), SPAWN_DELAYS_MS[0]);
-      window.setTimeout(() => spawn('bottom', bottomSide), SPAWN_DELAYS_MS[1]);
-      window.setTimeout(() => spawn('anywhere', topSide), SPAWN_DELAYS_MS[2]);
+      wordCount++;
+      window.setTimeout(reveal, REVEAL_DELAY_MS);
+      if (wordCount % SWAP_EVERY_WORDS === 0) {
+        // Swaps one that isn't about to be revealed, after the reveal is
+        // underway, so the two never happen to the same image.
+        window.setTimeout(() => {
+          const candidates = floaters.filter((f) => f !== lastRevealed);
+          if (candidates.length === 0) return;
+          removeFloater(candidates[Math.floor(Math.random() * candidates.length)]);
+          addFloater(FADE_OUT_MS / 2);
+        }, REVEAL_DELAY_MS + 200);
+      }
     },
   };
 }

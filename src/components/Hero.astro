@@ -520,11 +520,18 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     transition: none;
   }
 
-  /* Pop-up project images — created by initHeroPopups, so :global (Astro's
-     scoping only reaches elements in this file's own markup). Starts hidden;
-     the script grows and fades each one in. */
-  :global(.hero-popup) {
+  /* Floating project images — created by initHeroPopups, so :global (Astro's
+     scoping only reaches elements in this file's own markup). The outer
+     .hero-float drifts on a slow loop (direction, distance and speed set per
+     image by the script); the inner .hero-popup card is what blurs, fades and
+     pops, starting hidden until the script fades it in. */
+  :global(.hero-float) {
     position: absolute;
+    animation: hero-float-drift var(--drift-duration, 10s) ease-in-out infinite;
+  }
+  :global(.hero-popup) {
+    width: 100%;
+    height: 100%;
     overflow: hidden;
     border-radius: 8px;
     opacity: 0;
@@ -534,6 +541,15 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+  @keyframes hero-float-drift {
+    0%,
+    100% {
+      transform: translate(0, 0);
+    }
+    50% {
+      transform: translate(var(--drift-x), var(--drift-y));
+    }
   }
 </style>
 
