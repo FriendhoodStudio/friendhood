@@ -70,7 +70,12 @@ const serviceList: ServiceItem[] =
             <div class="size-[63px] shrink-0 overflow-hidden rounded-full">
               <img src={service.imageUrl} alt="" class="h-full w-full object-cover" />
             </div>
-            <p class="truncate pb-[2px] font-body text-body-2 text-front">{service.name}</p>
+            {/* Wraps onto a second line rather than truncating — with the grid's
+                columns now allowed to shrink to fit (see .col-grid), longer
+                names like "Creative engagement" no longer have the room to
+                sit on one line in three columns, and "Creative enga…" read
+                badly. The 96px tile fits two lines comfortably. */}
+            <p class="line-clamp-2 pb-[2px] font-body text-body-2 leading-tight text-front">{service.name}</p>
           </div>
           <div class="flex size-[22px] shrink-0 items-center justify-center transition-transform duration-300 ease-out group-hover:scale-125 group-active:scale-90">
             <svg viewBox="0 0 25 28" fill="none" class="h-full w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
