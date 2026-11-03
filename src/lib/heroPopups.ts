@@ -5,8 +5,8 @@ import type { HeroPopUpImage } from '../types/hero';
  * each word cycling through its own set of three. When a word comes up, its
  * image rises forward — sharpening and growing — and sinks back in one
  * smooth movement; then it dissolves and the word's next image drifts in
- * wherever there's most room, waiting for the word to come round again. The
- * whole field fades away as you scroll. On desktop, hovering an image brings
+ * wherever there's most room, waiting for the word to come round again. As
+ * you scroll, the hero's stage sends the whole field zooming past (zoomPast). On desktop, hovering an image brings
  * it up and holds it there — it can be clicked and dragged about — and once
  * the cursor leaves it falls away and its word's next image takes its
  * place. Nothing overlaps the headline or
@@ -53,22 +53,20 @@ const REVEALED: Keyframe = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, fi
 // long it takes to fall away once the cursor leaves.
 const HOLD_RISE_MS = 900;
 const RELEASE_FALL_MS = 1500;
-// How far down the page (as a share of the screen's height) the field has
-// fully faded away by.
-const SCROLL_FADE_END = 0.25;
-// How much each image holds back per pixel scrolled — it moves up at
-// (1 - this) of the page's speed, so it reads as sitting further back.
-// Picked per image within this range, so the field separates into layers
-// of depth as it fades.
-const PARALLAX_MIN = 0.08;
-const PARALLAX_MAX = 0.25;
-
-// Resting look, from nearest to furthest back. Each image sits somewhere
-// between the two according to its parallax depth, so the ones that lag
-// furthest behind on scroll are also the blurriest and faintest — blur and
-// movement telling the same story about depth.
+// Each image gets a depth (0 nearest, 1 furthest back) that sets how blurred
+// and faint it rests, and how hard it zooms past when the hero's scroll
+// stage sends the field flying (see zoomPast) — nearer ones rush past
+// faster, so blur and movement tell the same story about depth.
+//
+// Resting look, from nearest to furthest back.
 const RESTING_NEAR = { blur: 8, opacity: 0.55 };
 const RESTING_FAR = { blur: 20, opacity: 0.35 };
+// As the stage zooms the field past: how far each image flies outward
+// (as a multiple of its distance from the screen's centre), how much it
+// grows, and how much the field blurs.
+const ZOOM_TRAVEL = { near: 2.6, far: 1.4 };
+const ZOOM_SCALE = { near: 3, far: 1.8 };
+const ZOOM_BLUR_PX = 16;
 const GONE: Keyframe = { transform: 'scale(0.85)', opacity: 0, filter: 'blur(24px)' };
 
 interface Floater {
@@ -98,7 +96,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   const preloaded = new Map<string, HTMLImageElement>();
   let floaters: Floater[] = [];
   let heroInView = true;
-  let scrolledAway = false;
+  let paused = false;
+  let zoom = 0;
   let baseHeight = 0;
   // Each word's own set of images, and which one it shows next.
   const wordImages: HeroPopUpImage[][] = [];
@@ -245,10 +244,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     img.draggable = false;
     card.appendChild(img);
     wrap.appendChild(card);
-    const depth = PARALLAX_MIN + Math.random() * (PARALLAX_MAX - PARALLAX_MIN);
-    // The standalone translate property, so the parallax stacks with the
-    // drift loop's transform on the same element instead of replacing it.
-    wrap.style.translate = `0 ${window.scrollY * depth}px`;
+    const depth = Math.random();
     const floater: Floater = { wrap, card, word, depth, state: 'resting', anim: null, dragging: false, x: 0, y: 0, w, h };
     // Hovering brings an image up and holds it there until the cursor
     // leaves; it can be clicked and dragged about while it's up. Desktop
@@ -264,7 +260,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   }
 
   function resting(f: Floater): Keyframe {
-    const far = (f.depth - PARALLAX_MIN) / (PARALLAX_MAX - PARALLAX_MIN);
+    const far = f.depth;
     const blur = RESTING_NEAR.blur + (RESTING_FAR.blur - RESTING_NEAR.blur) * far;
     const opacity = RESTING_NEAR.opacity + (RESTING_FAR.opacity - RESTING_NEAR.opacity) * far;
     return { transform: 'scale(0.92)', opacity, filter: `blur(${blur}px)` };
@@ -272,6 +268,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
 
   function fadeIn(floater: Floater, delay = 0) {
     layer.appendChild(floater.wrap);
+    // Joins in mid-zoom if the stage is already under way.
+    applyZoom(floater, layer.getBoundingClientRect());
     floater.card.animate([{ transform: 'scale(0.8)', opacity: 0, filter: 'blur(24px)' }, resting(floater)], {
       duration: FADE_IN_MS,
       delay,
@@ -407,7 +405,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   // last time), one is placed now and rises straight away, so a word change
   // never goes without one.
   async function showWord(word: number) {
-    if (!heroInView || scrolledAway || document.hidden) return;
+    if (!heroInView || paused || document.hidden) return;
     const mine = floaters.filter((f) => f.word === word);
     const waiting = mine.find((f) => f.state === 'resting');
     if (waiting) {
@@ -439,29 +437,38 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       .forEach((f, i) => fadeIn(f, i * 60));
   }
 
-  // Fades the whole field away over the first stretch of scrolling, so it
-  // belongs to the opening screen only, with each image lagging behind the
-  // page at its own rate (parallax); reveals pause once it's gone.
-  function updateScrollFade() {
-    const progress = Math.min(1, Math.max(0, window.scrollY / (window.innerHeight * SCROLL_FADE_END)));
-    layer.style.opacity = String(1 - progress);
-    scrolledAway = progress >= 1;
-    if (scrolledAway) return;
-    for (const f of floaters) f.wrap.style.translate = `0 ${window.scrollY * f.depth}px`;
+  // The hero's scroll stage sends the field flying past the viewer: at
+  // amount 0 everything sits where it floats; towards 1 each image flies
+  // outward from the screen's centre, growing (nearer ones further and
+  // bigger), while the whole field blurs and fades. Uses the standalone
+  // translate/scale properties, so it stacks with the drift loop's
+  // transform on the same element instead of replacing it.
+  function applyZoom(f: Floater, layerRect: DOMRect) {
+    if (!zoom) {
+      f.wrap.style.translate = '';
+      f.wrap.style.scale = '';
+      return;
+    }
+    const dx = layerRect.left + f.x + f.w / 2 - window.innerWidth / 2;
+    const dy = layerRect.top + f.y + f.h / 2 - window.innerHeight / 2;
+    const travel = ZOOM_TRAVEL.near + (ZOOM_TRAVEL.far - ZOOM_TRAVEL.near) * f.depth;
+    const grow = ZOOM_SCALE.near + (ZOOM_SCALE.far - ZOOM_SCALE.near) * f.depth;
+    f.wrap.style.translate = `${dx * zoom * travel}px ${dy * zoom * travel}px`;
+    f.wrap.style.scale = String(1 + zoom * (grow - 1));
   }
-  let scrollRafId = 0;
-  window.addEventListener(
-    'scroll',
-    () => {
-      if (scrollRafId) return;
-      scrollRafId = requestAnimationFrame(() => {
-        scrollRafId = 0;
-        updateScrollFade();
-      });
-    },
-    { passive: true }
-  );
-  updateScrollFade();
+
+  function zoomPast(amount: number) {
+    zoom = amount;
+    const layerRect = layer.getBoundingClientRect();
+    floaters.forEach((f) => applyZoom(f, layerRect));
+    layer.style.opacity = amount ? String(1 - amount) : '';
+    layer.style.filter = amount ? `blur(${amount * ZOOM_BLUR_PX}px)` : '';
+  }
+
+  // Word reveals hold off while the stage is under way.
+  function setPaused(value: boolean) {
+    paused = value;
+  }
 
   // Pauses reveals while the hero is off screen or the tab is hidden.
   new IntersectionObserver(([entry]) => {
@@ -483,5 +490,5 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     resizeTimer = window.setTimeout(build, 300);
   });
 
-  return { showWord };
+  return { showWord, zoomPast, setPaused };
 }

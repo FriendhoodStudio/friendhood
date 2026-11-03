@@ -33,6 +33,10 @@ const headlineAfter = swapIndex >= 0 ? headline.slice(swapIndex + headlineSwapWo
 const hoverWords =
   swapIndex >= 0 && headlineHoverWords.length > 0 ? [headlineSwapWord, ...headlineHoverWords] : [];
 const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
+// Each word of the headline as its own piece (spaces kept as plain text
+// between them), so the scroll stage can send them flying apart.
+const beforeParts = headlineBefore.split(/(\s+)/);
+const afterParts = headlineAfter.split(/(\s+)/);
 ---
 
 {/* pb-vertical-m: the section (and its dark gradient backdrop below, which
@@ -44,10 +48,13 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     first lets the card's edge sit inside a section, not ON the seam.
     Services' own top padding is reduced by the same amount (see there) so
     the total visible gap before "How we help" doesn't grow. */}
-<section
-  class="relative flex flex-col items-center px-[var(--page-margin)] pb-vertical-m"
-  data-hero-section
->
+<section class="hero-stage relative" data-hero-section>
+  {/* The hero is a pinned scroll "stage": this sticky screen holds still
+      for the extra scroll height the section adds (see .hero-stage), while
+      the scroll drives the headline and floating images zooming apart past
+      the viewer, then the showreel zooming up into focus (the stage script
+      below). Once it's through, the page scrolls on normally. */}
+  <div class="hero-stage-sticky sticky top-0 flex h-[100dvh] w-full flex-col items-center overflow-hidden px-[var(--page-margin)]">
   {/* Backdrop: the gradient's own colour stops are lifted directly from the
       reference gradient (Figma node 7718:19099) — deep maroon at the top,
       through a dark purple-indigo, down to the page's actual --color-back
@@ -77,7 +84,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       can't collapse like that, at the cost of being an approximation
       rather than an exact centre between two measured points. margin-top
       nudges it down slightly for nav clearance. */}
-  <div class="hero-headline-area relative flex w-full items-center justify-center" style="margin-top:var(--nav-menu-height)">
+  <div class="hero-headline-area absolute inset-0 flex items-center justify-center px-[var(--page-margin)]">
     {/* Project images that roll up around the headline as the word changes
         — filled in by initHeroPopups (see the script below). In front of
         the headline (z-30 vs its z-20), so an image dragged onto it sits on
@@ -138,7 +145,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
               the roll overshoot's safety margin (see playWordRoll), and
               eating 6px of it here would have reopened the exact
               adjacent-word show-through bug that gap was added to fix. */}
-          {headlineBefore}<span
+          {beforeParts.map((part) => (/^\s*$/.test(part) ? part : <span class="hero-split">{part}</span>))}<span class="hero-split"><span
             class="hero-word-window-clip relative inline-block h-[1em] align-bottom overflow-visible"
             data-hero-word-window
           ><span class="flex flex-col items-start gap-[0.25em]" data-hero-word-track>
@@ -161,7 +168,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
                 ></span>
               )
             )}
-          </span></span><br class="hero-mobile-break" />{headlineAfter}
+          </span></span></span><br class="hero-mobile-break" />{afterParts.map((part) => (/^\s*$/.test(part) ? part : <span class="hero-split">{part}</span>))}
         </Fragment>
       ) : (
         headline
@@ -171,8 +178,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 
   {/* gap reduced from gap-vertical-s to gap-vertical-xs — brings the
       tagline right up close to the showreel below it. */}
-  <div class="flex w-full flex-col items-start gap-vertical-xs">
-    <p class="w-full text-center font-tag text-detail text-front" data-hero-tagline>
+    <p class="absolute inset-x-0 bottom-[28px] z-20 text-center font-tag text-detail text-front" data-hero-tagline>
       <span class="hero-tagline-shadow relative z-20 inline-flex items-baseline pointer-events-none">
         {tagline}
         <svg
@@ -194,7 +200,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 
     {media && (
       <div
-        class="hero-media-aspect relative z-20 w-full cursor-default overflow-hidden rounded-card"
+        class="hero-stage-reel absolute z-20 cursor-default overflow-hidden rounded-card"
         data-hero-media
       >
         {media.type === 'video' ? (
@@ -209,10 +215,10 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
             {/* <source media> is only evaluated once, when the browser first
                 runs resource selection — not reactively on resize/rotate,
                 same one-time-pick tradeoff as e.g. responsive <picture>
-                sources. Acceptable here since the aspect-ratio breakpoint
-                this pairs with (.hero-media-aspect below) is itself a
-                load-time viewport check, not something that needs to react
-                live either. Listed first: the browser uses the first
+                sources. Acceptable here: the portrait clip suits the tall
+                phone-shaped card it lands in on small screens (see
+                .hero-stage-reel), and that doesn't need to react live
+                either. Listed first: the browser uses the first
                 matching <source>, falling through to the plain 16:9 file
                 below whenever no mobile-specific clip has been uploaded. */}
             {heroVideoMobileUrl && <source src={heroVideoMobileUrl} media="(max-width: 767px)" />}
@@ -467,23 +473,6 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
      no heroVideoMobile clip is uploaded (see above), object-cover crops the
      centre of the 16:9 frame into it; when one is uploaded, a real 4:5
      clip just fills it natively with nothing cropped. */
-  /* The headline gets (almost) the whole first screen: from below the nav
-     down to just above the tagline, which sits near the bottom with only
-     the top edge of the showreel peeking in under it — so on load it's the
-     headline and its floating images, not the reel, that hold attention.
-     Replaces a fixed min-h-[76dvh], which left most of the reel on screen
-     on tall viewports.
-     The area runs from the nav's height down to --hero-bottom-gap above the
-     viewport's bottom, so its own centre sits half the difference between
-     those two off the viewport's true centre. The padding cancels exactly
-     that difference (only one side is ever non-zero), so the headline lands
-     dead centre on screen at every breakpoint's nav height. */
-  .hero-headline-area {
-    --hero-bottom-gap: 56px;
-    min-height: calc(100dvh - var(--nav-menu-height) - var(--hero-bottom-gap));
-    padding-top: max(0px, calc(var(--hero-bottom-gap) - var(--nav-menu-height)));
-    padding-bottom: max(0px, calc(var(--nav-menu-height) - var(--hero-bottom-gap)));
-  }
 
   /* The pop-up image field runs edge to edge across the screen, past the
      page margins the rest of the hero sits inside. Clipped only
@@ -493,25 +482,37 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
   .hero-popup-layer {
     left: calc(-1 * var(--page-margin));
     right: calc(-1 * var(--page-margin));
+    /* Starts below the nav, so no image sits under the nav pill. */
+    top: var(--nav-menu-height);
     overflow-x: clip;
   }
 
-  /* Scales from its top edge (see the scroll script), so the smaller
-     starting size narrows it without opening a gap under the tagline; the
-     margin gives it a little breathing room below the tagline instead. */
-  [data-hero-media] {
-    transform-origin: 50% 0;
-    margin-top: 12px;
+  /* The scroll stage: one screen tall plus the scroll distance the
+     transition plays out over (the sticky screen inside holds still for
+     that stretch). */
+  .hero-stage {
+    --hero-stage-scroll: 180vh;
+    height: calc(100dvh + var(--hero-stage-scroll));
   }
 
-  .hero-media-aspect {
-    aspect-ratio: 4 / 5;
+  /* Headline words, each its own piece so they can fly apart separately. */
+  .hero-split {
+    display: inline-block;
   }
-  @media (min-width: 768px) {
-    .hero-media-aspect {
-      aspect-ratio: 1670 / 939;
-    }
+
+  /* The showreel's landing size: filling the screen below the nav, inside
+     the page margins. It starts hidden, small and blurred in the middle,
+     and the stage script zooms it up into this. */
+  .hero-stage-reel {
+    left: var(--page-margin);
+    right: var(--page-margin);
+    top: calc(var(--nav-menu-height) + 12px);
+    bottom: var(--page-margin);
+    opacity: 0;
+    pointer-events: none;
   }
+
+
 
   /* Fades the headline in on page load — separate from the scroll-scrubbed
      reveal used everywhere else on the site (scrollReveal.ts), since that's
@@ -622,126 +623,119 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
   import { initHeroPopups } from '../lib/heroPopups';
   import type { HeroPopUpImage } from '../types/hero';
 
-  // Scroll-scrubbed hero entrance, modeled on wearecollins.com's reel section:
-  // the media block grows from slightly-scaled-down to full size, and the small
-  // caption above it drifts upward, as the hero scrolls up through the viewport.
-  const media = document.querySelector<HTMLElement>('[data-hero-media]');
-  const tagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function clamp(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value));
   }
 
-  // Captured once, before any scroll listener runs — the media's own
-  // on-load position, whatever that happens to be given the current
-  // layout (previously this assumed it always started at the bottom of
-  // the viewport via `start = vh`, which broke once the hero was
-  // compacted enough that the video is already visible on load: progress
-  // was landing partway through instead of at 0, so the tagline showed up
-  // already partly scrolled-away — translateY'd up and faded — before any
-  // actual scrolling had happened). Using the real starting position keeps
-  // this self-calibrating regardless of how the layout above it changes.
-  let mediaStartTop = 0;
+  // Set once the floating images are running (see the word cycle below), so
+  // the stage can send them flying past too.
+  let popups: ReturnType<typeof initHeroPopups> = null;
 
-  function update() {
-    if (!media) return;
-    const rect = media.getBoundingClientRect();
-    const vh = window.innerHeight;
-    // progress: 0 at the media's actual on-load position, 1 once it has
-    // scrolled up to ~35% from the top of the viewport — i.e. fully
-    // "arrived".
-    const start = mediaStartTop;
-    const end = vh * 0.35;
-    const progress = clamp((start - rect.top) / (start - end), 0, 1);
-
-    // Scales from its top edge (transform-origin in the styles above), so
-    // starting this small only narrows it — its top stays tucked right
-    // under the tagline instead of drifting down and opening a gap.
-    const scale = 0.8 + 0.2 * progress;
-    media.style.transform = `scale(${scale})`;
-    // Only the top of the showreel peeks in on load (see
-    // .hero-headline-area), soft-focused so it doesn't pull attention from
-    // the headline — it sharpens as you scroll it into view, reaching full
-    // focus well before it's fully arrived.
-    const focusEnd = vh * 0.6;
-    const focusProgress = clamp((start - rect.top) / (start - focusEnd), 0, 1);
-    media.style.filter = focusProgress < 1 ? `blur(${(1 - focusProgress) * 16}px)` : '';
-
-    if (tagline) {
-      // Reaches its end state well before the image finishes scaling, so it
-      // visibly moves faster — same start point, shorter run.
-      const taglineEnd = vh * 0.65;
-      const taglineProgress = clamp((start - rect.top) / (start - taglineEnd), 0, 1);
-      tagline.style.transform = `translateY(${-taglineProgress * 48}px)`;
-      tagline.style.opacity = String(1 - taglineProgress * 0.6);
-    }
-  }
-
-  if (!reduceMotion && media) {
-    mediaStartTop = media.getBoundingClientRect().top;
-    let rafId = 0;
-    const onScroll = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        update();
-        rafId = 0;
-      });
-    };
-    update();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-  }
-
-  // Experimental — the hero starts inverted (light --color-front backdrop,
-  // dark --color-back headline/tagline) rather than matching the rest of
-  // the site, then reverses back to the normal dark theme as you scroll
-  // through it. Scroll-scrubbed like the media/tagline effect above (tied
-  // to how far you've scrolled, not a timer), and kept as its own
-  // independent scroll listener rather than folded into update() above
-  // since that one's gated on media existing and this shouldn't be.
+  // The scroll stage. While the hero's sticky screen is pinned, scroll
+  // progress (0 → 1 across the stage's extra height) drives two overlapping
+  // phases:
+  //   - out (first half): the headline's words and the floating images
+  //     zoom up and fly outward from the centre, blurring and fading as if
+  //     passing the viewer; the tagline fades first, and the light backdrop
+  //     gives way to the dark one;
+  //   - in (second half): the showreel zooms up from small and blurred in
+  //     the middle to fill the screen, coming into focus.
+  // Scrolling back up plays it in reverse. With reduced motion it's a plain
+  // crossfade — no zooming or blur.
   {
-    const invertSection = document.querySelector<HTMLElement>('[data-hero-section]');
-    const invertOverlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
-    const invertHeadline = document.querySelector<HTMLElement>('.hero-headline-shadow');
-    const invertTagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
+    const stage = document.querySelector<HTMLElement>('[data-hero-section]');
+    const headline = document.querySelector<HTMLElement>('.hero-headline-shadow');
+    const pieces = Array.from(document.querySelectorAll<HTMLElement>('.hero-split'));
+    const popupLayer = document.querySelector<HTMLElement>('[data-hero-popups]');
+    const tagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
+    const reel = document.querySelector<HTMLElement>('[data-hero-media]');
+    const overlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
 
-    const COLOR_BACK = { r: 0x0d, g: 0x0d, b: 0x0d };
-    const COLOR_FRONT = { r: 0xf3, g: 0xfa, b: 0xf0 };
-    function lerpColor(a: typeof COLOR_BACK, b: typeof COLOR_BACK, t: number) {
-      const r = Math.round(a.r + (b.r - a.r) * t);
-      const g = Math.round(a.g + (b.g - a.g) * t);
-      const bl = Math.round(a.b + (b.b - a.b) * t);
-      return `rgb(${r}, ${g}, ${bl})`;
+    // Headline/tagline text goes from the light-theme dark to the normal
+    // light as the backdrop darkens — read from the live colour tokens.
+    function tokenRgb(name: string) {
+      const probe = document.createElement('span');
+      probe.style.color = `var(${name})`;
+      document.body.appendChild(probe);
+      const [r, g, b] = getComputedStyle(probe).color.match(/\d+/g)!.map(Number);
+      probe.remove();
+      return { r, g, b };
+    }
+    const dark = tokenRgb('--color-back');
+    const light = tokenRgb('--color-front');
+    const mix = (t: number) =>
+      `rgb(${Math.round(dark.r + (light.r - dark.r) * t)}, ${Math.round(dark.g + (light.g - dark.g) * t)}, ${Math.round(dark.b + (light.b - dark.b) * t)})`;
+
+    const easeIn = (t: number) => t * t;
+    const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
+
+    function updateStage() {
+      if (!stage) return;
+      const travel = stage.offsetHeight - window.innerHeight;
+      const p = travel > 0 ? clamp(-stage.getBoundingClientRect().top / travel, 0, 1) : 0;
+      const out = easeIn(clamp(p / 0.5, 0, 1));
+      const into = easeOut(clamp((p - 0.4) / 0.6, 0, 1));
+      const darken = clamp((p - 0.15) / 0.3, 0, 1);
+
+      if (overlay) overlay.style.opacity = String(1 - darken);
+      if (headline) headline.style.color = mix(darken);
+      if (tagline) {
+        tagline.style.color = mix(darken);
+        tagline.style.opacity = String(1 - clamp(p / 0.12, 0, 1));
+      }
+      popups?.setPaused(p > 0.02);
+
+      if (reel) {
+        reel.style.opacity = String(clamp(into * 1.6, 0, 1));
+        // Only clickable (the "Watch our showreel" button) once it's landed.
+        reel.style.pointerEvents = into > 0.95 ? 'auto' : 'none';
+      }
+
+      if (reduceMotion) {
+        if (headline) headline.style.opacity = String(1 - out);
+        if (popupLayer) popupLayer.style.opacity = String(1 - out);
+        return;
+      }
+
+      // Each word flies outward from the centre of the screen along the
+      // line from the centre to where it sits, growing and blurring as it
+      // goes. Positions come from layout (offsetLeft/Top within the
+      // headline), which the transforms don't affect.
+      if (headline) {
+        const h = headline.getBoundingClientRect();
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
+        for (const piece of pieces) {
+          const px = h.left + piece.offsetLeft + piece.offsetWidth / 2 - cx;
+          const py = h.top + piece.offsetTop + piece.offsetHeight / 2 - cy;
+          piece.style.translate = out ? `${px * out * 2.2}px ${py * out * 2.2}px` : '';
+          piece.style.scale = out ? String(1 + out * 2.5) : '';
+          piece.style.filter = out ? `blur(${out * 18}px)` : '';
+          piece.style.opacity = out ? String(1 - out) : '';
+        }
+      }
+      popups?.zoomPast(out);
+
+      if (reel) {
+        reel.style.scale = String(0.25 + 0.75 * into);
+        reel.style.filter = into < 1 ? `blur(${(1 - into) * 30}px)` : '';
+      }
     }
 
-    function updateInvert() {
-      if (!invertSection) return;
-      const rect = invertSection.getBoundingClientRect();
-      // Fully inverted at the very top, fully back to normal once scrolled
-      // one viewport height (times 0.6, so it doesn't take a full screen's
-      // worth of scrolling to finish) past the section's own top.
-      const distance = window.innerHeight * 0.6;
-      const progress = clamp(-rect.top / distance, 0, 1);
-
-      if (invertOverlay) invertOverlay.style.opacity = String(1 - progress);
-      const textColor = lerpColor(COLOR_BACK, COLOR_FRONT, progress);
-      if (invertHeadline) invertHeadline.style.color = textColor;
-      if (invertTagline) invertTagline.style.color = textColor;
-    }
-
-    if (!reduceMotion && invertSection) {
-      let invertRafId = 0;
-      const onInvertScroll = () => {
-        if (invertRafId) return;
-        invertRafId = requestAnimationFrame(() => {
-          updateInvert();
-          invertRafId = 0;
+    if (stage) {
+      let rafId = 0;
+      const onScroll = () => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+          rafId = 0;
+          updateStage();
         });
       };
-      updateInvert();
-      window.addEventListener('scroll', onInvertScroll, { passive: true });
-      window.addEventListener('resize', onInvertScroll);
+      updateStage();
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
     }
   }
 
@@ -764,7 +758,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     const popupLayer = document.querySelector<HTMLElement>('[data-hero-popups]');
     const popupData = document.querySelector<HTMLScriptElement>('[data-hero-popup-images]');
     const popupHeadline = document.querySelector<HTMLElement>('.hero-headline-shadow');
-    const popups =
+    popups =
       popupLayer && popupData && popupHeadline
         ? initHeroPopups(
             popupLayer,
