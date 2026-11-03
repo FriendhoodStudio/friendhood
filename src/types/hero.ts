@@ -5,6 +5,8 @@ export interface HeroData {
   headlineSwapWord?: string;
   headlineHoverWords?: string[];
   tagline: string;
+  /** The large line the showreel zooms into on scroll. */
+  statement?: string;
   media: Media;
   /** Optional 4:5 portrait crop of `media`'s video, swapped in on mobile in
    * place of the automatic CSS crop of the 16:9 source. Only meaningful

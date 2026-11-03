@@ -35,6 +35,14 @@ export default defineType({
       validation: (rule) => rule.required(),
     }),
     defineField({
+      name: 'statement',
+      title: 'Statement',
+      description:
+        'The large line the showreel zooms into as you scroll, e.g. "Get your brand in the hands and hearts of the people that matter most".',
+      type: 'text',
+      rows: 2,
+    }),
+    defineField({
       name: 'mediaType',
       title: 'Hero media type',
       type: 'string',

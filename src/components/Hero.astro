@@ -7,6 +7,7 @@ const headline = hero?.headline ?? 'For people thinking about tomorrow.';
 const headlineSwapWord = hero?.headlineSwapWord ?? 'people';
 const headlineHoverWords = hero?.headlineHoverWords ?? ['places', 'brands', 'orgs'];
 const tagline = hero?.tagline ?? 'Create your neighbourhood';
+const statement = hero?.statement || 'Get your brand in the hands and hearts of the people that matter most';
 const media = hero?.media;
 // Optional purpose-shot 4:5 portrait crop of `media`'s video — see the
 // heroVideoMobile field description in the Sanity schema. Undefined falls
@@ -245,6 +246,13 @@ const afterParts = headlineAfter.split(/(\s+)/);
         )}
       </div>
     )}
+
+    {/* The statement the showreel zooms into at the end of the stage
+        (Figma "HeroTitle", node 7552:8892) — starts hidden, zoomed in by
+        the stage script. */}
+    <div class="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-[var(--page-margin)]" data-hero-statement>
+      <p class="max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front">{statement}</p>
+    </div>
   </div>
 </section>
 
@@ -488,10 +496,11 @@ const afterParts = headlineAfter.split(/(\s+)/);
   }
 
   /* The scroll stage: one screen tall plus the scroll distance the
-     transition plays out over (the sticky screen inside holds still for
-     that stretch). */
+     transitions play out over (the sticky screen inside holds still for
+     that stretch): headline out, showreel in, a beat on the reel, then the
+     reel out and the statement in. */
   .hero-stage {
-    --hero-stage-scroll: 180vh;
+    --hero-stage-scroll: 320vh;
     height: calc(100dvh + var(--hero-stage-scroll));
   }
 
@@ -503,6 +512,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
   /* The showreel's landing size: filling the screen below the nav, inside
      the page margins. It starts hidden, small and blurred in the middle,
      and the stage script zooms it up into this. */
+  [data-hero-statement] {
+    opacity: 0;
+  }
+
   .hero-stage-reel {
     left: var(--page-margin);
     right: var(--page-margin);
@@ -644,8 +657,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
   //     racing off screen while the floating images behind drift outward
   //     more slowly (parallax), blurring and fading; the tagline fades
   //     first, and the light backdrop gives way to the dark one;
-  //   - in (second half): the showreel zooms up from small and blurred in
-  //     the middle to fill the screen, coming into focus.
+  //   - in: the showreel zooms up from small and blurred in the middle to
+  //     fill the screen, coming into focus, and holds for a beat;
+  //   - on: the reel carries on zooming past the viewer, blurring and
+  //     fading, as the statement zooms up out of a blur into focus.
   // Scrolling back up plays it in reverse. With reduced motion it's a plain
   // crossfade — no zooming or blur.
   {
@@ -655,6 +670,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const popupLayer = document.querySelector<HTMLElement>('[data-hero-popups]');
     const tagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
     const reel = document.querySelector<HTMLElement>('[data-hero-media]');
+    const statement = document.querySelector<HTMLElement>('[data-hero-statement]');
     const overlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
 
     // Headline/tagline text goes from the light-theme dark to the normal
@@ -675,6 +691,12 @@ const afterParts = headlineAfter.split(/(\s+)/);
     // How far the headline's lines travel up/down over the transition, as a
     // share of the screen's height — enough to carry them off screen.
     const LINE_TRAVEL = 0.75;
+    // Stage timeline (shares of its scroll): the reel has fully landed by
+    // REEL_LANDED_AT, holds for a beat, starts zooming on past at
+    // REEL_LEAVES_AT, and the statement comes up from STATEMENT_ARRIVES_AT.
+    const REEL_LANDED_AT = 0.56;
+    const REEL_LEAVES_AT = 0.66;
+    const STATEMENT_ARRIVES_AT = 0.72;
     // How much the headline grows as it passes the viewer.
     const LINE_GROW = 1.6;
     // On phones, where it zooms as one block instead — kept gentle, as the
@@ -689,24 +711,31 @@ const afterParts = headlineAfter.split(/(\s+)/);
       if (!stage) return;
       const travel = stage.offsetHeight - window.innerHeight;
       const p = travel > 0 ? clamp(-stage.getBoundingClientRect().top / travel, 0, 1) : 0;
-      const out = easeIn(clamp(p / 0.5, 0, 1));
-      const into = easeOut(clamp((p - 0.4) / 0.6, 0, 1));
-      const darken = clamp((p - 0.15) / 0.3, 0, 1);
+      // Phases, as shares of the stage: headline out and reel in over the
+      // first part (q), a beat on the landed reel, then the reel zooming on
+      // past while the statement zooms up into focus.
+      const q = clamp(p / REEL_LANDED_AT, 0, 1);
+      const out = easeIn(clamp(q / 0.5, 0, 1));
+      const into = easeOut(clamp((q - 0.4) / 0.6, 0, 1));
+      const darken = clamp((q - 0.15) / 0.3, 0, 1);
+      const reelOut = easeIn(clamp((p - REEL_LEAVES_AT) / (1 - REEL_LEAVES_AT - 0.04), 0, 1));
+      const statementIn = easeOut(clamp((p - STATEMENT_ARRIVES_AT) / (1 - STATEMENT_ARRIVES_AT), 0, 1));
 
       if (overlay) overlay.style.opacity = String(1 - darken);
       if (headline) headline.style.color = mix(darken);
       if (tagline) {
         tagline.style.color = mix(darken);
-        tagline.style.opacity = String(1 - clamp(p / 0.12, 0, 1));
+        tagline.style.opacity = String(1 - clamp(q / 0.12, 0, 1));
       }
       stageUnderway = p > 0.002;
       popups?.setPaused(p > 0.02);
 
       if (reel) {
-        reel.style.opacity = String(clamp(into * 1.6, 0, 1));
-        // Only clickable (the "Watch our showreel" button) once it's landed.
-        reel.style.pointerEvents = into > 0.95 ? 'auto' : 'none';
+        reel.style.opacity = String(clamp(into * 1.6, 0, 1) * (1 - reelOut));
+        // Only clickable (the "Watch our showreel" button) while it's landed.
+        reel.style.pointerEvents = into > 0.95 && reelOut < 0.05 ? 'auto' : 'none';
       }
+      if (statement) statement.style.opacity = String(statementIn);
 
       if (reduceMotion) {
         if (headline) headline.style.opacity = String(1 - out);
@@ -777,9 +806,17 @@ const afterParts = headlineAfter.split(/(\s+)/);
       }
       popups?.zoomPast(out);
 
+      // The reel zooms up from small and blurred to fill the screen, then
+      // carries on growing past the viewer — blurring and fading — as the
+      // statement zooms up out of a blur into focus behind it.
       if (reel) {
-        reel.style.scale = String(0.25 + 0.75 * into);
-        reel.style.filter = into < 1 ? `blur(${(1 - into) * 30}px)` : '';
+        reel.style.scale = String((0.25 + 0.75 * into) * (1 + reelOut * 0.6));
+        const blur = (1 - into) * 30 + reelOut * 24;
+        reel.style.filter = blur > 0.1 ? `blur(${blur}px)` : '';
+      }
+      if (statement) {
+        statement.style.scale = String(0.7 + 0.3 * statementIn);
+        statement.style.filter = statementIn < 1 ? `blur(${(1 - statementIn) * 20}px)` : '';
       }
     }
 

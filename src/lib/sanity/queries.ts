@@ -154,6 +154,7 @@ const HERO_QUERY = `*[_type == "hero"][0]{
   headlineSwapWord,
   headlineHoverWords,
   tagline,
+  statement,
   mediaType,
   heroImage,
   "heroVideoUrl": heroVideo.asset->url,
