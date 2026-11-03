@@ -1,11 +1,7 @@
 /** A little floating control bar over the hero headline, for visitors to play
  * with: it appears on hover (desktop only) with a grip to drag the headline
  * anywhere on screen and buttons to set it left, centre or right aligned.
- * Not saved anywhere — a reload puts it back.
- *
- * The headline's placed position is kept on its data-home-x/y attributes,
- * which heroPopups reads so an image shove springs back to it rather than
- * the centre. */
+ * Not saved anywhere — a reload puts it back. */
 
 // How long the bar lingers after the cursor leaves the headline and bar.
 const HIDE_DELAY_MS = 500;
@@ -82,11 +78,6 @@ export function initHeadlineControls(headline: HTMLElement, bar: HTMLElement, on
   grip.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    // Any spring-back from an image shove still playing gives way.
-    headline
-      .getAnimations()
-      .filter((a) => !(a instanceof CSSAnimation))
-      .forEach((a) => a.cancel());
     dragging = true;
     grip.classList.add('is-dragging');
     grip.setPointerCapture(e.pointerId);
