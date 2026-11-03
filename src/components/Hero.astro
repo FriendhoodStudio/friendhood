@@ -498,10 +498,18 @@ const afterParts = headlineAfter.split(/(\s+)/);
   /* The scroll stage: one screen tall plus the scroll distance the
      transitions play out over (the sticky screen inside holds still for
      that stretch): headline out, showreel in, a beat on the reel, then the
-     reel out and the statement in. */
+     reel out and the statement in, and the hand-over to the next section. */
   .hero-stage {
-    --hero-stage-scroll: 320vh;
+    --hero-stage-scroll: 420vh;
     height: calc(100dvh + var(--hero-stage-scroll));
+    /* The hand-over: the next section is pulled up a screen to scroll in
+       over the stage's last, still-pinned stretch, while the reel backdrop
+       holds and fades behind it (the stage script reads this margin). */
+    margin-bottom: -100dvh;
+  }
+  :global(.hero-stage + section) {
+    position: relative;
+    z-index: 10;
   }
 
   /* Headline words, each its own piece so they can fly apart separately. */
@@ -671,6 +679,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const tagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
     const reel = document.querySelector<HTMLElement>('[data-hero-media]');
     const statement = document.querySelector<HTMLElement>('[data-hero-statement]');
+    const glow = document.querySelector<HTMLElement>('.hero-gradient');
     const overlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
 
     // Headline/tagline text goes from the light-theme dark to the normal
@@ -697,10 +706,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const REEL_LANDED_AT = 0.56;
     const REEL_LEAVES_AT = 0.66;
     const STATEMENT_ARRIVES_AT = 0.72;
-    // How strongly the reel stays on behind the statement, and how far into
-    // the normal scroll afterwards (as a share of the screen) it's all faded.
+    // How strongly the reel stays on behind the statement.
     const REEL_BACKDROP_OPACITY = 0.45;
-    const AFTER_FADE = 0.5;
     // How much the headline grows as it passes the viewer.
     const LINE_GROW = 1.6;
     // On phones, where it zooms as one block instead — kept gentle, as the
@@ -714,7 +721,18 @@ const afterParts = headlineAfter.split(/(\s+)/);
     function updateStage() {
       if (!stage) return;
       const travel = stage.offsetHeight - window.innerHeight;
-      const p = travel > 0 ? clamp(-stage.getBoundingClientRect().top / travel, 0, 1) : 0;
+      const scrolled = -stage.getBoundingClientRect().top;
+      // The last stretch of the stage is the hand-over: the screen stays
+      // pinned, so the blurred reel backdrop and the hero's background glow
+      // hold still and fade, while the statement and tagline scroll up and
+      // away like normal content and the next section (pulled up to overlap
+      // this stretch — see .hero-stage) scrolls in on top. Nothing behind
+      // moves, so there's no edge to see. Its length is the stage's negative
+      // bottom margin.
+      const fadePx = Math.max(0, -parseFloat(getComputedStyle(stage).marginBottom) || 0);
+      const phases = Math.max(1, travel - fadePx);
+      const p = travel > 0 ? clamp(scrolled / phases, 0, 1) : 0;
+      const after = travel > 0 ? clamp((scrolled - phases) / fadePx, 0, 1) : 0;
       // Phases, as shares of the stage: headline out and reel in over the
       // first part (q), a beat on the landed reel, then the reel zooming on
       // past while the statement zooms up into focus.
@@ -725,19 +743,16 @@ const afterParts = headlineAfter.split(/(\s+)/);
       const reelOut = easeIn(clamp((p - REEL_LEAVES_AT) / (1 - REEL_LEAVES_AT - 0.04), 0, 1));
       // Fully in a little before the stage ends, so it rests there in focus.
       const statementIn = easeOut(clamp((p - STATEMENT_ARRIVES_AT) / (0.95 - STATEMENT_ARRIVES_AT), 0, 1));
-      // Once the stage is through and the page scrolls on, the statement,
-      // its tagline and the blurred reel behind them all fade away over
-      // the first part of that scroll, so the step down to the next
-      // section doesn't read as a big empty gap.
-      const scrolledPast = travel > 0 ? -stage.getBoundingClientRect().top - travel : 0;
-      const after = clamp(scrolledPast / (window.innerHeight * AFTER_FADE), 0, 1);
 
       if (overlay) overlay.style.opacity = String(1 - darken);
+      if (glow) glow.style.opacity = String(1 - after);
       if (headline) headline.style.color = mix(darken);
       if (tagline) {
         tagline.style.color = mix(darken);
-        // Fades at the start, and comes back under the statement.
-        tagline.style.opacity = String(Math.max(1 - clamp(q / 0.12, 0, 1), statementIn) * (1 - after));
+        // Fades at the start, comes back under the statement, and scrolls
+        // away with it at the end.
+        tagline.style.opacity = String(Math.max(1 - clamp(q / 0.12, 0, 1), statementIn));
+        tagline.style.translate = after ? `0 ${-after * fadePx}px` : '';
       }
       const wasUnderway = stageUnderway;
       stageUnderway = p > 0.002;
@@ -751,7 +766,11 @@ const afterParts = headlineAfter.split(/(\s+)/);
         // Only clickable (the "Watch our showreel" button) while it's landed.
         reel.style.pointerEvents = into > 0.95 && reelOut < 0.05 ? 'auto' : 'none';
       }
-      if (statement) statement.style.opacity = String(statementIn * (1 - after));
+      if (statement) {
+        statement.style.opacity = String(statementIn);
+        // Scrolls away at the page's own speed during the hand-over.
+        statement.style.translate = after ? `0 ${-after * fadePx}px` : '';
+      }
 
       if (reduceMotion) {
         if (headline) headline.style.opacity = String(1 - out);
