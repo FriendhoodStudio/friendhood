@@ -36,8 +36,10 @@ const REVEAL_SCALE = 1.5;
 // How far down the page (as a share of the screen's height) the field has
 // fully faded away by.
 const SCROLL_FADE_END = 0.25;
-// Extra upward travel per pixel scrolled, picked per image within this
-// range, so the field separates into layers of depth as it fades.
+// How much each image holds back per pixel scrolled — it moves up at
+// (1 - this) of the page's speed, so it reads as sitting further back.
+// Picked per image within this range, so the field separates into layers
+// of depth as it fades.
 const PARALLAX_MIN = 0.25;
 const PARALLAX_MAX = 0.75;
 
@@ -190,7 +192,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     const depth = PARALLAX_MIN + Math.random() * (PARALLAX_MAX - PARALLAX_MIN);
     // The standalone translate property, so the parallax stacks with the
     // drift loop's transform on the same element instead of replacing it.
-    wrap.style.translate = `0 ${-window.scrollY * depth}px`;
+    wrap.style.translate = `0 ${window.scrollY * depth}px`;
     return { wrap, card, word, depth, x: 0, y: 0, w, h };
   }
 
@@ -274,14 +276,14 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   }
 
   // Fades the whole field away over the first stretch of scrolling, so it
-  // belongs to the opening screen only, with each image rising a little
-  // faster than the page at its own rate; reveals pause once it's gone.
+  // belongs to the opening screen only, with each image lagging behind the
+  // page at its own rate (parallax); reveals pause once it's gone.
   function updateScrollFade() {
     const progress = Math.min(1, Math.max(0, window.scrollY / (window.innerHeight * SCROLL_FADE_END)));
     layer.style.opacity = String(1 - progress);
     scrolledAway = progress >= 1;
     if (scrolledAway) return;
-    for (const f of floaters) f.wrap.style.translate = `0 ${-window.scrollY * f.depth}px`;
+    for (const f of floaters) f.wrap.style.translate = `0 ${window.scrollY * f.depth}px`;
   }
   let scrollRafId = 0;
   window.addEventListener(
