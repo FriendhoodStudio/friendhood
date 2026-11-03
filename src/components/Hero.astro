@@ -470,9 +470,25 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
      the top edge of the showreel peeking in under it — so on load it's the
      headline and its floating images, not the reel, that hold attention.
      Replaces a fixed min-h-[76dvh], which left most of the reel on screen
-     on tall viewports. */
+     on tall viewports.
+     The area runs from the nav's height down to --hero-bottom-gap above the
+     viewport's bottom, so its own centre sits half the difference between
+     those two off the viewport's true centre. The padding cancels exactly
+     that difference (only one side is ever non-zero), so the headline lands
+     dead centre on screen at every breakpoint's nav height. */
   .hero-headline-area {
-    min-height: calc(100dvh - var(--nav-menu-height) - 88px);
+    --hero-bottom-gap: 56px;
+    min-height: calc(100dvh - var(--nav-menu-height) - var(--hero-bottom-gap));
+    padding-top: max(0px, calc(var(--hero-bottom-gap) - var(--nav-menu-height)));
+    padding-bottom: max(0px, calc(var(--nav-menu-height) - var(--hero-bottom-gap)));
+  }
+
+  /* Scales from its top edge (see the scroll script), so the smaller
+     starting size narrows it without opening a gap under the tagline; the
+     margin gives it a little breathing room below the tagline instead. */
+  [data-hero-media] {
+    transform-origin: 50% 0;
+    margin-top: 12px;
   }
 
   .hero-media-aspect {
@@ -610,13 +626,10 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     const end = vh * 0.35;
     const progress = clamp((start - rect.top) / (start - end), 0, 1);
 
-    // Base raised from 0.88 — scale() shrinks around the element's own
-    // centre, so the more it starts scaled down, the more its visual top
-    // edge (not just its layout box, which doesn't move) drifts down from
-    // the tagline above it. 0.88 was creating a ~45px gap on top of the
-    // actual CSS gap between them once the video sits this close to the
-    // tagline in the current layout.
-    const scale = 0.96 + 0.04 * progress;
+    // Scales from its top edge (transform-origin in the styles above), so
+    // starting this small only narrows it — its top stays tucked right
+    // under the tagline instead of drifting down and opening a gap.
+    const scale = 0.9 + 0.1 * progress;
     media.style.transform = `scale(${scale})`;
     // Only the top of the showreel peeks in on load (see
     // .hero-headline-area), soft-focused so it doesn't pull attention from
