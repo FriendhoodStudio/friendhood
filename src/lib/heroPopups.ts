@@ -12,8 +12,10 @@ const SPAWN_DELAYS_MS = [300, 450, 600];
 // One continuous grow, overshoot, settle and fade — no hold — short enough
 // that all three are gone before the next word (every 2000ms) arrives.
 const LIFETIME_MS = 1250;
-// Minimum space kept between the headline and the two images framing it.
+// Minimum space kept between an image and the headline, and between images.
 const HEADLINE_CLEARANCE_PX = 16;
+const IMAGE_GAP_PX = 12;
+const PLACEMENT_ATTEMPTS = 40;
 const SHRINK_OUT_MS = 250;
 
 type Slot = 'top' | 'bottom' | 'anywhere';
@@ -64,38 +66,41 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       : Math.min(300, Math.max(172, layerRect.height * 0.31));
   }
 
+  function intersects(a: DOMRect, b: DOMRect, gap: number) {
+    return a.left < b.right + gap && b.left < a.right + gap && a.top < b.bottom + gap && b.top < a.bottom + gap;
+  }
+
   // The first two of each set are composed rather than scattered: one in the
   // space above the headline, one in the space below, on opposite halves
   // (which side alternates each word), so it reads as a balanced diagonal.
-  // The exact spot within that quarter is random so it still feels loose.
-  // The third lands anywhere, so it's the one that can pass over the text.
+  // The third lands anywhere. The exact spot is random so it still feels
+  // loose, but no image ever overlaps the headline or another image — a
+  // spot that can't be found after a few tries is skipped for that word.
   // Positions are layer-relative.
-  function place(width: number, height: number, slot: Slot, side: 'left' | 'right'): DOMRect {
+  function place(width: number, height: number, slot: Slot, side: 'left' | 'right'): DOMRect | null {
     const layerRect = layer.getBoundingClientRect();
-    // The third image of each set: anywhere in the hero.
-    if (slot === 'anywhere') {
-      return new DOMRect(
-        Math.random() * Math.max(0, layerRect.width - width),
-        Math.random() * Math.max(0, layerRect.height - height),
-        width,
-        height
-      );
-    }
     const h = headline.getBoundingClientRect();
-    const clearTop = h.top - layerRect.top - HEADLINE_CLEARANCE_PX;
-    const clearBottom = h.bottom - layerRect.top + HEADLINE_CLEARANCE_PX;
-    const [minY, maxY] = slot === 'top' ? [0, clearTop - height] : [clearBottom, layerRect.height - height];
+    const headlineRect = new DOMRect(h.left - layerRect.left, h.top - layerRect.top, h.width, h.height);
 
-    const half = layerRect.width / 2;
-    const [minX, maxX] =
-      side === 'left' ? [0, Math.max(0, half - width)] : [Math.min(half, layerRect.width - width), layerRect.width - width];
+    let [minX, maxX] = [0, layerRect.width - width];
+    let [minY, maxY] = [0, layerRect.height - height];
+    if (slot !== 'anywhere') {
+      const half = layerRect.width / 2;
+      [minX, maxX] = side === 'left' ? [0, Math.max(0, half - width)] : [Math.min(half, maxX), maxX];
+      [minY, maxY] =
+        slot === 'top'
+          ? [0, headlineRect.top - HEADLINE_CLEARANCE_PX - height]
+          : [headlineRect.bottom + HEADLINE_CLEARANCE_PX, maxY];
+    }
+    if (maxX < minX || maxY < minY) return null;
 
-    return new DOMRect(
-      minX + Math.random() * (maxX - minX),
-      minY + Math.random() * Math.max(0, maxY - minY),
-      width,
-      height
-    );
+    for (let i = 0; i < PLACEMENT_ATTEMPTS; i++) {
+      const rect = new DOMRect(minX + Math.random() * (maxX - minX), minY + Math.random() * (maxY - minY), width, height);
+      if (intersects(rect, headlineRect, HEADLINE_CLEARANCE_PX)) continue;
+      if (visible.some((p) => intersects(rect, p.rect, IMAGE_GAP_PX))) continue;
+      return rect;
+    }
+    return null;
   }
 
   // Safety net for a set still fading when the next word starts (e.g. a
@@ -131,6 +136,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     // Clamped so very tall or panoramic images still read as photos.
     const width = height * Math.min(1.6, Math.max(0.7, image.aspectRatio));
     const rect = place(width, height, slot, side);
+    if (!rect) return;
 
     const el = document.createElement('div');
     el.className = 'hero-popup';
