@@ -22,7 +22,7 @@ const FADE_IN_MS = 1200;
 const FADE_OUT_MS = 800;
 // How far each image wanders from its spot while floating. The spacing
 // below allows for two neighbours drifting towards each other at once.
-const DRIFT_PX = 18;
+const DRIFT_PX = 6;
 const HEADLINE_CLEARANCE_PX = 16 + DRIFT_PX;
 const IMAGE_GAP_PX = 8 + DRIFT_PX * 2;
 const PLACEMENT_ATTEMPTS = 60;
@@ -131,8 +131,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       `left:${rect.x}px;top:${rect.y}px;width:${width}px;height:${height}px;` +
       `--drift-x:${(Math.random() < 0.5 ? -1 : 1) * DRIFT_PX * (0.6 + Math.random() * 0.4)}px;` +
       `--drift-y:${(Math.random() < 0.5 ? -1 : 1) * DRIFT_PX * (0.6 + Math.random() * 0.4)}px;` +
-      `--drift-rotate:${(Math.random() * 2 - 1) * 2}deg;` +
-      `--drift-duration:${6 + Math.random() * 4}s;animation-delay:${-Math.random() * 10}s`;
+      `--drift-rotate:${(Math.random() * 2 - 1) * 0.5}deg;` +
+      `--drift-duration:${10 + Math.random() * 6}s;animation-delay:${-Math.random() * 16}s`;
     const card = document.createElement('div');
     card.className = 'hero-popup';
     const img = document.createElement('img');
