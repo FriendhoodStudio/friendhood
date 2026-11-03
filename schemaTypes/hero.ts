@@ -107,6 +107,34 @@ export default defineType({
       options: { accept: 'video/*' },
       hidden: ({ parent }) => parent?.mediaType !== 'video',
     }),
+    defineField({
+      name: 'popUpImagesEnabled',
+      title: 'Pop-up project images',
+      description:
+        'Two project images roll up around the headline each time the hover word changes. Turn off to show just the headline.',
+      type: 'boolean',
+      initialValue: true,
+    }),
+    defineField({
+      name: 'popUpImages',
+      title: 'Pop-up images',
+      description:
+        'Optional. Leave empty to pick automatically from published case studies (each one\'s hero image plus a few from its body). Add images here to use only these instead.',
+      type: 'array',
+      of: [
+        {
+          type: 'image',
+          fields: [
+            defineField({
+              name: 'alt',
+              title: 'Alt text',
+              type: 'string',
+            }),
+          ],
+        },
+      ],
+      hidden: ({ parent }) => parent?.popUpImagesEnabled === false,
+    }),
   ],
   preview: {
     select: {

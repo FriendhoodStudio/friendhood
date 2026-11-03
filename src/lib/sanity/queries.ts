@@ -159,7 +159,17 @@ const HERO_QUERY = `*[_type == "hero"][0]{
   "heroVideoUrl": heroVideo.asset->url,
   videoPoster,
   "heroVideoMobileUrl": heroVideoMobile.asset->url,
-  "reelVideoUrl": reelVideo.asset->url
+  "reelVideoUrl": reelVideo.asset->url,
+  popUpImagesEnabled,
+  "popUpImages": popUpImages[]{ asset, alt, "aspectRatio": asset->metadata.dimensions.aspectRatio },
+  "projectPopUpImages": *[_type == "project" && comingSoon != true && defined(slug.current)]{
+    title,
+    "images": [heroImage, ...body[_type == "mediaBlock"].items[_type == "image"]][0...5]{
+      asset,
+      alt,
+      "aspectRatio": asset->metadata.dimensions.aspectRatio
+    }
+  }
 }`;
 
 export async function fetchHero(): Promise<HeroData | null> {

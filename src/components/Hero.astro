@@ -17,6 +17,7 @@ const heroVideoMobileUrl = hero?.heroVideoMobileUrl;
 // render once this is actually set, rather than falling back to replaying
 // the tiny background loop unmuted.
 const reelVideoUrl = hero?.reelVideoUrl;
+const popUpImages = hero?.popUpImages ?? [];
 
 // Splits the headline around the one literal word that rolls on hover, so
 // the rest of the sentence stays put — e.g. "For people thinking about
@@ -76,7 +77,17 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       can't collapse like that, at the cost of being an approximation
       rather than an exact centre between two measured points. margin-top
       nudges it down slightly for nav clearance. */}
-  <div class="flex min-h-[76dvh] w-full items-center justify-center" style="margin-top:var(--nav-menu-height)">
+  <div class="relative flex min-h-[76dvh] w-full items-center justify-center" style="margin-top:var(--nav-menu-height)">
+    {/* Project images that roll up around the headline as the word changes
+        — filled in by initHeroPopups (see the script below). Behind the
+        headline (z-10 vs its z-20), and the script keeps them clear of it
+        anyway. Decorative, so hidden from screen readers. */}
+    {popUpImages.length > 1 && (
+      <Fragment>
+        <div class="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden="true" data-hero-popups></div>
+        <script type="application/json" data-hero-popup-images set:html={JSON.stringify(popUpImages)} />
+      </Fragment>
+    )}
     <h1
       class="hero-fade-in hero-headline-shadow hero-headline-heavy-font relative z-20 max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front pointer-events-none"
     >
@@ -509,10 +520,28 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
   .reel-close-btn.is-settling {
     transition: none;
   }
+
+  /* Pop-up project images — created by initHeroPopups, so :global (Astro's
+     scoping only reaches elements in this file's own markup). The outer box
+     is the mask; the img inside rolls up through it. */
+  :global(.hero-popup) {
+    position: absolute;
+    overflow: hidden;
+    border-radius: 8px;
+  }
+  :global(.hero-popup img) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: translateY(105%);
+  }
 </style>
 
 <script>
   import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock';
+  import { initHeroPopups } from '../lib/heroPopups';
+  import type { HeroPopUpImage } from '../types/hero';
 
   // Scroll-scrubbed hero entrance, modeled on wearecollins.com's reel section:
   // the media block grows from slightly-scaled-down to full size, and the small
@@ -648,6 +677,14 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     // doesn't persist into the advance() closure defined below.
     const win = wordWindow;
     const track = wordTrack;
+
+    const popupLayer = document.querySelector<HTMLElement>('[data-hero-popups]');
+    const popupData = document.querySelector<HTMLScriptElement>('[data-hero-popup-images]');
+    const popupHeadline = document.querySelector<HTMLElement>('.hero-headline-shadow');
+    const popups =
+      popupLayer && popupData && popupHeadline
+        ? initHeroPopups(popupLayer, popupHeadline, JSON.parse(popupData.textContent || '[]') as HeroPopUpImage[])
+        : null;
     const frameCount = track.children.length;
     let index = 0;
 
@@ -838,6 +875,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       if (index >= frameCount - 1) resetToFirstFrame();
       index++;
       playWordRoll(-index * frameStep);
+      popups?.onWordAdvance();
       const width = frameWidths[index];
       if (width) animateWordWidth(width);
     }

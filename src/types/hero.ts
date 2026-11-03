@@ -14,4 +14,13 @@ export interface HeroData {
    * separate file from `media`'s short muted loop. Undefined until one is
    * uploaded in Studio, which is also what gates the trigger button. */
   reelVideoUrl?: string;
+  /** Project images that roll up around the headline as the hover word
+   * cycles. Empty when the effect is switched off in Studio. */
+  popUpImages: HeroPopUpImage[];
+}
+
+export interface HeroPopUpImage {
+  url: string;
+  alt: string;
+  aspectRatio: number;
 }

@@ -1,7 +1,7 @@
 import { createImageUrlBuilder, type SanityImageSource } from '@sanity/image-url';
 import type { Category, ProjectCardData } from '../../types/project';
 import type { Media } from '../../types/media';
-import type { HeroData } from '../../types/hero';
+import type { HeroData, HeroPopUpImage } from '../../types/hero';
 import type { ServiceItem, ServicesData } from '../../types/services';
 import type { LogoItem, LogoCarouselData } from '../../types/logoCarousel';
 import type { LinkCardItem, LinkCardsData } from '../../types/linkCards';
@@ -259,6 +259,32 @@ export interface RawHero extends RawMedia {
   tagline: string;
   heroVideoMobileUrl?: string;
   reelVideoUrl?: string;
+  popUpImagesEnabled?: boolean;
+  popUpImages?: RawPopUpImage[] | null;
+  projectPopUpImages?: { title: string; images: RawPopUpImage[] | null }[];
+}
+
+interface RawPopUpImage {
+  asset?: SanityImageSource;
+  alt?: string;
+  aspectRatio?: number;
+}
+
+// Pop-ups render small (a few hundred px tall at most), so a modest width
+// keeps ~70 of them cheap to fetch one pair at a time.
+function toPopUpImages(raw: RawHero): HeroPopUpImage[] {
+  if (raw.popUpImagesEnabled === false) return [];
+  const custom = (raw.popUpImages ?? []).map((image) => ({ image, fallbackAlt: '' }));
+  const fromProjects = (raw.projectPopUpImages ?? []).flatMap((project) =>
+    (project.images ?? []).map((image) => ({ image, fallbackAlt: project.title }))
+  );
+  return (custom.length > 0 ? custom : fromProjects)
+    .filter(({ image }) => image?.asset)
+    .map(({ image, fallbackAlt }) => ({
+      url: urlFor(image.asset!).width(600).fit('max').url(),
+      alt: image.alt || fallbackAlt,
+      aspectRatio: image.aspectRatio || 4 / 3,
+    }));
 }
 
 export function toHeroData(raw: RawHero): HeroData {
@@ -270,6 +296,7 @@ export function toHeroData(raw: RawHero): HeroData {
     media: toMedia(raw, raw.headline),
     heroVideoMobileUrl: raw.heroVideoMobileUrl,
     reelVideoUrl: raw.reelVideoUrl,
+    popUpImages: toPopUpImages(raw),
   };
 }
 
