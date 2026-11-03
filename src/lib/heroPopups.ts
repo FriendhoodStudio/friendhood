@@ -129,16 +129,15 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     layer.appendChild(el);
     visible.push({ el, rect });
 
-    // Grows past full size and settles back (the same overshoot shape as
-    // the headline word's width change and the nav/footer button release),
-    // then carries straight on into shrinking and fading out. Blurred at
-    // both ends so the fades read soft rather than as a hard cut.
+    // Grows past full size (the same overshoot as the headline word's width
+    // change and the nav/footer button release), then keeps shrinking
+    // straight on into the fade — never resting at full size, so it's always
+    // moving. Blurred at both ends so the fades read soft, not as a cut.
     const anim = el.animate(
       [
         { transform: 'scale(0.4)', opacity: 0, filter: 'blur(12px)', easing: 'ease-out' },
-        { transform: 'scale(1.06)', opacity: 1, filter: 'blur(0px)', offset: 0.35, easing: 'ease-in-out' },
-        { transform: 'scale(0.98)', opacity: 1, filter: 'blur(0px)', offset: 0.5, easing: 'ease-out' },
-        { transform: 'scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0.58, easing: 'ease-in' },
+        { transform: 'scale(1.06)', opacity: 1, filter: 'blur(0px)', offset: 0.38, easing: 'ease-in' },
+        { transform: 'scale(0.98)', opacity: 1, filter: 'blur(0px)', offset: 0.62, easing: 'linear' },
         { transform: 'scale(0.8)', opacity: 0, filter: 'blur(12px)' },
       ],
       { duration: LIFETIME_MS, fill: 'both' }
