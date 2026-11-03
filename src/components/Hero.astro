@@ -596,7 +596,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
      says it's grabbable. Touch scrolling is left on: a quick swipe over an
      image still scrolls the page, and the script stops it only once an
      image has been picked up. */
-  :global(.hero-float) {
+  :global(.hero-float),
+  :global(.hero-float img) {
     cursor: grab;
     user-select: none;
     -webkit-user-select: none;

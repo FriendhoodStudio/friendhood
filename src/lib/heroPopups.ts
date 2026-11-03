@@ -303,6 +303,10 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     wrap.addEventListener('pointerleave', (e) => e.pointerType !== 'touch' && release(floater));
     wrap.addEventListener('pointerdown', (e) => startDrag(floater, e));
     wrap.addEventListener('touchstart', (e) => watchTouch(floater, e), { passive: true });
+    // Safari decides whether a touch can be stopped from scrolling from the
+    // listeners already on the spot when the finger lands, so this one has
+    // to be here from the start, not added once a hold begins.
+    wrap.addEventListener('touchmove', (e) => floater.dragging && e.preventDefault(), { passive: false });
     // Android opens the image menu on a long press, right as a drag starts.
     wrap.addEventListener('contextmenu', (e) => floater.dragging && e.preventDefault());
     return floater;
@@ -468,9 +472,10 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
 
   // Touch: press and hold still on an image to pick it up, then drag it
   // about. A finger that moves off before then is a scroll or swipe, and is
-  // left to the page. Once the image is up, cancelling the touch moves stops
-  // the page scrolling under the drag (the browser only lets that happen
-  // before it has started scrolling, which the hold makes sure of).
+  // left to the page. Once the image is up, the touchmove listener set up
+  // with the image stops the page scrolling under the drag (the browser
+  // only lets that happen before it has started scrolling, which the hold
+  // makes sure of).
   function watchTouch(f: Floater, e: TouchEvent) {
     if (e.touches.length !== 1 || !floaters.includes(f)) return;
     const { identifier, clientX: x0, clientY: y0 } = e.touches[0];
@@ -482,7 +487,6 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       const t = ours(ev);
       if (!t) return;
       if (drag) {
-        ev.preventDefault();
         drag.move(t.clientX, t.clientY);
       } else if (Math.hypot(t.clientX - x0, t.clientY - y0) > HOLD_SLOP_PX) {
         stop();
@@ -497,7 +501,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       drag?.end();
       drag = null;
     }
-    f.wrap.addEventListener('touchmove', move, { passive: false });
+    f.wrap.addEventListener('touchmove', move, { passive: true });
     f.wrap.addEventListener('touchend', end);
     f.wrap.addEventListener('touchcancel', end);
   }
