@@ -239,7 +239,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
           <button
             type="button"
             data-reel-trigger
-            class="reel-trigger-btn absolute bottom-[var(--page-margin)] left-[var(--page-margin)] cursor-pointer rounded-full border border-front/15 bg-grey-600 px-btn-x py-btn-y font-body text-body-3 text-front backdrop-blur-[14px] transition-colors duration-300 ease-out hover:text-accent-yellow"
+            class="reel-trigger-btn absolute bottom-[var(--page-margin)] left-[var(--page-margin)] cursor-pointer rounded-full border border-front/15 bg-grey-600 px-btn-x py-btn-y font-body text-body-3 text-front backdrop-blur-[14px] transition-[color,opacity,visibility] duration-300 ease-out hover:text-accent-yellow data-[past=true]:invisible data-[past=true]:opacity-0"
           >
             Watch our showreel
           </button>
@@ -686,6 +686,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const popupLayer = document.querySelector<HTMLElement>('[data-hero-popups]');
     const tagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
     const reel = document.querySelector<HTMLElement>('[data-hero-media]');
+    const reelButton = document.querySelector<HTMLElement>('[data-reel-trigger]');
     const statement = document.querySelector<HTMLElement>('[data-hero-statement]');
     const glow = document.querySelector<HTMLElement>('.hero-gradient');
     const overlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
@@ -791,6 +792,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
         // Only clickable (the "Watch our showreel" button) while it's landed.
         reel.style.pointerEvents = into > 0.95 && reelOut < 0.05 ? 'auto' : 'none';
       }
+      // The button fades out as the reel starts zooming past (rather than
+      // riding along into the blurred backdrop) and back when you scroll up.
+      // Hidden, not just faded, so its backdrop blur isn't drawn.
+      if (reelButton) reelButton.dataset.past = String(reelOut > 0.02);
       if (statement) {
         statement.style.opacity = String(statementIn * handoverFade);
         // Scrolls away at the page's own speed during the hand-over.
