@@ -727,7 +727,9 @@ const afterParts = headlineAfter.split(/(\s+)/);
         tagline.style.color = mix(darken);
         tagline.style.opacity = String(1 - clamp(q / 0.12, 0, 1));
       }
+      const wasUnderway = stageUnderway;
       stageUnderway = p > 0.002;
+      if (wasUnderway && !stageUnderway) window.dispatchEvent(new Event('hero-stage-rest'));
       popups?.setPaused(p > 0.02);
 
       if (reel) {
@@ -880,12 +882,22 @@ const afterParts = headlineAfter.split(/(\s+)/);
     // them, re-measured on resize/font-load same as frameWidths below since
     // both em-based values (the h-[1em] frame and the gap-[0.15em]) scale
     // with font-size across breakpoints.
+    // The window's true (unscaled) size. While the scroll stage has the
+    // headline scaled up, getBoundingClientRect reports the enlarged size —
+    // measuring then (on a resize or late font load) used to leave the roll
+    // step and window width wrong once the headline was back at rest: the
+    // word sat too high, clipped, in a too-wide slot. Dividing out the
+    // stage's scale on the word's piece keeps every measurement true.
+    const stageScale = () => parseFloat(win.parentElement?.style.scale || '1') || 1;
+    const trueWidth = (el: Element) => el.getBoundingClientRect().width / stageScale();
+    const trueHeight = (el: Element) => el.getBoundingClientRect().height / stageScale();
+
     let frameStep = 0;
     function measureFrameStep() {
       const first = track.children[0] as HTMLElement | undefined;
       if (!first) return;
       const gap = parseFloat(getComputedStyle(track).rowGap) || 0;
-      frameStep = first.getBoundingClientRect().height + gap;
+      frameStep = trueHeight(first) + gap;
     }
     measureFrameStep();
 
@@ -908,7 +920,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     // overshoots it, so the fix belongs on the clip-path (paint-only, see
     // .hero-word-window-clip) rather than here on layout.
     const frames = Array.from(track.children) as HTMLElement[];
-    let frameWidths = frames.map((frame) => frame.getBoundingClientRect().width);
+    let frameWidths = frames.map((frame) => trueWidth(frame));
     if (frameWidths[0]) win.style.width = `${frameWidths[0]}px`;
 
     // On a cold cache, this script can run (and take the measurement above)
@@ -919,7 +931,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     // once the real fonts are actually ready corrects that; a no-op on a
     // warm cache where they were already loaded before this ran.
     document.fonts.ready.then(() => {
-      frameWidths = frames.map((frame) => frame.getBoundingClientRect().width);
+      frameWidths = frames.map((frame) => trueWidth(frame));
       const width = frameWidths[index];
       if (width) win.style.width = `${width}px`;
       measureFrameStep();
@@ -999,7 +1011,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // resting width, so a rapid word-to-word change mid-swing would
       // measure "start" as if nothing was moving and jump instead of
       // continuing smoothly. Same bug class fixed elsewhere on this site.
-      const startWidth = win.getBoundingClientRect().width;
+      const startWidth = trueWidth(win);
       widthAnim?.cancel();
       const delta = targetWidth - startWidth;
       // The roll itself no longer overshoots (see the no-overshoot comment
@@ -1066,11 +1078,11 @@ const afterParts = headlineAfter.split(/(\s+)/);
     window.setInterval(advance, 2000);
 
     let resizeRafId = 0;
-    window.addEventListener('resize', () => {
+    const remeasureWord = () => {
       if (resizeRafId) return;
       resizeRafId = requestAnimationFrame(() => {
         resizeRafId = 0;
-        frameWidths = frames.map((frame) => frame.getBoundingClientRect().width);
+        frameWidths = frames.map((frame) => trueWidth(frame));
         const width = frameWidths[index];
         if (width) {
           // Instant, not animated — this is a layout correction for the new
@@ -1093,7 +1105,11 @@ const afterParts = headlineAfter.split(/(\s+)/);
         rollAnim = null;
         track.style.transform = `translateY(${-index * frameStep}px)`;
       });
-    });
+    };
+    window.addEventListener('resize', remeasureWord);
+    // And again whenever the scroll stage returns the headline to rest, as
+    // a belt-and-braces correction for anything measured mid-transition.
+    window.addEventListener('hero-stage-rest', remeasureWord);
 
   }
 
