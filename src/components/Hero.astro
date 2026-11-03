@@ -580,11 +580,14 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
   :global(.hero-float.is-dragging) {
     cursor: grabbing;
   }
+  /* The rounded corners live on the img itself, not as overflow: hidden on
+     the card: the card is what gets blurred, and clipping it sliced the
+     blur off at the card's edges (very visible on iOS Safari) — leaving
+     crisp-edged boxes of fuzz instead of soft shapes. Unclipped, the blur
+     feathers out past the image's edges. */
   :global(.hero-popup) {
     width: 100%;
     height: 100%;
-    overflow: hidden;
-    border-radius: 8px;
     opacity: 0;
   }
   :global(.hero-popup img) {
@@ -592,6 +595,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     width: 100%;
     height: 100%;
     object-fit: cover;
+    border-radius: 8px;
   }
   /* A loose loop rather than a straight back-and-forth: out along one axis,
      across, back along the other, with a slight sway — so it reads as

@@ -33,6 +33,8 @@ const BOTTOM_INSET_PX = 72;
 // Share of the free space around the headline the field fills — sets the
 // image size, so it scales with the number of words and the screen.
 const FIELD_COVERAGE = 0.3;
+// Most floating images a phone-sized screen holds at once.
+const MOBILE_MAX_ON_SCREEN = 4;
 // Random spots tried when placing an image, and how many of the best it
 // picks between at random.
 const SPOT_CANDIDATES = 60;
@@ -136,10 +138,17 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
 
   // Sized so the whole field (one image per word) fills a set share of the
   // free space around the headline, whatever the screen or word count.
+  // Phones get a sparser field — a few images rather than one per word —
+  // so the small screen doesn't fill up. Words without one waiting still
+  // get an image placed when they come up (see showWord).
+  function maxOnScreen() {
+    return layer.getBoundingClientRect().width < 768 ? Math.min(MOBILE_MAX_ON_SCREEN, wordCount) : wordCount;
+  }
+
   function measureBaseHeight() {
     const b = bounds();
     const free = Math.max(0, (b.width - EDGE_INSET_PX * 2) * (b.height - EDGE_INSET_PX - BOTTOM_INSET_PX) - b.headline.w * b.headline.h);
-    const perImage = (free * FIELD_COVERAGE) / wordCount;
+    const perImage = (free * FIELD_COVERAGE) / maxOnScreen();
     // Area = h × (h × ~1.3 average aspect), solved for h.
     const mobile = b.width < 768;
     baseHeight = Math.min(mobile ? 120 : 240, Math.max(mobile ? 64 : 110, Math.sqrt(perImage / 1.3)));
@@ -293,14 +302,15 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       .catch(() => {});
   }
 
-  // Gone for good: makes way for the word's next image (unless the word
-  // already has one waiting, placed when it came up while this one was
-  // still on its way out).
+  // Gone for good: makes way for the word's next image — unless the word
+  // already has one waiting (placed when it came up while this one was
+  // still on its way out), or the screen already holds as many as it
+  // should (phones keep a sparser field).
   function retire(f: Floater) {
     if (!floaters.includes(f)) return;
     floaters = floaters.filter((g) => g !== f);
     f.wrap.remove();
-    if (!floaters.some((g) => g.word === f.word)) addFloater(f.word);
+    if (!floaters.some((g) => g.word === f.word) && floaters.length < maxOnScreen()) addFloater(f.word);
   }
 
   // A word reveal: one smooth movement up out of the blur, sharpening and
@@ -403,7 +413,11 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     floaters.forEach((f) => f.wrap.remove());
     floaters = [];
     measureBaseHeight();
-    const created = await Promise.all(Array.from({ length: wordCount }, (_, word) => createFloater(word)));
+    // One per word, or on phones a random handful of the words.
+    const words = Array.from({ length: wordCount }, (_, word) => word)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, maxOnScreen());
+    const created = await Promise.all(words.map((word) => createFloater(word)));
     for (const f of created) {
       if (f && moveToOpenSpot(f)) floaters.push(f);
     }
