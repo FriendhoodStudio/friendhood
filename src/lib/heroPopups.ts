@@ -44,6 +44,11 @@ const ALIGN_PENALTY = 80;
 // How big an image grows as it rises into focus. It sits behind the
 // headline, so growing near it never covers the text.
 const REVEAL_SCALE = 1.5;
+const REVEALED: Keyframe = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, filter: 'blur(0px)' };
+// Hovering an image brings it up the same way, and it settles back when
+// the cursor leaves.
+const HOVER_RISE_MS = 600;
+const HOVER_SETTLE_MS = 900;
 // How far down the page (as a share of the screen's height) the field has
 // fully faded away by.
 const SCROLL_FADE_END = 0.25;
@@ -62,6 +67,10 @@ interface Floater {
   card: HTMLElement;
   word: number;
   depth: number;
+  // Mid word-reveal (which hovering never interrupts), and the hover rise
+  // or settle currently playing, if any.
+  revealing: boolean;
+  hoverAnim: Animation | null;
   x: number;
   y: number;
   w: number;
@@ -220,7 +229,13 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     // The standalone translate property, so the parallax stacks with the
     // drift loop's transform on the same element instead of replacing it.
     wrap.style.translate = `0 ${window.scrollY * depth}px`;
-    return { wrap, card, word, depth, x: 0, y: 0, w, h };
+    const floater: Floater = { wrap, card, word, depth, revealing: false, hoverAnim: null, x: 0, y: 0, w, h };
+    if (canHover) {
+      wrap.style.pointerEvents = 'auto';
+      wrap.addEventListener('pointerenter', () => hoverRise(floater));
+      wrap.addEventListener('pointerleave', () => hoverSettle(floater));
+    }
+    return floater;
   }
 
   function fadeIn(floater: Floater, delay = 0) {
@@ -247,16 +262,55 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   // carries straight on falling away — shrinking, blurring and fading until
   // it's gone — with no hold or stop at the blurred resting state between.
   // Then the word's next image drifts in.
+  // Hover-capable devices only — on touch there's nothing to hover, and a
+  // tap shouldn't be swallowed by a decorative image.
+  const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  function hoverRise(floater: Floater) {
+    if (floater.revealing) return;
+    floater.wrap.style.zIndex = '1';
+    // A single keyframe animates from wherever the image currently is
+    // (including partway through a settle), so it never jumps.
+    floater.hoverAnim = floater.card.animate([REVEALED], {
+      duration: HOVER_RISE_MS,
+      easing: 'ease-out',
+      fill: 'forwards',
+    });
+  }
+
+  // Eases back to the blurred resting state. Its own animation is left in
+  // place afterwards to hold it there: the browser automatically discards
+  // older finished animations (like the original fade-in) once a newer one
+  // fully overrides them, so cancelling this would leave the image with
+  // nothing holding it visible.
+  function hoverSettle(floater: Floater) {
+    if (floater.revealing || !floater.hoverAnim) return;
+    const anim = floater.card.animate([RESTING], { duration: HOVER_SETTLE_MS, easing: 'ease-in-out', fill: 'forwards' });
+    floater.hoverAnim = anim;
+    anim.finished
+      .then(() => {
+        if (floater.hoverAnim === anim) floater.wrap.style.zIndex = '';
+      })
+      .catch(() => {});
+  }
+
   function riseAndFall(floater: Floater, delay: number) {
+    // A word reveal takes over from any hover, starting from wherever the
+    // image is right now (resting, or partway up from a hover) so it never
+    // jumps.
+    floater.revealing = true;
+    const now = getComputedStyle(floater.card);
+    const from: Keyframe = { transform: now.transform, opacity: now.opacity, filter: now.filter };
+    floater.hoverAnim = null;
     floater.wrap.style.zIndex = '1';
     floater.card
       .animate(
         [
-          { ...RESTING, easing: 'ease-in-out' },
-          { transform: `scale(${REVEAL_SCALE})`, opacity: 1, filter: 'blur(0px)', offset: 0.5, easing: 'ease-in' },
+          { ...from, easing: 'ease-in-out' },
+          { ...REVEALED, offset: 0.5, easing: 'ease-in' },
           GONE,
         ],
-        { duration: REVEAL_MS, delay, fill: 'forwards' }
+        { duration: REVEAL_MS, delay, fill: 'both' }
       )
       .finished.then(() => {
         if (!floaters.includes(floater)) return;
