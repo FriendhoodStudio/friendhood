@@ -567,6 +567,18 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     position: absolute;
     animation: hero-float-drift var(--drift-duration, 10s) ease-in-out infinite;
   }
+  /* Hover-capable devices can pick an image up and drag it about (the
+     script only turns pointer events on for them). No text selection or
+     native image drag getting in the way, and the cursor says it's
+     grabbable. */
+  :global(.hero-float) {
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+  }
+  :global(.hero-float.is-dragging) {
+    cursor: grabbing;
+  }
   :global(.hero-popup) {
     width: 100%;
     height: 100%;

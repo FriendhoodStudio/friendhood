@@ -6,9 +6,10 @@ import type { HeroPopUpImage } from '../types/hero';
  * image rises forward — sharpening and growing — and sinks back in one
  * smooth movement; then it dissolves and the word's next image drifts in
  * wherever there's most room, waiting for the word to come round again. The
- * whole field fades away as you scroll. On desktop, hovering an image sets
- * it off early — it rises and falls away the same way, and its word's next
- * image takes its place. Nothing overlaps the headline or
+ * whole field fades away as you scroll. On desktop, hovering an image brings
+ * it up and holds it there — it can be clicked and dragged about — and once
+ * the cursor leaves it falls away and its word's next image takes its
+ * place. Nothing overlaps the headline or
  * another image. */
 
 // How many images each word cycles through, one on screen at a time.
@@ -47,6 +48,10 @@ const ALIGN_PENALTY = 80;
 // headline, so growing near it never covers the text.
 const REVEAL_SCALE = 1.5;
 const REVEALED: Keyframe = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, filter: 'blur(0px)' };
+// Hover: how quickly an image comes up and is held, and how long it takes
+// to fall away once the cursor leaves.
+const HOLD_RISE_MS = 700;
+const RELEASE_FALL_MS = 1500;
 // How far down the page (as a share of the screen's height) the field has
 // fully faded away by.
 const SCROLL_FADE_END = 0.25;
@@ -65,8 +70,13 @@ interface Floater {
   card: HTMLElement;
   word: number;
   depth: number;
-  // Mid rise-and-fall, so a word change or hover can't set it off twice.
-  revealing: boolean;
+  // resting: blurred in the field. revealing: mid word-reveal (rise then
+  // fall in one go). held: brought up by hover and staying up. falling: on
+  // its way out after a hover.
+  state: 'resting' | 'revealing' | 'held' | 'falling';
+  // The rise/fall currently playing on the card, if any.
+  anim: Animation | null;
+  dragging: boolean;
   x: number;
   y: number;
   w: number;
@@ -219,20 +229,23 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     const img = document.createElement('img');
     img.src = image.url;
     img.alt = '';
+    img.draggable = false;
     card.appendChild(img);
     wrap.appendChild(card);
     const depth = PARALLAX_MIN + Math.random() * (PARALLAX_MAX - PARALLAX_MIN);
     // The standalone translate property, so the parallax stacks with the
     // drift loop's transform on the same element instead of replacing it.
     wrap.style.translate = `0 ${window.scrollY * depth}px`;
-    const floater: Floater = { wrap, card, word, depth, revealing: false, x: 0, y: 0, w, h };
-    // Hovering sets an image off early: it rises and falls away just as if
-    // its word had come up, and the word's next image takes its place.
+    const floater: Floater = { wrap, card, word, depth, state: 'resting', anim: null, dragging: false, x: 0, y: 0, w, h };
+    // Hovering brings an image up and holds it there until the cursor
+    // leaves; it can be clicked and dragged about while it's up. Desktop
+    // only — on touch there's nothing to hover, and a tap shouldn't be
+    // swallowed by a decorative image.
     if (canHover) {
       wrap.style.pointerEvents = 'auto';
-      wrap.addEventListener('pointerenter', () => {
-        if (!floater.revealing) riseAndFall(floater, 0);
-      });
+      wrap.addEventListener('pointerenter', () => hold(floater));
+      wrap.addEventListener('pointerleave', () => release(floater));
+      wrap.addEventListener('pointerdown', (e) => startDrag(floater, e));
     }
     return floater;
   }
@@ -257,55 +270,123 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     return floater;
   }
 
-  // One smooth movement: rises out of the blur, sharpening and growing, then
-  // carries straight on falling away — shrinking, blurring and fading until
-  // it's gone — with no hold or stop at the blurred resting state between.
-  // Then the word's next image drifts in.
-  // Hover-capable devices only — on touch there's nothing to hover, and a
-  // tap shouldn't be swallowed by a decorative image.
   const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  function riseAndFall(floater: Floater, delay: number) {
-    // Starts from wherever the image is right now (it may still be fading
-    // in if it's hovered straight away), so it never jumps.
-    floater.revealing = true;
-    const now = getComputedStyle(floater.card);
-    const from: Keyframe = { transform: now.transform, opacity: now.opacity, filter: now.filter };
-    floater.wrap.style.zIndex = '1';
-    floater.card
-      .animate(
-        [
-          { ...from, easing: 'ease-in-out' },
-          { ...REVEALED, offset: 0.5, easing: 'ease-in' },
-          GONE,
-        ],
-        { duration: REVEAL_MS, delay, fill: 'both' }
-      )
-      .finished.then(() => {
-        if (!floaters.includes(floater)) return;
-        floaters = floaters.filter((f) => f !== floater);
-        floater.wrap.remove();
-        // Unless its word already has a new image waiting (placed when the
-        // word came up while this one was still falling from a hover).
-        if (!floaters.some((f) => f.word === floater.word)) addFloater(floater.word);
+  // Where the card is right now, mid-animation or not — every move below
+  // starts from here, so catching an image partway through anything carries
+  // on smoothly rather than jumping.
+  function currentFrame(f: Floater): Keyframe {
+    const now = getComputedStyle(f.card);
+    return { transform: now.transform, opacity: now.opacity, filter: now.filter };
+  }
+
+  function play(f: Floater, keyframes: Keyframe[], options: KeyframeAnimationOptions, onDone?: () => void) {
+    const previous = f.anim;
+    const anim = f.card.animate(keyframes, { ...options, fill: 'both' });
+    // Cancelled only once the new one has taken over, so there's no frame
+    // where neither holds the card.
+    previous?.cancel();
+    f.anim = anim;
+    anim.finished
+      .then(() => {
+        if (f.anim === anim) onDone?.();
       })
       .catch(() => {});
   }
 
-  // Each word change brings that word's image up. If the word has no image
-  // waiting (a hover already set it off, or there was no clear space for it
+  // Gone for good: makes way for the word's next image (unless the word
+  // already has one waiting, placed when it came up while this one was
+  // still on its way out).
+  function retire(f: Floater) {
+    if (!floaters.includes(f)) return;
+    floaters = floaters.filter((g) => g !== f);
+    f.wrap.remove();
+    if (!floaters.some((g) => g.word === f.word)) addFloater(f.word);
+  }
+
+  // A word reveal: one smooth movement up out of the blur, sharpening and
+  // growing, then straight on falling away — shrinking, blurring and fading
+  // until it's gone — with no hold in between.
+  function wordReveal(f: Floater, delay: number) {
+    f.state = 'revealing';
+    f.wrap.style.zIndex = '1';
+    play(
+      f,
+      [{ ...currentFrame(f), easing: 'ease-in-out' }, { ...REVEALED, offset: 0.5, easing: 'ease-in' }, GONE],
+      { duration: REVEAL_MS, delay },
+      () => retire(f)
+    );
+  }
+
+  // Hover: up into focus and held there (also catches an image mid word
+  // reveal, or mid fall after an earlier hover, and brings it back up).
+  function hold(f: Floater) {
+    if (!floaters.includes(f) || f.state === 'held') return;
+    f.state = 'held';
+    f.wrap.style.zIndex = '2';
+    play(f, [currentFrame(f), REVEALED], { duration: HOLD_RISE_MS, easing: 'ease-out' });
+  }
+
+  // Mouse off (and not mid-drag): falls away from wherever it is, and the
+  // word's next image takes its place.
+  function release(f: Floater) {
+    if (f.state !== 'held' || f.dragging) return;
+    f.state = 'falling';
+    f.wrap.style.zIndex = '1';
+    play(f, [currentFrame(f), GONE], { duration: RELEASE_FALL_MS, easing: 'ease-in' }, () => retire(f));
+  }
+
+  // Click and drag a held image anywhere in the hero. Pointer capture keeps
+  // the drag going even if the cursor outruns the image; letting go off the
+  // image releases it as if the mouse had just left.
+  function startDrag(f: Floater, e: PointerEvent) {
+    if (e.button !== 0 || !floaters.includes(f)) return;
+    e.preventDefault();
+    hold(f);
+    f.dragging = true;
+    f.wrap.classList.add('is-dragging');
+    f.wrap.setPointerCapture(e.pointerId);
+    const start = { x: e.clientX, y: e.clientY, left: f.x, top: f.y };
+    const b = bounds();
+
+    const move = (ev: PointerEvent) => {
+      f.x = Math.min(Math.max(start.left + ev.clientX - start.x, -f.w / 2), b.width - f.w / 2);
+      f.y = Math.min(Math.max(start.top + ev.clientY - start.y, -f.h / 2), b.height - f.h / 2);
+      f.wrap.style.left = `${f.x}px`;
+      f.wrap.style.top = `${f.y}px`;
+    };
+    const end = (ev: PointerEvent) => {
+      f.dragging = false;
+      f.wrap.classList.remove('is-dragging');
+      f.wrap.removeEventListener('pointermove', move);
+      f.wrap.removeEventListener('pointerup', end);
+      f.wrap.removeEventListener('pointercancel', end);
+      if (f.wrap.hasPointerCapture(ev.pointerId)) f.wrap.releasePointerCapture(ev.pointerId);
+      const r = f.wrap.getBoundingClientRect();
+      const over = ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
+      if (!over) release(f);
+    };
+    f.wrap.addEventListener('pointermove', move);
+    f.wrap.addEventListener('pointerup', end);
+    f.wrap.addEventListener('pointercancel', end);
+  }
+
+  // Each word change brings that word's image up. If it's already up
+  // (held under the cursor), it's left be. If the word has no image waiting
+  // (a hover already sent it on its way, or there was no clear space for it
   // last time), one is placed now and rises straight away, so a word change
   // never goes without one.
   async function showWord(word: number) {
     if (!heroInView || scrolledAway || document.hidden) return;
-    // Skips an image already on its way out (set off early by a hover).
-    const waiting = floaters.find((f) => f.word === word && !f.revealing);
+    const mine = floaters.filter((f) => f.word === word);
+    const waiting = mine.find((f) => f.state === 'resting');
     if (waiting) {
-      riseAndFall(waiting, REVEAL_DELAY_MS);
+      wordReveal(waiting, REVEAL_DELAY_MS);
       return;
     }
+    if (mine.some((f) => f.state === 'held')) return;
     const placed = await addFloater(word);
-    if (placed) riseAndFall(placed, REVEAL_DELAY_MS);
+    if (placed) wordReveal(placed, REVEAL_DELAY_MS);
   }
 
   // Lays the whole field out at once, each image placed in turn in the most
