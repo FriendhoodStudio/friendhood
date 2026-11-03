@@ -889,18 +889,38 @@ const afterParts = headlineAfter.split(/(\s+)/);
     }
 
     if (stage) {
+      // Driven by a frame loop that runs while the stage is on screen and
+      // reads its position each frame, rather than by scroll events alone:
+      // in some Chrome windows those never reached the page, leaving the
+      // stage frozen on its first frame while the page scrolled through it.
+      // A frame where nothing has moved costs one position read.
       let rafId = 0;
-      const onScroll = () => {
+      let onScreen = true;
+      let lastTop = NaN;
+      let lastHeight = 0;
+      let chasing = false;
+      const frame = () => {
+        rafId = 0;
+        const top = stage.getBoundingClientRect().top;
+        const moved = top !== lastTop || window.innerHeight !== lastHeight;
+        lastTop = top;
+        lastHeight = window.innerHeight;
+        if (moved || chasing) chasing = updateStage();
+        if (onScreen || chasing) rafId = requestAnimationFrame(frame);
+      };
+      const wake = () => {
         if (rafId) return;
-        const frame = () => {
-          rafId = updateStage() ? requestAnimationFrame(frame) : 0;
-        };
         lastFrameAt = performance.now();
         rafId = requestAnimationFrame(frame);
       };
+      new IntersectionObserver(([entry]) => {
+        onScreen = entry.isIntersecting;
+        if (onScreen) wake();
+      }).observe(stage);
       updateStage();
-      window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', onScroll);
+      wake();
+      window.addEventListener('scroll', wake, { passive: true });
+      window.addEventListener('resize', wake);
     }
   }
 
