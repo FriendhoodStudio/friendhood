@@ -280,6 +280,9 @@ function toPopUpImages(raw: RawHero): HeroPopUpImage[] {
   );
   return (custom.length > 0 ? custom : fromProjects)
     .filter(({ image }) => image?.asset)
+    // Animated GIFs are left out: playing while blurred and drifting they
+    // read as flicker, fighting the calm of the field.
+    .filter(({ image }) => !String((image.asset as { _ref?: string })._ref ?? '').endsWith('-gif'))
     .map(({ image, fallbackAlt }) => ({
       url: urlFor(image.asset!).width(600).fit('max').url(),
       alt: image.alt || fallbackAlt,

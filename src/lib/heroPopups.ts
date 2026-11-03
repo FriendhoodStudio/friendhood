@@ -24,6 +24,9 @@ const IMAGE_GAP_PX = 8 + DRIFT_PX * 2;
 // Kept clear at the screen's edge, just enough that the drift never pushes
 // an image off it.
 const EDGE_INSET_PX = 12;
+// More room kept at the bottom, so the field sits clear of the tagline and
+// the showreel peeking in below it.
+const BOTTOM_INSET_PX = 72;
 // Share of the free space around the headline the field fills — sets the
 // image size, so it scales with the number of words and the screen.
 const FIELD_COVERAGE = 0.3;
@@ -113,7 +116,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   // free space around the headline, whatever the screen or word count.
   function measureBaseHeight() {
     const b = bounds();
-    const free = Math.max(0, (b.width - EDGE_INSET_PX * 2) * (b.height - EDGE_INSET_PX * 2) - b.headline.w * b.headline.h);
+    const free = Math.max(0, (b.width - EDGE_INSET_PX * 2) * (b.height - EDGE_INSET_PX - BOTTOM_INSET_PX) - b.headline.w * b.headline.h);
     const perImage = (free * FIELD_COVERAGE) / wordCount;
     // Area = h × (h × ~1.3 average aspect), solved for h.
     const mobile = b.width < 768;
@@ -136,7 +139,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     let best = { x: f.x, y: f.y, score: -Infinity };
     for (let i = 0; i < SPOT_CANDIDATES; i++) {
       f.x = EDGE_INSET_PX + Math.random() * Math.max(0, b.width - f.w - EDGE_INSET_PX * 2);
-      f.y = EDGE_INSET_PX + Math.random() * Math.max(0, b.height - f.h - EDGE_INSET_PX * 2);
+      f.y = EDGE_INSET_PX + Math.random() * Math.max(0, b.height - f.h - EDGE_INSET_PX - BOTTOM_INSET_PX);
       const score = Math.min(
         gapBetween(f, b.headline),
         ...floaters.filter((g) => g !== f).map((g) => gapBetween(f, g) - IMAGE_GAP_PX)
