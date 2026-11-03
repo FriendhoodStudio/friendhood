@@ -70,9 +70,15 @@ const { services } = Astro.props;
          is exactly why none of them moved the needle. bg-accent-yellow/90
          is already 90% opaque, so the blur was also doing very little
          visible work to begin with — there's barely any of the photo
-         underneath left to blur through. */
+         underneath left to blur through.
+
+         The swipe snaps to the plain outer slot, not the card inside it:
+         the card is scaled as it moves off-centre, and snapping works from
+         each element's transformed box — so a card shrinking towards the
+         centre one (on phones) would drag its own snap point with it. */
+      <div class="flex shrink-0 snap-center">
       <div
-        class="services-card flex shrink-0 snap-center flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[36px] shadow-[0_0_4px_rgba(0,0,0,0.3)]"
+        class="services-card flex flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[36px] shadow-[0_0_4px_rgba(0,0,0,0.3)]"
         data-service-card
         data-index={i}
         data-name={service.name}
@@ -192,6 +198,7 @@ const { services } = Astro.props;
             </div>
           </div>
         </div>
+      </div>
       </div>
     )))}
   </div>
