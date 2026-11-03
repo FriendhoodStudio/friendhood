@@ -61,11 +61,13 @@ const RELEASE_FALL_MS = 1500;
 // Resting look, from nearest to furthest back. The blur is baked into a
 // small copy of the image by Sanity's image service (blur strength in its
 // own units, on a copy SOFT_WIDTH_PX wide inside SOFT_PAD_PX of transparent
-// padding the blur feathers out into), rather than applied live with CSS:
+// padding the blur feathers out into — transparent page colour, as
+// transparent black blurred a dark rim into the edges), rather than applied
+// live with CSS:
 // Chrome redraws every live blur on every frame, which with a field of
 // drifting images ate so much of the GPU that, mid trackpad scroll, it held
-// back the scroll stage's frames entirely. Coming into focus fades the
-// sharp image in over the soft copy.
+// back the scroll stage's frames entirely. Coming into focus crossfades
+// from the soft copy to the sharp image.
 const RESTING_NEAR = { blur: 45, opacity: 0.55 };
 const RESTING_FAR = { blur: 100, opacity: 0.35 };
 const SOFT_WIDTH_PX = 160;
@@ -92,6 +94,7 @@ interface Pose {
 interface Floater {
   wrap: HTMLElement;
   card: HTMLElement;
+  soft: HTMLImageElement;
   sharp: HTMLImageElement;
   word: number;
   depth: number;
@@ -100,9 +103,9 @@ interface Floater {
   // its way out after a hover.
   state: 'resting' | 'revealing' | 'held' | 'falling';
   // The rise/fall currently playing on the card, if any, and the matching
-  // fade of its sharp image.
+  // crossfade between its soft and sharp images.
   anim: Animation | null;
-  focusAnim: Animation | null;
+  focusAnims: Animation[];
   dragging: boolean;
   x: number;
   y: number;
@@ -250,7 +253,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     soft.decoding = 'async';
     soft.src =
       `${image.url.split('?')[0]}?w=${SOFT_WIDTH_PX + SOFT_PAD_PX * 2}&h=${softH + SOFT_PAD_PX * 2}` +
-      `&fit=crop&pad=${SOFT_PAD_PX}&bg=00000000&blur=${blur}&fm=webp&q=70`;
+      `&fit=crop&pad=${SOFT_PAD_PX}&bg=00F9F7F2&blur=${blur}&fm=webp&q=70`;
     try {
       await Promise.all([preload(image).decode(), soft.decode()]);
     } catch {
@@ -286,7 +289,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     sharp.draggable = false;
     card.append(soft, sharp);
     wrap.appendChild(card);
-    const floater: Floater = { wrap, card, sharp, word, depth, state: 'resting', anim: null, focusAnim: null, dragging: false, x: 0, y: 0, w, h };
+    const floater: Floater = { wrap, card, soft, sharp, word, depth, state: 'resting', anim: null, focusAnims: [], dragging: false, x: 0, y: 0, w, h };
     // Hovering brings an image up and holds it there until the cursor
     // leaves; it can be clicked and dragged about while it's up. Desktop
     // only — on touch there's nothing to hover, and a tap shouldn't be
@@ -337,18 +340,20 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   }
 
   // Plays a run of poses: the card's transform and opacity, and alongside
-  // it the sharp image's fade.
+  // it the crossfade from soft to sharp — the soft copy fades out as the
+  // sharp image fades in, or its blur would spill out round the sharp
+  // image's edges like a shadow.
   function play(f: Floater, poses: Pose[], options: KeyframeAnimationOptions, onDone?: () => void) {
-    const previous = [f.anim, f.focusAnim];
+    const previous = [f.anim, ...f.focusAnims];
     const timing = (p: Pose) => ({ ...(p.offset !== undefined && { offset: p.offset }), ...(p.easing && { easing: p.easing }) });
     const anim = f.card.animate(
       poses.map((p) => ({ transform: p.transform, opacity: p.opacity, ...timing(p) })),
       { ...options, fill: 'both' }
     );
-    f.focusAnim = f.sharp.animate(
-      poses.map((p) => ({ opacity: p.focus, ...timing(p) })),
-      { ...options, fill: 'both' }
-    );
+    f.focusAnims = [
+      f.sharp.animate(poses.map((p) => ({ opacity: p.focus, ...timing(p) })), { ...options, fill: 'both' }),
+      f.soft.animate(poses.map((p) => ({ opacity: 1 - Number(p.focus), ...timing(p) })), { ...options, fill: 'both' }),
+    ];
     // Cancelled only once the new ones have taken over, so there's no frame
     // where neither holds the card.
     previous.forEach((a) => a?.cancel());

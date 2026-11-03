@@ -500,7 +500,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
      that stretch): headline out, showreel in, a beat on the reel, then the
      reel out and the statement in, and the hand-over to the next section. */
   .hero-stage {
-    --hero-stage-scroll: 440vh;
+    --hero-stage-scroll: 420vh;
     height: calc(100dvh + var(--hero-stage-scroll));
     /* The hand-over: the next section is pulled up a screen to scroll in
        over the stage's last, still-pinned stretch, while the reel backdrop
@@ -707,13 +707,13 @@ const afterParts = headlineAfter.split(/(\s+)/);
 
     // How far the headline's lines travel up/down over the transition, as a
     // share of the screen's height — enough to carry them off screen.
-    const LINE_TRAVEL = 0.6;
+    const LINE_TRAVEL = 0.75;
     // Stage timeline (shares of its scroll): the reel has fully landed by
     // REEL_LANDED_AT, holds for a beat, starts zooming on past at
     // REEL_LEAVES_AT, and the statement comes up from STATEMENT_ARRIVES_AT.
-    const REEL_LANDED_AT = 0.6;
-    const REEL_LEAVES_AT = 0.69;
-    const STATEMENT_ARRIVES_AT = 0.75;
+    const REEL_LANDED_AT = 0.56;
+    const REEL_LEAVES_AT = 0.66;
+    const STATEMENT_ARRIVES_AT = 0.72;
     // How strongly the reel stays on behind the statement.
     const REEL_BACKDROP_OPACITY = 0.45;
     // How far through the hand-over (as a share of it) the statement and
@@ -724,25 +724,15 @@ const afterParts = headlineAfter.split(/(\s+)/);
     // On phones, where it zooms as one block instead — kept gentle, as the
     // narrow screen fills up fast.
     const BLOCK_GROW = 1.1;
+    // How many steps the headline's colour takes from dark to light.
+    const COLOUR_STEPS = 12;
     // Line index of each headline word, for the split (see updateStage).
     let pieceLines: number[] = [];
     const easeIn = (t: number) => t * t;
     const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
 
-    // The phases' progress as shown, which chases the scroll position rather
-    // than jumping straight to it — a trackpad flick can cover the whole
-    // headline split in a frame or two, which skipped the zoom entirely.
-    // Smoothing it plays the zoom through regardless of how fast the scroll.
-    let shownP = -1;
-    let lastFrameAt = 0;
-    // Time constant of that chase, in ms: lower is snappier. Kept short so
-    // the stage still answers your scroll straight away.
-    const CATCH_UP_MS = 90;
-
-    // Returns true while the shown progress is still catching up, so the
-    // caller knows to keep drawing frames.
-    function updateStage(): boolean {
-      if (!stage) return false;
+    function updateStage() {
+      if (!stage) return;
       const travel = stage.offsetHeight - window.innerHeight;
       const scrolled = -stage.getBoundingClientRect().top;
       // The last stretch of the stage is the hand-over: the screen stays
@@ -754,29 +744,15 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // bottom margin.
       const fadePx = Math.max(0, -parseFloat(getComputedStyle(stage).marginBottom) || 0);
       const phases = Math.max(1, travel - fadePx);
-      const targetP = travel > 0 ? clamp(scrolled / phases, 0, 1) : 0;
-      const now = performance.now();
-      if (shownP < 0 || reduceMotion) {
-        shownP = targetP;
-      } else {
-        const dt = Math.min(100, now - lastFrameAt);
-        shownP += (targetP - shownP) * (1 - Math.exp(-dt / CATCH_UP_MS));
-        if (Math.abs(targetP - shownP) < 0.0005) shownP = targetP;
-      }
-      lastFrameAt = now;
-      const p = shownP;
+      const p = travel > 0 ? clamp(scrolled / phases, 0, 1) : 0;
       const after = travel > 0 ? clamp((scrolled - phases) / fadePx, 0, 1) : 0;
       // Phases, as shares of the stage: headline out and reel in over the
       // first part (q), a beat on the landed reel, then the reel zooming on
       // past while the statement zooms up into focus.
       const q = clamp(p / REEL_LANDED_AT, 0, 1);
-      // The headline gets the first two thirds or so to itself, on the
-      // light backdrop (dark text stays legible while the lines part); the
-      // backdrop darkens and the reel comes up once it's mostly through.
-      // Linear, so the lines start moving on the very first bit of scroll.
-      const out = clamp(q / 0.65, 0, 1);
-      const into = easeOut(clamp((q - 0.5) / 0.5, 0, 1));
-      const darken = clamp((q - 0.4) / 0.35, 0, 1);
+      const out = easeIn(clamp(q / 0.5, 0, 1));
+      const into = easeOut(clamp((q - 0.4) / 0.6, 0, 1));
+      const darken = clamp((q - 0.15) / 0.3, 0, 1);
       const reelOut = easeIn(clamp((p - REEL_LEAVES_AT) / (1 - REEL_LEAVES_AT - 0.04), 0, 1));
       // Fully in a little before the stage ends, so it rests there in focus.
       const statementIn = easeOut(clamp((p - STATEMENT_ARRIVES_AT) / (0.95 - STATEMENT_ARRIVES_AT), 0, 1));
@@ -786,13 +762,12 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // through the hand-over, ahead of the next section arriving.
       const handoverFade = 1 - clamp(after / HANDOVER_FADE_BY, 0, 1);
       if (glow) glow.style.opacity = String(handoverFade);
-      // Text colour changes in steps rather than every frame — a new colour
-      // means repainting the text, the slowest thing a frame can ask for,
-      // and enough of them made Chrome hold the stage's frames back during
-      // a trackpad scroll. The headline is mostly gone by the time the
-      // backdrop darkens, so it keeps its colour; the tagline swaps while
-      // it's faded out between the headline and the statement.
-      if (headline) headline.style.color = mix(0);
+      // Text colour changes in small steps rather than every frame — a new
+      // colour means repainting the text, the slowest thing a frame can ask
+      // for, and with too much to draw Chrome holds the stage's frames back
+      // during a trackpad scroll. The tagline swaps in one go, while it's
+      // faded out between the headline and the statement.
+      if (headline) headline.style.color = mix(Math.round(darken * COLOUR_STEPS) / COLOUR_STEPS);
       if (tagline) {
         tagline.style.color = mix(darken > 0.5 ? 1 : 0);
         // Fades at the start, comes back under the statement, and fades
@@ -821,7 +796,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       if (reduceMotion) {
         if (headline) headline.style.opacity = String(1 - out);
         if (popupLayer) popupLayer.style.opacity = String(1 - out);
-        return false;
+        return;
       }
 
       // The headline's lines part like a curtain: lines above its middle
@@ -875,7 +850,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
           piece.style.transformOrigin = `${headline.offsetWidth / 2 - piece.offsetLeft}px ${headline.offsetHeight / 2 - piece.offsetTop}px`;
           piece.style.scale = String(1 + out * grow);
           piece.style.translate = `0 ${side * out * travel}px`;
-          piece.style.filter = out > 0.3 ? `blur(${(out - 0.3) * 6}px)` : '';
+          piece.style.filter = `blur(${out * 8}px)`;
           // Moving lines stay solid until they're mostly off screen; a
           // middle line has nowhere to go, so it fades sooner.
           // As one block on phones it clears quickly, before it's grown
@@ -892,49 +867,27 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // statement zooms up out of a blur into focus behind it.
       if (reel) {
         reel.style.scale = String((0.25 + 0.75 * into) * (1 + reelOut * 0.6));
-        const blur = (1 - into) * 16 + reelOut * 14;
+        const blur = (1 - into) * 30 + reelOut * 24;
         reel.style.filter = blur > 0.1 ? `blur(${blur}px)` : '';
       }
       if (statement) {
         statement.style.scale = String(0.7 + 0.3 * statementIn);
         statement.style.filter = statementIn < 1 ? `blur(${(1 - statementIn) * 20}px)` : '';
       }
-      return shownP !== targetP;
     }
 
     if (stage) {
-      // Driven by a frame loop that runs while the stage is on screen and
-      // reads its position each frame, rather than by scroll events alone:
-      // in some Chrome windows those never reached the page, leaving the
-      // stage frozen on its first frame while the page scrolled through it.
-      // A frame where nothing has moved costs one position read.
       let rafId = 0;
-      let onScreen = true;
-      let lastTop = NaN;
-      let lastHeight = 0;
-      let chasing = false;
-      const frame = () => {
-        rafId = 0;
-        const top = stage.getBoundingClientRect().top;
-        const moved = top !== lastTop || window.innerHeight !== lastHeight;
-        lastTop = top;
-        lastHeight = window.innerHeight;
-        if (moved || chasing) chasing = updateStage();
-        if (onScreen || chasing) rafId = requestAnimationFrame(frame);
-      };
-      const wake = () => {
+      const onScroll = () => {
         if (rafId) return;
-        lastFrameAt = performance.now();
-        rafId = requestAnimationFrame(frame);
+        rafId = requestAnimationFrame(() => {
+          rafId = 0;
+          updateStage();
+        });
       };
-      new IntersectionObserver(([entry]) => {
-        onScreen = entry.isIntersecting;
-        if (onScreen) wake();
-      }).observe(stage);
       updateStage();
-      wake();
-      window.addEventListener('scroll', wake, { passive: true });
-      window.addEventListener('resize', wake);
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
     }
   }
 
