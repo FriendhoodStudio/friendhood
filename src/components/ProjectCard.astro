@@ -5,8 +5,8 @@ import CategoryTag from './CategoryTag.astro';
 interface Props {
   project: ProjectCardData;
   /**
-   * Home shows bare images only (no caption); Work shows the full card with
-   * title/detail/tags. See CaseStudy-Card (Work) vs ProjectCard_Image (Home) in Figma.
+   * The full card with title/detail/tags (Work, and now Home too), or bare
+   * images only. See CaseStudy-Card vs ProjectCard_Image in Figma.
    */
   showCaption?: boolean;
   /**

@@ -4,7 +4,7 @@ import ProjectCard from './ProjectCard.astro';
 
 interface Props {
   projects: ProjectCardData[];
-  /** Home shows bare images only; Work shows the full card with title/detail/tags. */
+  /** Full card with title/detail/tags (default), or bare images only. */
   showCaption?: boolean;
   /** 'scroll' = horizontal scroll strip (Home); 'grid' = wrapping 3-column grid (Work). */
   layout?: 'scroll' | 'grid';
@@ -21,7 +21,13 @@ const { projects, showCaption = true, layout = 'scroll' } = Astro.props;
   <section class="overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
     <div
       data-reveal-group="project-gallery"
-      class="flex w-max items-end gap-horizontal-m px-[var(--page-margin)] pt-vertical-l pb-vertical-xl"
+      class:list={[
+        'flex w-max gap-horizontal-m px-[var(--page-margin)] pt-vertical-l pb-vertical-xl',
+        // Bare images sit on a shared bottom edge (their alternating
+        // heights stagger at the top); with captions underneath — which
+        // vary in length — the cards line up along the top instead.
+        showCaption ? 'items-start' : 'items-end',
+      ]}
     >
       {projects.map((project, index) => (
         <ProjectCard project={project} showCaption={showCaption} layout={layout} index={index} />
