@@ -79,12 +79,12 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       nudges it down slightly for nav clearance. */}
   <div class="relative flex min-h-[76dvh] w-full items-center justify-center" style="margin-top:var(--nav-menu-height)">
     {/* Project images that roll up around the headline as the word changes
-        — filled in by initHeroPopups (see the script below). Behind the
-        headline (z-10 vs its z-20), and the script keeps them clear of it
-        anyway. Decorative, so hidden from screen readers. */}
+        — filled in by initHeroPopups (see the script below). In front of
+        the headline (z-30 vs its z-20): they hug its edges and briefly pass
+        over the text. Decorative, so hidden from screen readers. */}
     {popUpImages.length > 1 && (
       <Fragment>
-        <div class="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden="true" data-hero-popups></div>
+        <div class="pointer-events-none absolute inset-0 z-30 overflow-hidden" aria-hidden="true" data-hero-popups></div>
         <script type="application/json" data-hero-popup-images set:html={JSON.stringify(popUpImages)} />
       </Fragment>
     )}

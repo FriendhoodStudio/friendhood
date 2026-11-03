@@ -1,20 +1,20 @@
 import type { HeroPopUpImage } from '../types/hero';
 
-/** Two project images grow in around the hero headline just after each word
- * change, with the same overshoot-and-settle as the site's buttons and the
+/** Three project images grow in around the hero headline just after each
+ * word change — two hugging its edges, one anywhere — with the same overshoot-and-settle as the site's buttons and the
  * word's own width change, then shrink and fade straight back out — so each
- * pair belongs to exactly one word. Images come from a shuffled deck
+ * set belongs to exactly one word. Images come from a shuffled deck
  * (every image shows once before any repeats). */
 
 // Delays after the word starts rolling (its own roll is 650ms, peaking at
-// ~455ms): the first image lands just behind the word, the second follows.
-const PAIR_DELAYS_MS = [320, 520];
+// ~455ms): the first image lands just behind the word, the others follow.
+const SPAWN_DELAYS_MS = [250, 400, 550];
 // One continuous grow, overshoot, settle and fade — no hold — short enough
 // that both images are gone before the next word (every 1500ms) arrives.
-const LIFETIME_MS = 1050;
+const LIFETIME_MS = 950;
 const SHRINK_OUT_MS = 250;
-// Padding kept clear around the headline.
-const HEADLINE_CLEARANCE_PX = 16;
+
+type Slot = 'top' | 'bottom' | 'anywhere';
 
 interface Popup {
   el: HTMLElement;
@@ -41,8 +41,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   function draw(): HeroPopUpImage {
     if (deck.length === 0) shuffle();
     const next = deck.pop()!;
-    // Warm the following pair so they've decoded by the next word change.
-    deck.slice(-2).forEach((image) => preload(image));
+    // Warm the following set so they've decoded by the next word change.
+    deck.slice(-3).forEach((image) => preload(image));
     return next;
   }
 
@@ -62,28 +62,43 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       : Math.min(260, Math.max(150, layerRect.height * 0.27));
   }
 
-  // A pair is composed rather than scattered: one image in the band above
-  // the headline, one in the band below, on opposite sides (which side
-  // alternates each word), so it always reads as a balanced diagonal. The
-  // exact spot within that quarter is random so it still feels loose.
+  // The first two of each set are composed rather than scattered: one hugging the top
+  // edge of the headline, one the bottom edge, on opposite sides (which side
+  // alternates each word), so it reads as a balanced diagonal. Each overlaps
+  // the headline's edge by a random amount and sits in front of the text —
+  // they're only fully visible for a moment, so it never blocks it for long.
   // Positions are layer-relative.
-  function place(width: number, height: number, slot: 'top' | 'bottom', side: 'left' | 'right'): DOMRect | null {
+  function place(width: number, height: number, slot: Slot, side: 'left' | 'right'): DOMRect {
     const layerRect = layer.getBoundingClientRect();
+    // The third image of each set: anywhere in the hero.
+    if (slot === 'anywhere') {
+      return new DOMRect(
+        Math.random() * Math.max(0, layerRect.width - width),
+        Math.random() * Math.max(0, layerRect.height - height),
+        width,
+        height
+      );
+    }
     const h = headline.getBoundingClientRect();
-    const clearTop = h.top - layerRect.top - HEADLINE_CLEARANCE_PX;
-    const clearBottom = h.bottom - layerRect.top + HEADLINE_CLEARANCE_PX;
+    const left = h.left - layerRect.left;
+    const top = h.top - layerRect.top;
 
-    const [minY, maxY] = slot === 'top' ? [0, clearTop - height] : [clearBottom, layerRect.height - height];
-    if (maxY < minY) return null;
+    // Centre somewhere along that side's half of the headline, reaching a
+    // little past its outer end.
+    const centreX =
+      side === 'left'
+        ? left - width * 0.25 + Math.random() * (h.width * 0.45)
+        : left + h.width * 0.55 + Math.random() * (h.width * 0.45 + width * 0.25);
+    // Between half on and fully off the headline's top/bottom edge.
+    const reach = height * (0.1 + Math.random() * 0.4);
+    const centreY = slot === 'top' ? top - reach : top + h.height + reach;
 
-    const half = layerRect.width / 2;
-    const [minX, maxX] =
-      side === 'left' ? [0, Math.max(0, half - width)] : [Math.min(half, layerRect.width - width), layerRect.width - width];
-
-    return new DOMRect(minX + Math.random() * (maxX - minX), minY + Math.random() * (maxY - minY), width, height);
+    const x = Math.min(Math.max(centreX - width / 2, 0), layerRect.width - width);
+    const y = Math.min(Math.max(centreY - height / 2, 0), layerRect.height - height);
+    return new DOMRect(x, y, width, height);
   }
 
-  // Safety net for a pair still fading when the next word starts (e.g. a
+  // Safety net for a set still fading when the next word starts (e.g. a
   // slow image decode delayed it): finishes it off quickly.
   function clearVisible() {
     visible.splice(0).forEach(({ el }) => {
@@ -99,7 +114,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     });
   }
 
-  async function spawn(slot: 'top' | 'bottom', side: 'left' | 'right') {
+  async function spawn(slot: Slot, side: 'left' | 'right') {
     const image = draw();
     const source = preload(image);
     try {
@@ -109,15 +124,10 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     }
 
     const layerRect = layer.getBoundingClientRect();
-    const h = headline.getBoundingClientRect();
-    // Shrunk to fit if the band above/below the headline is short.
-    const band =
-      slot === 'top' ? h.top - layerRect.top : layerRect.bottom - h.bottom;
-    const height = Math.min(popupHeight(layerRect), band - HEADLINE_CLEARANCE_PX);
+    const height = popupHeight(layerRect);
     // Clamped so very tall or panoramic images still read as photos.
     const width = height * Math.min(1.6, Math.max(0.7, image.aspectRatio));
     const rect = place(width, height, slot, side);
-    if (!rect) return;
 
     const el = document.createElement('div');
     el.className = 'hero-popup';
@@ -151,14 +161,14 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       .catch(() => {});
   }
 
-  // Pauses while the hero is scrolled away or the tab is hidden, so pairs
+  // Pauses while the hero is scrolled away or the tab is hidden, so sets
   // don't pile up off-screen.
   new IntersectionObserver(([entry]) => {
     heroInView = entry.isIntersecting;
   }).observe(layer);
 
   shuffle();
-  deck.slice(-2).forEach((image) => preload(image));
+  deck.slice(-3).forEach((image) => preload(image));
 
   return {
     onWordAdvance() {
@@ -166,8 +176,9 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       if (!heroInView || document.hidden) return;
       topSide = topSide === 'left' ? 'right' : 'left';
       const bottomSide = topSide === 'left' ? 'right' : 'left';
-      window.setTimeout(() => spawn('top', topSide), PAIR_DELAYS_MS[0]);
-      window.setTimeout(() => spawn('bottom', bottomSide), PAIR_DELAYS_MS[1]);
+      window.setTimeout(() => spawn('top', topSide), SPAWN_DELAYS_MS[0]);
+      window.setTimeout(() => spawn('bottom', bottomSide), SPAWN_DELAYS_MS[1]);
+      window.setTimeout(() => spawn('anywhere', topSide), SPAWN_DELAYS_MS[2]);
     },
   };
 }
