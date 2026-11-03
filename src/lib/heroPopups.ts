@@ -12,9 +12,8 @@ const SPAWN_DELAYS_MS = [300, 450, 600];
 // One continuous grow, overshoot, settle and fade — no hold — short enough
 // that all three are gone before the next word (every 2000ms) arrives.
 const LIFETIME_MS = 1250;
-// Gap between the headline and the two images framing it.
-const EDGE_GAP_MIN_PX = 8;
-const EDGE_GAP_MAX_PX = 40;
+// Minimum space kept between the headline and the two images framing it.
+const HEADLINE_CLEARANCE_PX = 16;
 const SHRINK_OUT_MS = 250;
 
 type Slot = 'top' | 'bottom' | 'anywhere';
@@ -65,10 +64,11 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       : Math.min(300, Math.max(172, layerRect.height * 0.31));
   }
 
-  // The first two of each set are composed rather than scattered: one just
-  // above the headline, one just below, on opposite sides (which side
-  // alternates each word), so it reads as a balanced diagonal. The third
-  // lands anywhere, so it's the one that can pass over the text.
+  // The first two of each set are composed rather than scattered: one in the
+  // space above the headline, one in the space below, on opposite halves
+  // (which side alternates each word), so it reads as a balanced diagonal.
+  // The exact spot within that quarter is random so it still feels loose.
+  // The third lands anywhere, so it's the one that can pass over the text.
   // Positions are layer-relative.
   function place(width: number, height: number, slot: Slot, side: 'left' | 'right'): DOMRect {
     const layerRect = layer.getBoundingClientRect();
@@ -82,22 +82,20 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       );
     }
     const h = headline.getBoundingClientRect();
-    const left = h.left - layerRect.left;
-    const top = h.top - layerRect.top;
+    const clearTop = h.top - layerRect.top - HEADLINE_CLEARANCE_PX;
+    const clearBottom = h.bottom - layerRect.top + HEADLINE_CLEARANCE_PX;
+    const [minY, maxY] = slot === 'top' ? [0, clearTop - height] : [clearBottom, layerRect.height - height];
 
-    // Centre somewhere along that side's half of the headline, reaching a
-    // little past its outer end.
-    const centreX =
-      side === 'left'
-        ? left - width * 0.25 + Math.random() * (h.width * 0.45)
-        : left + h.width * 0.55 + Math.random() * (h.width * 0.45 + width * 0.25);
-    // Just clear of the headline's top/bottom edge, by a small random gap.
-    const gap = EDGE_GAP_MIN_PX + Math.random() * (EDGE_GAP_MAX_PX - EDGE_GAP_MIN_PX);
-    const y0 = slot === 'top' ? top - height - gap : top + h.height + gap;
+    const half = layerRect.width / 2;
+    const [minX, maxX] =
+      side === 'left' ? [0, Math.max(0, half - width)] : [Math.min(half, layerRect.width - width), layerRect.width - width];
 
-    const x = Math.min(Math.max(centreX - width / 2, 0), layerRect.width - width);
-    const y = Math.min(Math.max(y0, 0), layerRect.height - height);
-    return new DOMRect(x, y, width, height);
+    return new DOMRect(
+      minX + Math.random() * (maxX - minX),
+      minY + Math.random() * Math.max(0, maxY - minY),
+      width,
+      height
+    );
   }
 
   // Safety net for a set still fading when the next word starts (e.g. a
@@ -126,7 +124,10 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     }
 
     const layerRect = layer.getBoundingClientRect();
-    const height = popupHeight(layerRect);
+    const h = headline.getBoundingClientRect();
+    // The framing images shrink to fit if the space above/below is short.
+    const band = slot === 'top' ? h.top - layerRect.top : slot === 'bottom' ? layerRect.bottom - h.bottom : Infinity;
+    const height = Math.min(popupHeight(layerRect), band - HEADLINE_CLEARANCE_PX);
     // Clamped so very tall or panoramic images still read as photos.
     const width = height * Math.min(1.6, Math.max(0.7, image.aspectRatio));
     const rect = place(width, height, slot, side);
