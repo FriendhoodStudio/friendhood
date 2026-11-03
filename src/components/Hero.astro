@@ -84,7 +84,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
         covers the text; the script keeps them clear of it and each other. Decorative, so hidden from screen readers. */}
     {popUpImages.length > 1 && (
       <Fragment>
-        <div class="pointer-events-none absolute inset-0 z-10" aria-hidden="true" data-hero-popups></div>
+        <div class="hero-popup-layer pointer-events-none absolute inset-y-0 z-10" aria-hidden="true" data-hero-popups></div>
         <script type="application/json" data-hero-popup-images set:html={JSON.stringify(popUpImages)} />
       </Fragment>
     )}
@@ -482,6 +482,17 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     min-height: calc(100dvh - var(--nav-menu-height) - var(--hero-bottom-gap));
     padding-top: max(0px, calc(var(--hero-bottom-gap) - var(--nav-menu-height)));
     padding-bottom: max(0px, calc(var(--nav-menu-height) - var(--hero-bottom-gap)));
+  }
+
+  /* The pop-up image field runs edge to edge across the screen, past the
+     page margins the rest of the hero sits inside. Clipped only
+     horizontally (overflow-x: clip, unlike hidden, leaves the vertical
+     axis visible) so an image growing at the screen's edge can't cause a
+     sideways scroll, while blur still spills softly above and below. */
+  .hero-popup-layer {
+    left: calc(-1 * var(--page-margin));
+    right: calc(-1 * var(--page-margin));
+    overflow-x: clip;
   }
 
   /* Scales from its top edge (see the scroll script), so the smaller
