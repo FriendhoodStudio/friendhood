@@ -30,8 +30,17 @@ const BOTTOM_INSET_PX = 72;
 // Share of the free space around the headline the field fills — sets the
 // image size, so it scales with the number of words and the screen.
 const FIELD_COVERAGE = 0.3;
-// Random spots tried when picking the most open place for an image.
-const SPOT_CANDIDATES = 40;
+// Random spots tried when placing an image, and how many of the best it
+// picks between at random.
+const SPOT_CANDIDATES = 60;
+const PICK_FROM_BEST = 4;
+// Past this much clear space, a spot doesn't count as any better.
+const COMFORTABLE_GAP_PX = 80;
+// Two images count as lined up when their centres are within this share
+// of their combined height (or width) of each other, and each such
+// neighbour costs a spot this many points.
+const ALIGN_TOLERANCE = 0.18;
+const ALIGN_PENALTY = 80;
 // How big an image grows as it rises into focus. It sits behind the
 // headline, so growing near it never covers the text.
 const REVEAL_SCALE = 1.5;
@@ -73,7 +82,6 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   // Each word's own set of images, and which one it shows next.
   const wordImages: HeroPopUpImage[][] = [];
   const wordNext: number[] = [];
-  let currentWord = 0;
 
   function shuffle() {
     deck = [...images];
@@ -130,28 +138,44 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     return dx > 0 && dy > 0 ? Math.hypot(dx, dy) : Math.max(dx, dy);
   }
 
-  // The most open of a batch of random spots: the one furthest from the
-  // headline and every other image. That naturally pushes images out
-  // towards the edges and corners and spreads them loosely, rather than
-  // letting them cluster or settle into rows.
+  // Picks from a batch of random spots. A spot must be clear of the
+  // headline and every other image; beyond that, it scores for space up to
+  // a comfortable gap (past which more distance counts for nothing, so
+  // images aren't all pulled out to the edges) and loses points for sitting
+  // level with, or directly above or below, another image — which is what
+  // made the field fall into rows. The pick is random among the best few,
+  // so the layout stays loose rather than predictable.
   function moveToOpenSpot(f: Floater) {
     const b = bounds();
-    let best = { x: f.x, y: f.y, score: -Infinity };
+    const others = floaters.filter((g) => g !== f);
+    const candidates: { x: number; y: number; clear: boolean; score: number }[] = [];
     for (let i = 0; i < SPOT_CANDIDATES; i++) {
       f.x = EDGE_INSET_PX + Math.random() * Math.max(0, b.width - f.w - EDGE_INSET_PX * 2);
       f.y = EDGE_INSET_PX + Math.random() * Math.max(0, b.height - f.h - EDGE_INSET_PX - BOTTOM_INSET_PX);
-      const score = Math.min(
-        gapBetween(f, b.headline),
-        ...floaters.filter((g) => g !== f).map((g) => gapBetween(f, g) - IMAGE_GAP_PX)
-      );
-      if (score > best.score) best = { x: f.x, y: f.y, score };
+      const gap = Math.min(gapBetween(f, b.headline), ...others.map((g) => gapBetween(f, g) - IMAGE_GAP_PX));
+      const cx = f.x + f.w / 2;
+      const cy = f.y + f.h / 2;
+      const aligned = others.filter((g) => {
+        const gx = g.x + g.w / 2;
+        const gy = g.y + g.h / 2;
+        return Math.abs(cy - gy) < (f.h + g.h) * ALIGN_TOLERANCE || Math.abs(cx - gx) < (f.w + g.w) * ALIGN_TOLERANCE;
+      }).length;
+      candidates.push({
+        x: f.x,
+        y: f.y,
+        clear: gap >= 0,
+        score: Math.min(gap, COMFORTABLE_GAP_PX) - aligned * ALIGN_PENALTY,
+      });
     }
-    f.x = best.x;
-    f.y = best.y;
+    const clear = candidates.filter((c) => c.clear).sort((a, c) => c.score - a.score);
+    const pick = clear.length
+      ? clear[Math.floor(Math.random() * Math.min(PICK_FROM_BEST, clear.length))]
+      : candidates.reduce((a, c) => (c.score > a.score ? c : a));
+    f.x = pick.x;
+    f.y = pick.y;
     f.wrap.style.left = `${f.x}px`;
     f.wrap.style.top = `${f.y}px`;
-    // Clear of the headline and every other image.
-    return best.score >= 0;
+    return clear.length > 0;
   }
 
   async function createFloater(word: number): Promise<Floater | null> {
@@ -170,7 +194,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     }
 
     // Varied a little so the field doesn't read as a grid of equal tiles.
-    const h = baseHeight * (0.8 + Math.random() * 0.3);
+    const h = baseHeight * (0.65 + Math.random() * 0.5);
     // Clamped so very tall or panoramic images still read as photos.
     const w = h * Math.min(1.6, Math.max(0.7, image.aspectRatio));
 
@@ -213,10 +237,10 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   // space at all on this screen, it sits this round out.
   async function addFloater(word: number, delay = 0) {
     const floater = await createFloater(word);
-    if (!floater) return;
-    if (!moveToOpenSpot(floater)) return;
+    if (!floater || !moveToOpenSpot(floater)) return null;
     floaters.push(floater);
     fadeIn(floater, delay);
+    return floater;
   }
 
   // One smooth movement: rises out of the blur, sharpening and growing, then
@@ -243,10 +267,19 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       .catch(() => {});
   }
 
-  function showWord(word: number) {
-    currentWord = word;
+  // Driven only by the headline's word changes: each change brings that
+  // word's image up, and nothing rises on its own. If the word has no image
+  // waiting (there was no clear space for it last time), one is placed now
+  // and rises straight away, so a word change never goes without one.
+  async function showWord(word: number) {
     if (!heroInView || scrolledAway || document.hidden) return;
-    floaters.filter((f) => f.word === word).forEach((f) => riseAndFall(f, REVEAL_DELAY_MS));
+    const waiting = floaters.find((f) => f.word === word);
+    if (waiting) {
+      riseAndFall(waiting, REVEAL_DELAY_MS);
+      return;
+    }
+    const placed = await addFloater(word);
+    if (placed) riseAndFall(placed, REVEAL_DELAY_MS);
   }
 
   // Lays the whole field out at once, each image placed in turn in the most
@@ -263,9 +296,6 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       .slice()
       .sort(() => Math.random() - 0.5)
       .forEach((f, i) => fadeIn(f, i * 60));
-    // The word already on screen gets its rise once the field has faded in,
-    // rather than waiting a full cycle for it to come round again.
-    window.setTimeout(() => showWord(currentWord), FADE_IN_MS);
   }
 
   // Fades the whole field away over the first stretch of scrolling, so it
