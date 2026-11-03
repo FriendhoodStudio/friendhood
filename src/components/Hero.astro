@@ -708,6 +708,9 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const STATEMENT_ARRIVES_AT = 0.72;
     // How strongly the reel stays on behind the statement.
     const REEL_BACKDROP_OPACITY = 0.45;
+    // How far through the hand-over (as a share of it) the statement and
+    // video have fully faded.
+    const HANDOVER_FADE_BY = 0.6;
     // How much the headline grows as it passes the viewer.
     const LINE_GROW = 1.6;
     // On phones, where it zooms as one block instead — kept gentle, as the
@@ -745,7 +748,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
       const statementIn = easeOut(clamp((p - STATEMENT_ARRIVES_AT) / (0.95 - STATEMENT_ARRIVES_AT), 0, 1));
 
       if (overlay) overlay.style.opacity = String(1 - darken);
-      if (glow) glow.style.opacity = String(1 - after);
+      // The statement and the video behind it are gone a little over halfway
+      // through the hand-over, ahead of the next section arriving.
+      const handoverFade = 1 - clamp(after / HANDOVER_FADE_BY, 0, 1);
+      if (glow) glow.style.opacity = String(handoverFade);
       if (headline) headline.style.color = mix(darken);
       if (tagline) {
         tagline.style.color = mix(darken);
@@ -762,12 +768,12 @@ const afterParts = headlineAfter.split(/(\s+)/);
       if (reel) {
         // It doesn't vanish as it zooms past: it settles back as a dimmed,
         // blurred, still-playing backdrop behind the statement.
-        reel.style.opacity = String(clamp(into * 1.6, 0, 1) * (1 - reelOut * (1 - REEL_BACKDROP_OPACITY)) * (1 - after));
+        reel.style.opacity = String(clamp(into * 1.6, 0, 1) * (1 - reelOut * (1 - REEL_BACKDROP_OPACITY)) * handoverFade);
         // Only clickable (the "Watch our showreel" button) while it's landed.
         reel.style.pointerEvents = into > 0.95 && reelOut < 0.05 ? 'auto' : 'none';
       }
       if (statement) {
-        statement.style.opacity = String(statementIn);
+        statement.style.opacity = String(statementIn * handoverFade);
         // Scrolls away at the page's own speed during the hand-over.
         statement.style.translate = after ? `0 ${-after * fadePx}px` : '';
       }
