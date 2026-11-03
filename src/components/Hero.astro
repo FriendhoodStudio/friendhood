@@ -641,7 +641,7 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     // Scales from its top edge (transform-origin in the styles above), so
     // starting this small only narrows it — its top stays tucked right
     // under the tagline instead of drifting down and opening a gap.
-    const scale = 0.9 + 0.1 * progress;
+    const scale = 0.8 + 0.2 * progress;
     media.style.transform = `scale(${scale})`;
     // Only the top of the showreel peeks in on load (see
     // .hero-headline-area), soft-focused so it doesn't pull attention from
