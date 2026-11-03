@@ -42,8 +42,8 @@ const SCROLL_FADE_END = 0.25;
 // (1 - this) of the page's speed, so it reads as sitting further back.
 // Picked per image within this range, so the field separates into layers
 // of depth as it fades.
-const PARALLAX_MIN = 0.25;
-const PARALLAX_MAX = 0.75;
+const PARALLAX_MIN = 0.08;
+const PARALLAX_MAX = 0.25;
 
 const RESTING: Keyframe = { transform: 'scale(0.92)', opacity: 0.45, filter: 'blur(14px)' };
 const GONE: Keyframe = { transform: 'scale(0.85)', opacity: 0, filter: 'blur(24px)' };
