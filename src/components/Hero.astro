@@ -500,7 +500,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
      that stretch): headline out, showreel in, a beat on the reel, then the
      reel out and the statement in, and the hand-over to the next section. */
   .hero-stage {
-    --hero-stage-scroll: 520vh;
+    --hero-stage-scroll: 440vh;
     height: calc(100dvh + var(--hero-stage-scroll));
     /* The hand-over: the next section is pulled up a screen to scroll in
        over the stage's last, still-pinned stretch, while the reel backdrop
@@ -727,11 +727,9 @@ const afterParts = headlineAfter.split(/(\s+)/);
     // Smoothing it plays the zoom through regardless of how fast the scroll.
     let shownP = -1;
     let lastFrameAt = 0;
-    // Time constant of that chase, in ms: lower is snappier.
-    const CATCH_UP_MS = 220;
-    // And a speed limit on it, so even a big flick plays the zoom at a
-    // watchable pace: the whole of the phases takes at least this long.
-    const MIN_PLAY_MS = 2400;
+    // Time constant of that chase, in ms: lower is snappier. Kept short so
+    // the stage still answers your scroll straight away.
+    const CATCH_UP_MS = 90;
 
     // Returns true while the shown progress is still catching up, so the
     // caller knows to keep drawing frames.
@@ -754,9 +752,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
         shownP = targetP;
       } else {
         const dt = Math.min(100, now - lastFrameAt);
-        const step = (targetP - shownP) * (1 - Math.exp(-dt / CATCH_UP_MS));
-        const maxStep = dt / MIN_PLAY_MS;
-        shownP += clamp(step, -maxStep, maxStep);
+        shownP += (targetP - shownP) * (1 - Math.exp(-dt / CATCH_UP_MS));
         if (Math.abs(targetP - shownP) < 0.0005) shownP = targetP;
       }
       lastFrameAt = now;
@@ -769,7 +765,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // The headline gets the first two thirds or so to itself, on the
       // light backdrop (dark text stays legible while the lines part); the
       // backdrop darkens and the reel comes up once it's mostly through.
-      const out = easeIn(clamp(q / 0.65, 0, 1));
+      // Linear, so the lines start moving on the very first bit of scroll.
+      const out = clamp(q / 0.65, 0, 1);
       const into = easeOut(clamp((q - 0.5) / 0.5, 0, 1));
       const darken = clamp((q - 0.4) / 0.35, 0, 1);
       const reelOut = easeIn(clamp((p - REEL_LEAVES_AT) / (1 - REEL_LEAVES_AT - 0.04), 0, 1));
@@ -864,7 +861,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
           piece.style.transformOrigin = `${headline.offsetWidth / 2 - piece.offsetLeft}px ${headline.offsetHeight / 2 - piece.offsetTop}px`;
           piece.style.scale = String(1 + out * grow);
           piece.style.translate = `0 ${side * out * travel}px`;
-          piece.style.filter = `blur(${out * 8}px)`;
+          piece.style.filter = out > 0.3 ? `blur(${(out - 0.3) * 6}px)` : '';
           // Moving lines stay solid until they're mostly off screen; a
           // middle line has nowhere to go, so it fades sooner.
           // As one block on phones it clears quickly, before it's grown
@@ -881,7 +878,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // statement zooms up out of a blur into focus behind it.
       if (reel) {
         reel.style.scale = String((0.25 + 0.75 * into) * (1 + reelOut * 0.6));
-        const blur = (1 - into) * 30 + reelOut * 24;
+        const blur = (1 - into) * 16 + reelOut * 14;
         reel.style.filter = blur > 0.1 ? `blur(${blur}px)` : '';
       }
       if (statement) {
