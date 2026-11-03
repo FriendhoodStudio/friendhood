@@ -632,6 +632,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
   // Set once the floating images are running (see the word cycle below), so
   // the stage can send them flying past too.
   let popups: ReturnType<typeof initHeroPopups> = null;
+  // True while the scroll stage's transition is under way: the headline's
+  // word cycle holds still, since a new word's width can re-wrap the lines
+  // and send a word to the other line (and the other direction) mid-split.
+  let stageUnderway = false;
 
   // The scroll stage. While the hero's sticky screen is pinned, scroll
   // progress (0 → 1 across the stage's extra height) drives two overlapping
@@ -690,6 +694,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
         tagline.style.color = mix(darken);
         tagline.style.opacity = String(1 - clamp(p / 0.12, 0, 1));
       }
+      stageUnderway = p > 0.002;
       popups?.setPaused(p > 0.02);
 
       if (reel) {
@@ -981,7 +986,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     }
 
     function advance() {
-      if (frameCount <= 1) return;
+      if (frameCount <= 1 || stageUnderway) return;
       // Self-correcting rather than relying solely on playWordRoll's own
       // finished-promise reset: once we're sitting on (or, from a burst of
       // rapid triggers, ever managed to reach) the final looping-duplicate
