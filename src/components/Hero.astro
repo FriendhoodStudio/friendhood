@@ -721,8 +721,22 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const easeIn = (t: number) => t * t;
     const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
 
-    function updateStage() {
-      if (!stage) return;
+    // The phases' progress as shown, which chases the scroll position rather
+    // than jumping straight to it — a trackpad flick can cover the whole
+    // headline split in a frame or two, which skipped the zoom entirely.
+    // Smoothing it plays the zoom through regardless of how fast the scroll.
+    let shownP = -1;
+    let lastFrameAt = 0;
+    // Time constant of that chase, in ms: lower is snappier.
+    const CATCH_UP_MS = 220;
+    // And a speed limit on it, so even a big flick plays the zoom at a
+    // watchable pace: the whole of the phases takes at least this long.
+    const MIN_PLAY_MS = 1400;
+
+    // Returns true while the shown progress is still catching up, so the
+    // caller knows to keep drawing frames.
+    function updateStage(): boolean {
+      if (!stage) return false;
       const travel = stage.offsetHeight - window.innerHeight;
       const scrolled = -stage.getBoundingClientRect().top;
       // The last stretch of the stage is the hand-over: the screen stays
@@ -734,7 +748,19 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // bottom margin.
       const fadePx = Math.max(0, -parseFloat(getComputedStyle(stage).marginBottom) || 0);
       const phases = Math.max(1, travel - fadePx);
-      const p = travel > 0 ? clamp(scrolled / phases, 0, 1) : 0;
+      const targetP = travel > 0 ? clamp(scrolled / phases, 0, 1) : 0;
+      const now = performance.now();
+      if (shownP < 0 || reduceMotion) {
+        shownP = targetP;
+      } else {
+        const dt = Math.min(100, now - lastFrameAt);
+        const step = (targetP - shownP) * (1 - Math.exp(-dt / CATCH_UP_MS));
+        const maxStep = dt / MIN_PLAY_MS;
+        shownP += clamp(step, -maxStep, maxStep);
+        if (Math.abs(targetP - shownP) < 0.0005) shownP = targetP;
+      }
+      lastFrameAt = now;
+      const p = shownP;
       const after = travel > 0 ? clamp((scrolled - phases) / fadePx, 0, 1) : 0;
       // Phases, as shares of the stage: headline out and reel in over the
       // first part (q), a beat on the landed reel, then the reel zooming on
@@ -781,7 +807,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       if (reduceMotion) {
         if (headline) headline.style.opacity = String(1 - out);
         if (popupLayer) popupLayer.style.opacity = String(1 - out);
-        return;
+        return false;
       }
 
       // The headline's lines part like a curtain: lines above its middle
@@ -859,16 +885,18 @@ const afterParts = headlineAfter.split(/(\s+)/);
         statement.style.scale = String(0.7 + 0.3 * statementIn);
         statement.style.filter = statementIn < 1 ? `blur(${(1 - statementIn) * 20}px)` : '';
       }
+      return shownP !== targetP;
     }
 
     if (stage) {
       let rafId = 0;
       const onScroll = () => {
         if (rafId) return;
-        rafId = requestAnimationFrame(() => {
-          rafId = 0;
-          updateStage();
-        });
+        const frame = () => {
+          rafId = updateStage() ? requestAnimationFrame(frame) : 0;
+        };
+        lastFrameAt = performance.now();
+        rafId = requestAnimationFrame(frame);
       };
       updateStage();
       window.addEventListener('scroll', onScroll, { passive: true });
