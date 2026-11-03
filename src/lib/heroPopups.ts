@@ -51,8 +51,6 @@ const REVEALED: Keyframe = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, fi
 // Hover: how quickly an image comes up (overshooting and settling), and how
 // long it takes to fall away once the cursor leaves.
 const HOLD_RISE_MS = 900;
-// One loop of the gentle float a held image keeps up while it rests.
-const HELD_FLOAT_MS = 5000;
 const RELEASE_FALL_MS = 1500;
 // How far down the page (as a share of the screen's height) the field has
 // fully faded away by.
@@ -78,8 +76,6 @@ interface Floater {
   state: 'resting' | 'revealing' | 'held' | 'falling';
   // The rise/fall currently playing on the card, if any.
   anim: Animation | null;
-  // The gentle float added on top while it's held up.
-  ambient: Animation | null;
   dragging: boolean;
   x: number;
   y: number;
@@ -240,7 +236,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     // The standalone translate property, so the parallax stacks with the
     // drift loop's transform on the same element instead of replacing it.
     wrap.style.translate = `0 ${window.scrollY * depth}px`;
-    const floater: Floater = { wrap, card, word, depth, state: 'resting', anim: null, ambient: null, dragging: false, x: 0, y: 0, w, h };
+    const floater: Floater = { wrap, card, word, depth, state: 'resting', anim: null, dragging: false, x: 0, y: 0, w, h };
     // Hovering brings an image up and holds it there until the cursor
     // leaves; it can be clicked and dragged about while it's up. Desktop
     // only — on touch there's nothing to hover, and a tap shouldn't be
@@ -323,8 +319,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   }
 
   // Hover: up into focus, overshooting slightly past full size and settling
-  // back (the site's usual overshoot-and-settle), then resting there with a
-  // gentle ambient float until the cursor leaves. Also catches an image mid
+  // back (the site's usual overshoot-and-settle), then resting there until
+  // the cursor leaves. Also catches an image mid
   // word reveal, or mid fall after an earlier hover, and brings it back up.
   function hold(f: Floater) {
     if (!floaters.includes(f) || f.state === 'held') return;
@@ -340,23 +336,6 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       ],
       { duration: HOLD_RISE_MS, easing: 'ease-out' }
     );
-    // Added on top of whatever the card is doing (composite: 'add'), so it
-    // floats without disturbing the rise or the held size.
-    f.ambient?.cancel();
-    f.ambient = f.card.animate(
-      [
-        { transform: 'translate(0, 0) rotate(0deg)' },
-        { transform: 'translate(5px, -7px) rotate(0.6deg)' },
-        { transform: 'translate(-4px, 4px) rotate(-0.4deg)' },
-        { transform: 'translate(0, 0) rotate(0deg)' },
-      ],
-      { duration: HELD_FLOAT_MS, iterations: Infinity, easing: 'ease-in-out', composite: 'add' }
-    );
-  }
-
-  function stopAmbient(f: Floater) {
-    f.ambient?.cancel();
-    f.ambient = null;
   }
 
   // Mouse off (and not mid-drag): falls away from wherever it is, and the
@@ -364,7 +343,6 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   function release(f: Floater) {
     if (f.state !== 'held' || f.dragging) return;
     f.state = 'falling';
-    stopAmbient(f);
     f.wrap.style.zIndex = '1';
     play(f, [currentFrame(f), GONE], { duration: RELEASE_FALL_MS, easing: 'ease-in' }, () => retire(f));
   }
