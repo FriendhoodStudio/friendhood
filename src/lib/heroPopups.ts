@@ -63,7 +63,12 @@ const SCROLL_FADE_END = 0.25;
 const PARALLAX_MIN = 0.08;
 const PARALLAX_MAX = 0.25;
 
-const RESTING: Keyframe = { transform: 'scale(0.92)', opacity: 0.45, filter: 'blur(14px)' };
+// Resting look, from nearest to furthest back. Each image sits somewhere
+// between the two according to its parallax depth, so the ones that lag
+// furthest behind on scroll are also the blurriest and faintest — blur and
+// movement telling the same story about depth.
+const RESTING_NEAR = { blur: 8, opacity: 0.55 };
+const RESTING_FAR = { blur: 20, opacity: 0.35 };
 const GONE: Keyframe = { transform: 'scale(0.85)', opacity: 0, filter: 'blur(24px)' };
 
 interface Floater {
@@ -258,9 +263,16 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     return floater;
   }
 
+  function resting(f: Floater): Keyframe {
+    const far = (f.depth - PARALLAX_MIN) / (PARALLAX_MAX - PARALLAX_MIN);
+    const blur = RESTING_NEAR.blur + (RESTING_FAR.blur - RESTING_NEAR.blur) * far;
+    const opacity = RESTING_NEAR.opacity + (RESTING_FAR.opacity - RESTING_NEAR.opacity) * far;
+    return { transform: 'scale(0.92)', opacity, filter: `blur(${blur}px)` };
+  }
+
   function fadeIn(floater: Floater, delay = 0) {
     layer.appendChild(floater.wrap);
-    floater.card.animate([{ transform: 'scale(0.8)', opacity: 0, filter: 'blur(24px)' }, RESTING], {
+    floater.card.animate([{ transform: 'scale(0.8)', opacity: 0, filter: 'blur(24px)' }, resting(floater)], {
       duration: FADE_IN_MS,
       delay,
       easing: 'ease-out',
