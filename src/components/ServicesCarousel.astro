@@ -56,7 +56,7 @@ const { services } = Astro.props;
       the real one the instant the scroll goes idle. */}
   <div
     data-services-track
-    class="flex w-full snap-x snap-mandatory gap-horizontal-m overflow-x-auto md:gap-[var(--spacing-gutter)]"
+    class="flex w-full snap-x snap-mandatory gap-horizontal-m overflow-x-auto md:max-[1199px]:gap-[var(--spacing-gutter)]"
     style="touch-action: pan-x; scrollbar-width: none; user-select: none;"
   >
     {[0, 1, 2].map((copyIndex) => services.map((service, i) => (
