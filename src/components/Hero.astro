@@ -542,13 +542,22 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     height: 100%;
     object-fit: cover;
   }
+  /* A loose loop rather than a straight back-and-forth: out along one axis,
+     across, back along the other, with a slight sway — so it reads as
+     floating rather than oscillating. */
   @keyframes hero-float-drift {
     0%,
     100% {
-      transform: translate(0, 0);
+      transform: translate(0, 0) rotate(0deg);
+    }
+    25% {
+      transform: translate(var(--drift-x), calc(var(--drift-y) * -0.4)) rotate(var(--drift-rotate));
     }
     50% {
-      transform: translate(var(--drift-x), var(--drift-y));
+      transform: translate(calc(var(--drift-x) * 0.3), var(--drift-y)) rotate(0deg);
+    }
+    75% {
+      transform: translate(calc(var(--drift-x) * -0.6), calc(var(--drift-y) * 0.3)) rotate(calc(var(--drift-rotate) * -1));
     }
   }
 </style>

@@ -1,27 +1,30 @@
 import type { HeroPopUpImage } from '../types/hero';
 
 /** A loose field of project images floats around the hero headline, blurred
- * and faded back. On each word change one of them pops forward — sharpening
- * and growing past full size with the site's overshoot-and-settle — then
- * sinks back into the blur. Every few words one floating image dissolves and
+ * and faded back, each drifting on its own slow loop. On each word change
+ * one of them rises forward — sharpening and growing slightly — then sinks
+ * back into the blur in one smooth movement. Every few words one floating image dissolves and
  * a new one drifts in elsewhere, so the set slowly changes. Images come from
  * a shuffled deck (every image shows once before any repeats), and nothing
  * ever overlaps the headline or another image. */
 
 const FLOAT_COUNT_DESKTOP = 6;
 const FLOAT_COUNT_MOBILE = 4;
-// The pop starts just behind the word's own 750ms roll (which peaks at
-// ~525ms) and is back in the blur before the next word (every 2000ms).
+// The reveal starts just behind the word's own 750ms roll (which peaks at
+// ~525ms). It runs a little longer than one word (every 2000ms), so the next
+// image starts rising as this one is still settling back — one continuous
+// ebb and flow rather than separate pops.
 const REVEAL_DELAY_MS = 300;
-const REVEAL_MS = 1600;
+const REVEAL_MS = 2400;
 // One floating image is swapped for a new one every this many words.
 const SWAP_EVERY_WORDS = 3;
 const FADE_IN_MS = 1200;
 const FADE_OUT_MS = 800;
-// Minimum space kept between an image and the headline, and between images
-// — generous, since each one also drifts a little around its spot.
-const HEADLINE_CLEARANCE_PX = 24;
-const IMAGE_GAP_PX = 24;
+// How far each image wanders from its spot while floating. The spacing
+// below allows for two neighbours drifting towards each other at once.
+const DRIFT_PX = 18;
+const HEADLINE_CLEARANCE_PX = 16 + DRIFT_PX;
+const IMAGE_GAP_PX = 8 + DRIFT_PX * 2;
 const PLACEMENT_ATTEMPTS = 60;
 
 const RESTING: Keyframe = { transform: 'scale(0.92)', opacity: 0.45, filter: 'blur(14px)' };
@@ -126,8 +129,10 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     wrap.className = 'hero-float';
     wrap.style.cssText =
       `left:${rect.x}px;top:${rect.y}px;width:${width}px;height:${height}px;` +
-      `--drift-x:${(Math.random() * 2 - 1) * 12}px;--drift-y:${(Math.random() * 2 - 1) * 12}px;` +
-      `--drift-duration:${8 + Math.random() * 6}s;animation-delay:${-Math.random() * 8}s`;
+      `--drift-x:${(Math.random() < 0.5 ? -1 : 1) * DRIFT_PX * (0.6 + Math.random() * 0.4)}px;` +
+      `--drift-y:${(Math.random() < 0.5 ? -1 : 1) * DRIFT_PX * (0.6 + Math.random() * 0.4)}px;` +
+      `--drift-rotate:${(Math.random() * 2 - 1) * 2}deg;` +
+      `--drift-duration:${6 + Math.random() * 4}s;animation-delay:${-Math.random() * 10}s`;
     const card = document.createElement('div');
     card.className = 'hero-popup';
     const img = document.createElement('img');
@@ -165,9 +170,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       .catch(done);
   }
 
-  // Sharpens and grows past full size (the same overshoot as the headline
-  // word's width change and the nav/footer button release), holds for a
-  // beat, then sinks back into the blur.
+  // One smooth rise and fall: sharpens and grows forward, then sinks straight
+  // back into the blur, with no hold or settle in between.
   function reveal() {
     const candidates = floaters.filter((f) => f !== lastRevealed);
     if (candidates.length === 0) return;
@@ -177,10 +181,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     floater.card
       .animate(
         [
-          { ...RESTING, easing: 'ease-out' },
-          { transform: 'scale(1.08)', opacity: 1, filter: 'blur(0px)', offset: 0.28, easing: 'ease-in-out' },
-          { transform: 'scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0.42 },
-          { transform: 'scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0.62, easing: 'ease-in-out' },
+          { ...RESTING, easing: 'ease-in-out' },
+          { transform: 'scale(1.06)', opacity: 1, filter: 'blur(0px)', offset: 0.5, easing: 'ease-in-out' },
           RESTING,
         ],
         { duration: REVEAL_MS }
