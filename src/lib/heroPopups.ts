@@ -51,9 +51,6 @@ const REVEALED: Keyframe = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, fi
 // long it takes to fall away once the cursor leaves.
 const HOLD_RISE_MS = 900;
 const RELEASE_FALL_MS = 1500;
-// How long an image takes to glide out of the way of a headline being
-// moved with its control bar.
-const MAKE_ROOM_MS = 350;
 // How far down the page (as a share of the screen's height) the field has
 // fully faded away by.
 const SCROLL_FADE_END = 0.25;
@@ -358,9 +355,6 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     hold(f);
     f.dragging = true;
     f.wrap.classList.add('is-dragging');
-    // Follows the cursor directly, not via any glide left over from being
-    // nudged aside by the headline.
-    f.wrap.style.transition = '';
     f.wrap.setPointerCapture(e.pointerId);
     const start = { x: e.clientX, y: e.clientY, left: f.x, top: f.y };
     const b = bounds();
@@ -463,32 +457,5 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     resizeTimer = window.setTimeout(build, 300);
   });
 
-  // While the headline is being moved with its control bar, any resting
-  // image it runs into glides out of its way — pushed off along whichever
-  // axis needs the smaller move, kept inside the hero.
-  function makeRoomForHeadline() {
-    const layerRect = layer.getBoundingClientRect();
-    const h = headline.getBoundingClientRect();
-    const clear = {
-      left: h.left - layerRect.left - HEADLINE_CLEARANCE_PX,
-      top: h.top - layerRect.top - HEADLINE_CLEARANCE_PX,
-      right: h.right - layerRect.left + HEADLINE_CLEARANCE_PX,
-      bottom: h.bottom - layerRect.top + HEADLINE_CLEARANCE_PX,
-    };
-    for (const f of floaters) {
-      if (f.dragging || f.state === 'held') continue;
-      const overlapX = Math.min(f.x + f.w, clear.right) - Math.max(f.x, clear.left);
-      const overlapY = Math.min(f.y + f.h, clear.bottom) - Math.max(f.y, clear.top);
-      if (overlapX <= 0 || overlapY <= 0) continue;
-      if (overlapX < overlapY) f.x += f.x + f.w / 2 < (clear.left + clear.right) / 2 ? -overlapX : overlapX;
-      else f.y += f.y + f.h / 2 < (clear.top + clear.bottom) / 2 ? -overlapY : overlapY;
-      f.x = Math.min(Math.max(f.x, 0), layerRect.width - f.w);
-      f.y = Math.min(Math.max(f.y, 0), layerRect.height - f.h);
-      f.wrap.style.transition = `left ${MAKE_ROOM_MS}ms ease-out, top ${MAKE_ROOM_MS}ms ease-out`;
-      f.wrap.style.left = `${f.x}px`;
-      f.wrap.style.top = `${f.y}px`;
-    }
-  }
-
-  return { showWord, makeRoomForHeadline };
+  return { showWord };
 }

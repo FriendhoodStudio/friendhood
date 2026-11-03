@@ -167,41 +167,6 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
         headline
       )}
     </h1>
-    {/* Headline control bar — a little floating pill that appears over the
-        headline on hover (desktop only), to drag it anywhere on screen and
-        set its alignment. Driven by heroHeadlineControls (see the script
-        below); hidden until then. Visitors' own play, not saved anywhere. */}
-    <div
-      class="hero-transport pointer-events-none absolute left-0 top-0 z-40 flex items-center gap-[2px] rounded-full border border-front/15 bg-grey-600 p-[4px] text-front opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out"
-      role="toolbar"
-      aria-label="Headline controls"
-      data-hero-transport
-      hidden
-    >
-      <button type="button" class="hero-transport-btn hero-transport-grip" aria-label="Move headline" data-transport-grip>
-        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
-          <circle cx="5.5" cy="3.5" r="1.25" /><circle cx="10.5" cy="3.5" r="1.25" />
-          <circle cx="5.5" cy="8" r="1.25" /><circle cx="10.5" cy="8" r="1.25" />
-          <circle cx="5.5" cy="12.5" r="1.25" /><circle cx="10.5" cy="12.5" r="1.25" />
-        </svg>
-      </button>
-      <span class="mx-[2px] h-[16px] w-px bg-front/20" aria-hidden="true"></span>
-      <button type="button" class="hero-transport-btn" aria-label="Align left" data-transport-align="left">
-        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-          <path d="M2.5 4h11M2.5 8h7M2.5 12h9" />
-        </svg>
-      </button>
-      <button type="button" class="hero-transport-btn" aria-label="Align centre" data-transport-align="center">
-        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-          <path d="M2.5 4h11M4.5 8h7M3.5 12h9" />
-        </svg>
-      </button>
-      <button type="button" class="hero-transport-btn" aria-label="Align right" data-transport-align="right">
-        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-          <path d="M2.5 4h11M6.5 8h7M4.5 12h9" />
-        </svg>
-      </button>
-    </div>
   </div>
 
   {/* gap reduced from gap-vertical-s to gap-vertical-xs — brings the
@@ -603,36 +568,6 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     position: absolute;
     animation: hero-float-drift var(--drift-duration, 10s) ease-in-out infinite;
   }
-  /* Headline control bar: shown (and clickable) while visible. */
-  .hero-transport.is-visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .hero-transport-btn {
-    display: flex;
-    height: 32px;
-    width: 32px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 9999px;
-    cursor: pointer;
-    transition: color 200ms ease-out, background-color 200ms ease-out;
-  }
-  .hero-transport-btn:hover,
-  .hero-transport-btn[aria-pressed='true'] {
-    color: var(--color-accent-yellow);
-  }
-  .hero-transport-btn[aria-pressed='true'] {
-    background-color: rgb(255 255 255 / 0.08);
-  }
-  .hero-transport-grip {
-    cursor: grab;
-    touch-action: none;
-  }
-  .hero-transport-grip.is-dragging {
-    cursor: grabbing;
-  }
-
   /* Hover-capable devices can pick an image up and drag it about (the
      script only turns pointer events on for them). No text selection or
      native image drag getting in the way, and the cursor says it's
@@ -681,7 +616,6 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
 <script>
   import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock';
   import { initHeroPopups } from '../lib/heroPopups';
-  import { initHeadlineControls } from '../lib/heroHeadlineControls';
   import type { HeroPopUpImage } from '../types/hero';
 
   // Scroll-scrubbed hero entrance, modeled on wearecollins.com's reel section:
@@ -837,12 +771,6 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
             track.children.length - 1
           )
         : null;
-    // The headline's control bar; moving the headline with it nudges any
-    // floating images it runs into out of the way.
-    const transportBar = document.querySelector<HTMLElement>('[data-hero-transport]');
-    if (popupHeadline && transportBar) {
-      initHeadlineControls(popupHeadline, transportBar, () => popups?.makeRoomForHeadline());
-    }
     const frameCount = track.children.length;
     let index = 0;
 
