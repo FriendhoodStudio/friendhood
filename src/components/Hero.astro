@@ -65,9 +65,9 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     <div class="absolute inset-0 bg-front" data-hero-invert-overlay></div>
   </div>
 
-  {/* Keeps the headline roughly vertically centred in the space below the
-      nav — min-h-[76dvh] (a fixed fraction of the viewport, not tied to
-      the actual height of the tagline/media below) plus flex centring.
+  {/* Keeps the headline vertically centred in the space below the nav —
+      sized from the viewport (see .hero-headline-area), not tied to the
+      actual height of the tagline/media below, plus flex centring.
       A flex-1-based version that stretched this block to exactly fill the
       gap up to the tagline's real position was tried first and tuned to
       dead-centre — but the showreel is much taller than one viewport
@@ -77,13 +77,13 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       can't collapse like that, at the cost of being an approximation
       rather than an exact centre between two measured points. margin-top
       nudges it down slightly for nav clearance. */}
-  <div class="relative flex min-h-[76dvh] w-full items-center justify-center" style="margin-top:var(--nav-menu-height)">
+  <div class="hero-headline-area relative flex w-full items-center justify-center" style="margin-top:var(--nav-menu-height)">
     {/* Project images that roll up around the headline as the word changes
         — filled in by initHeroPopups (see the script below). The script
         keeps them clear of the headline and of each other. Decorative, so hidden from screen readers. */}
     {popUpImages.length > 1 && (
       <Fragment>
-        <div class="pointer-events-none absolute inset-0 z-30 overflow-hidden" aria-hidden="true" data-hero-popups></div>
+        <div class="pointer-events-none absolute inset-0 z-30" aria-hidden="true" data-hero-popups></div>
         <script type="application/json" data-hero-popup-images set:html={JSON.stringify(popUpImages)} />
       </Fragment>
     )}
@@ -465,6 +465,16 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
      no heroVideoMobile clip is uploaded (see above), object-cover crops the
      centre of the 16:9 frame into it; when one is uploaded, a real 4:5
      clip just fills it natively with nothing cropped. */
+  /* The headline gets (almost) the whole first screen: from below the nav
+     down to just above the tagline, which sits near the bottom with only
+     the top edge of the showreel peeking in under it — so on load it's the
+     headline and its floating images, not the reel, that hold attention.
+     Replaces a fixed min-h-[76dvh], which left most of the reel on screen
+     on tall viewports. */
+  .hero-headline-area {
+    min-height: calc(100dvh - var(--nav-menu-height) - 88px);
+  }
+
   .hero-media-aspect {
     aspect-ratio: 4 / 5;
   }
@@ -608,6 +618,13 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     // tagline in the current layout.
     const scale = 0.96 + 0.04 * progress;
     media.style.transform = `scale(${scale})`;
+    // Only the top of the showreel peeks in on load (see
+    // .hero-headline-area), soft-focused so it doesn't pull attention from
+    // the headline — it sharpens as you scroll it into view, reaching full
+    // focus well before it's fully arrived.
+    const focusEnd = vh * 0.6;
+    const focusProgress = clamp((start - rect.top) / (start - focusEnd), 0, 1);
+    media.style.filter = focusProgress < 1 ? `blur(${(1 - focusProgress) * 16}px)` : '';
 
     if (tagline) {
       // Reaches its end state well before the image finishes scaling, so it

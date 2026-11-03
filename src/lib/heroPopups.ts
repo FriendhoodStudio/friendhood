@@ -15,7 +15,7 @@ const FLOAT_COUNT_MOBILE = 4;
 // image starts rising as this one is still settling back — one continuous
 // ebb and flow rather than separate pops.
 const REVEAL_DELAY_MS = 300;
-const REVEAL_MS = 2400;
+const REVEAL_MS = 3000;
 // One floating image is swapped for a new one every this many words.
 const SWAP_EVERY_WORDS = 3;
 const FADE_IN_MS = 1200;
@@ -25,6 +25,9 @@ const FADE_OUT_MS = 800;
 const DRIFT_PX = 6;
 const HEADLINE_CLEARANCE_PX = 16 + DRIFT_PX;
 const IMAGE_GAP_PX = 8 + DRIFT_PX * 2;
+// Kept clear around the edge of the hero so the blur (up to 24px while
+// fading) can spill softly past it instead of being sliced off by the edge.
+const EDGE_INSET_PX = 32;
 const PLACEMENT_ATTEMPTS = 60;
 
 const RESTING: Keyframe = { transform: 'scale(0.92)', opacity: 0.45, filter: 'blur(14px)' };
@@ -93,12 +96,14 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     const layerRect = layer.getBoundingClientRect();
     const h = headline.getBoundingClientRect();
     const headlineRect = new DOMRect(h.left - layerRect.left, h.top - layerRect.top, h.width, h.height);
-    const maxX = layerRect.width - width;
-    const maxY = layerRect.height - height;
-    if (maxX < 0 || maxY < 0) return null;
+    const minX = EDGE_INSET_PX;
+    const minY = EDGE_INSET_PX;
+    const maxX = layerRect.width - width - EDGE_INSET_PX;
+    const maxY = layerRect.height - height - EDGE_INSET_PX;
+    if (maxX < minX || maxY < minY) return null;
 
     for (let i = 0; i < PLACEMENT_ATTEMPTS; i++) {
-      const rect = new DOMRect(Math.random() * maxX, Math.random() * maxY, width, height);
+      const rect = new DOMRect(minX + Math.random() * (maxX - minX), minY + Math.random() * (maxY - minY), width, height);
       if (intersects(rect, headlineRect, HEADLINE_CLEARANCE_PX)) continue;
       if ([...floaters, ...fading].some((f) => intersects(rect, f.rect, IMAGE_GAP_PX))) continue;
       return rect;
