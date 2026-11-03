@@ -53,9 +53,10 @@ const REVEALED: Pose = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, focus:
 // long it takes to fall away once the cursor leaves.
 const HOLD_RISE_MS = 900;
 const RELEASE_FALL_MS = 1500;
-// Touch: how long a finger has to rest on an image to pick it up, and how
-// far it can wander meanwhile before it counts as a scroll instead.
-const HOLD_TO_DRAG_MS = 250;
+// Touch: how long a finger has to rest on an image to pick it up (it starts
+// rising as soon as it's touched), and how far it can wander meanwhile
+// before it counts as a scroll instead.
+const HOLD_TO_DRAG_MS = 150;
 const HOLD_SLOP_PX = 10;
 // Each image gets a depth (0 nearest, 1 furthest back) that sets how blurred
 // and faint it rests, and how hard it zooms past when the hero's scroll
@@ -470,9 +471,10 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     f.wrap.addEventListener('pointercancel', end);
   }
 
-  // Touch: press and hold still on an image to pick it up, then drag it
-  // about. A finger that moves off before then is a scroll or swipe, and is
-  // left to the page. Once the image is up, the touchmove listener set up
+  // Touch: the image starts rising the moment it's touched, so there's
+  // something to see straight away; holding still a moment longer picks it
+  // up to drag about. A finger that moves off before then is a scroll or
+  // swipe, left to the page, and the image drops back, as does a tap. Once the image is up, the touchmove listener set up
   // with the image stops the page scrolling under the drag (the browser
   // only lets that happen before it has started scrolling, which the hold
   // makes sure of).
@@ -480,6 +482,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     if (e.touches.length !== 1 || !floaters.includes(f)) return;
     const { identifier, clientX: x0, clientY: y0 } = e.touches[0];
     let drag: ReturnType<typeof beginDrag> | null = null;
+    hold(f);
     const timer = window.setTimeout(() => (drag = beginDrag(f, x0, y0)), HOLD_TO_DRAG_MS);
     const ours = (ev: TouchEvent) => Array.from(ev.changedTouches).find((t) => t.identifier === identifier);
 
@@ -498,7 +501,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       f.wrap.removeEventListener('touchmove', move);
       f.wrap.removeEventListener('touchend', end);
       f.wrap.removeEventListener('touchcancel', end);
-      drag?.end();
+      if (drag) drag.end();
+      else release(f);
       drag = null;
     }
     f.wrap.addEventListener('touchmove', move, { passive: true });
