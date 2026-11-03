@@ -677,6 +677,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const LINE_TRAVEL = 0.75;
     // How much the headline grows as it passes the viewer.
     const LINE_GROW = 1.6;
+    // On phones, where it zooms as one block instead, it grows more.
+    const BLOCK_GROW = 2.4;
+    // Line index of each headline word, for the split (see updateStage).
+    let pieceLines: number[] = [];
     const easeIn = (t: number) => t * t;
     const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
 
@@ -721,22 +725,31 @@ const afterParts = headlineAfter.split(/(\s+)/);
         // in front, so a dragged image can cover it) — the title passing
         // over them is what sells the depth.
         headline.style.zIndex = out ? '40' : '';
-        // Grouped into lines by vertical centre, with some tolerance — the
-        // cycling word's window sits a touch differently from the plain
-        // words but is on the same line.
-        const centreOf = (piece: HTMLElement) => piece.offsetTop + piece.offsetHeight / 2;
-        const lines: number[] = [];
-        for (const c of pieces.map(centreOf).sort((a, b) => a - b)) {
-          if (!lines.length || c - lines[lines.length - 1] > headline.offsetHeight / 6) lines.push(c);
+        // Which line each word is on — worked out only while the headline
+        // is at rest, then held for the whole transition, so nothing can
+        // regroup mid-scroll. Read in reading order: a new line starts
+        // wherever a word begins further left than the one before it (how
+        // wrapping looks), or clearly lower down. Positions alone weren't
+        // enough — the cycling word's window sits a little lower than the
+        // plain words, and got treated as a line of its own.
+        if (!out || !pieceLines.length) {
+          pieceLines = [];
+          let line = 0;
+          pieces.forEach((piece, i) => {
+            const prev = pieces[i - 1];
+            if (prev && (piece.offsetLeft < prev.offsetLeft || piece.offsetTop > prev.offsetTop + prev.offsetHeight * 0.75)) line++;
+            pieceLines.push(line);
+          });
         }
-        const lineOf = (piece: HTMLElement) => {
-          const c = centreOf(piece);
-          return lines.reduce((best, l, i) => (Math.abs(l - c) < Math.abs(lines[best] - c) ? i : best), 0);
-        };
-        const middle = (lines.length - 1) / 2;
+        const lineCount = pieceLines[pieceLines.length - 1] + 1;
+        const middle = (lineCount - 1) / 2;
         const travel = window.innerHeight * LINE_TRAVEL;
-        for (const piece of pieces) {
-          const side = Math.sign(lineOf(piece) - middle);
+        // On phones the headline doesn't split — it stays one block and
+        // zooms towards the viewer as a whole.
+        const asBlock = window.innerWidth < 768;
+        const grow = asBlock ? BLOCK_GROW : LINE_GROW;
+        for (const [i, piece] of pieces.entries()) {
+          const side = asBlock ? 0 : Math.sign(pieceLines[i] - middle);
           if (!out) {
             piece.style.translate = '';
             piece.style.scale = '';
@@ -749,7 +762,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
           // the viewer with its spacing intact (scaling each word around
           // itself squashed neighbours together).
           piece.style.transformOrigin = `${headline.offsetWidth / 2 - piece.offsetLeft}px ${headline.offsetHeight / 2 - piece.offsetTop}px`;
-          piece.style.scale = String(1 + out * LINE_GROW);
+          piece.style.scale = String(1 + out * grow);
           piece.style.translate = `0 ${side * out * travel}px`;
           piece.style.filter = `blur(${out * 8}px)`;
           // Moving lines stay solid until they're mostly off screen; a
