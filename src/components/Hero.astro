@@ -636,10 +636,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
   // The scroll stage. While the hero's sticky screen is pinned, scroll
   // progress (0 → 1 across the stage's extra height) drives two overlapping
   // phases:
-  //   - out (first half): the headline's words and the floating images
-  //     zoom up and fly outward from the centre, blurring and fading as if
-  //     passing the viewer; the tagline fades first, and the light backdrop
-  //     gives way to the dark one;
+  //   - out (first half): the headline's lines part — top up, bottom down —
+  //     racing off screen while the floating images behind drift outward
+  //     more slowly (parallax), blurring and fading; the tagline fades
+  //     first, and the light backdrop gives way to the dark one;
   //   - in (second half): the showreel zooms up from small and blurred in
   //     the middle to fill the screen, coming into focus.
   // Scrolling back up plays it in reverse. With reduced motion it's a plain
@@ -668,6 +668,9 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const mix = (t: number) =>
       `rgb(${Math.round(dark.r + (light.r - dark.r) * t)}, ${Math.round(dark.g + (light.g - dark.g) * t)}, ${Math.round(dark.b + (light.b - dark.b) * t)})`;
 
+    // How far the headline's lines travel up/down over the transition, as a
+    // share of the screen's height — enough to carry them off screen.
+    const LINE_TRAVEL = 0.75;
     const easeIn = (t: number) => t * t;
     const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
 
@@ -699,21 +702,43 @@ const afterParts = headlineAfter.split(/(\s+)/);
         return;
       }
 
-      // Each word flies outward from the centre of the screen along the
-      // line from the centre to where it sits, growing and blurring as it
-      // goes. Positions come from layout (offsetLeft/Top within the
-      // headline), which the transforms don't affect.
+      // The headline's lines part like a curtain: lines above its middle
+      // slide up and off the top, lines below slide down and off the
+      // bottom (a middle line, when it wraps to three on phones, just
+      // fades). They travel much further and faster than the floating
+      // images (see zoomPast), and that parallax is what makes the title
+      // read as sitting in front of them. Lines are found from layout
+      // (offsetTop within the headline), which the transforms don't affect.
       if (headline) {
-        const h = headline.getBoundingClientRect();
-        const cx = window.innerWidth / 2;
-        const cy = window.innerHeight / 2;
+        // Grouped into lines by vertical centre, with some tolerance — the
+        // cycling word's window sits a touch differently from the plain
+        // words but is on the same line.
+        const centreOf = (piece: HTMLElement) => piece.offsetTop + piece.offsetHeight / 2;
+        const lines: number[] = [];
+        for (const c of pieces.map(centreOf).sort((a, b) => a - b)) {
+          if (!lines.length || c - lines[lines.length - 1] > headline.offsetHeight / 6) lines.push(c);
+        }
+        const lineOf = (piece: HTMLElement) => {
+          const c = centreOf(piece);
+          return lines.reduce((best, l, i) => (Math.abs(l - c) < Math.abs(lines[best] - c) ? i : best), 0);
+        };
+        const middle = (lines.length - 1) / 2;
+        const travel = window.innerHeight * LINE_TRAVEL;
         for (const piece of pieces) {
-          const px = h.left + piece.offsetLeft + piece.offsetWidth / 2 - cx;
-          const py = h.top + piece.offsetTop + piece.offsetHeight / 2 - cy;
-          piece.style.translate = out ? `${px * out * 2.2}px ${py * out * 2.2}px` : '';
-          piece.style.scale = out ? String(1 + out * 2.5) : '';
-          piece.style.filter = out ? `blur(${out * 18}px)` : '';
-          piece.style.opacity = out ? String(1 - out) : '';
+          const side = Math.sign(lineOf(piece) - middle);
+          if (!out) {
+            piece.style.translate = '';
+            piece.style.filter = '';
+            piece.style.opacity = '';
+            continue;
+          }
+          // Moved, not scaled: growing each word around its own centre
+          // squashed neighbouring words together.
+          piece.style.translate = `0 ${side * out * travel}px`;
+          piece.style.filter = `blur(${out * 8}px)`;
+          // Moving lines stay solid until they're mostly off screen; a
+          // middle line has nowhere to go, so it fades sooner.
+          piece.style.opacity = String(side ? 1 - clamp((out - 0.5) / 0.5, 0, 1) : 1 - out);
         }
       }
       popups?.zoomPast(out);

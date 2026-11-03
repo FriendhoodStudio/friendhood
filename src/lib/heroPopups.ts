@@ -64,8 +64,10 @@ const RESTING_FAR = { blur: 20, opacity: 0.35 };
 // As the stage zooms the field past: how far each image flies outward
 // (as a multiple of its distance from the screen's centre), how much it
 // grows, and how much the field blurs.
-const ZOOM_TRAVEL = { near: 2.6, far: 1.4 };
-const ZOOM_SCALE = { near: 3, far: 1.8 };
+// Kept well below the headline's own travel (see the hero's stage script):
+// the field moving slower than the title is what sets it behind.
+const ZOOM_TRAVEL = { near: 0.9, far: 0.4 };
+const ZOOM_SCALE = { near: 1.6, far: 1.25 };
 const ZOOM_BLUR_PX = 16;
 const GONE: Keyframe = { transform: 'scale(0.85)', opacity: 0, filter: 'blur(24px)' };
 
