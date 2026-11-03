@@ -211,11 +211,10 @@ const { services } = Astro.props;
      the scroll affordance, a visible scrollbar under the overlay would
      just be visual noise. */
   [data-services-track] {
-    /* Phones: wide cards with only a sliver of their neighbours peeking,
-       spaced like the featured projects row (the same horizontal-m gap,
-       and side cards that fade but don't shrink — see cardVisualState),
-       so the text gets as much of the narrow screen as possible. */
-    --services-card-image-size: min(446px, 86vw);
+    /* Phones: cards spaced on the same horizontal-m gap as the featured
+       projects row, as wide as they can be while the shrunken neighbours
+       (see cardVisualState) still peek in at the edges. */
+    --services-card-image-size: min(446px, 78vw);
     padding-inline: calc((100% - var(--services-card-image-size)) / 2);
     scroll-padding-inline: calc((100% - var(--services-card-image-size)) / 2);
   }
@@ -428,13 +427,10 @@ const { services } = Astro.props;
   // smaller and faded". One full step away (a peeking neighbour) is where
   // this bottoms out at its floor; 0.55 opacity / 0.85 scale keeps that
   // peeking card reading as "the next card" rather than washing out into
-  // background blur. On phones they don't shrink at all, so the space
-  // between cards stays exactly the track's gap, matching the featured
-  // projects row.
-  const phoneCards = window.matchMedia('(max-width: 767px)');
+  // background blur.
   function cardVisualState(delta: number) {
     const t = Math.min(Math.abs(delta), 1);
-    return { scale: phoneCards.matches ? 1 : 1 - t * 0.15, opacity: 1 - t * 0.45 };
+    return { scale: 1 - t * 0.15, opacity: 1 - t * 0.45 };
   }
 
   // Two passes, not one combined loop — all the layout reads (cardDelta,
