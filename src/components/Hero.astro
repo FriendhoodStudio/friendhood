@@ -671,6 +671,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
     // How far the headline's lines travel up/down over the transition, as a
     // share of the screen's height — enough to carry them off screen.
     const LINE_TRAVEL = 0.75;
+    // How much the headline grows as it passes the viewer.
+    const LINE_GROW = 1.6;
     const easeIn = (t: number) => t * t;
     const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
 
@@ -710,6 +712,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // read as sitting in front of them. Lines are found from layout
       // (offsetTop within the headline), which the transforms don't affect.
       if (headline) {
+        // In front of the floating images while it parts (they normally sit
+        // in front, so a dragged image can cover it) — the title passing
+        // over them is what sells the depth.
+        headline.style.zIndex = out ? '40' : '';
         // Grouped into lines by vertical centre, with some tolerance — the
         // cycling word's window sits a touch differently from the plain
         // words but is on the same line.
@@ -728,12 +734,17 @@ const afterParts = headlineAfter.split(/(\s+)/);
           const side = Math.sign(lineOf(piece) - middle);
           if (!out) {
             piece.style.translate = '';
+            piece.style.scale = '';
             piece.style.filter = '';
             piece.style.opacity = '';
             continue;
           }
-          // Moved, not scaled: growing each word around its own centre
-          // squashed neighbouring words together.
+          // Every word grows around the same point — the headline's centre —
+          // rather than its own, so the whole headline scales up towards
+          // the viewer with its spacing intact (scaling each word around
+          // itself squashed neighbours together).
+          piece.style.transformOrigin = `${headline.offsetWidth / 2 - piece.offsetLeft}px ${headline.offsetHeight / 2 - piece.offsetTop}px`;
+          piece.style.scale = String(1 + out * LINE_GROW);
           piece.style.translate = `0 ${side * out * travel}px`;
           piece.style.filter = `blur(${out * 8}px)`;
           // Moving lines stay solid until they're mostly off screen; a
