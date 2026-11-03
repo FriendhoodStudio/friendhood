@@ -44,8 +44,7 @@ const COMFORTABLE_GAP_PX = 80;
 // neighbour costs a spot this many points.
 const ALIGN_TOLERANCE = 0.18;
 const ALIGN_PENALTY = 80;
-// How big an image grows as it rises into focus. It sits behind the
-// headline, so growing near it never covers the text.
+// How big an image grows as it rises into focus.
 const REVEAL_SCALE = 1.5;
 const REVEALED: Keyframe = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, filter: 'blur(0px)' };
 // Hover: how quickly an image comes up (overshooting and settling), and how
