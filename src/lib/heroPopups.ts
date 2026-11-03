@@ -48,7 +48,7 @@ const ALIGN_TOLERANCE = 0.18;
 const ALIGN_PENALTY = 80;
 // How big an image grows as it rises into focus.
 const REVEAL_SCALE = 1.5;
-const REVEALED: Keyframe = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, filter: 'blur(0px)' };
+const REVEALED: Pose = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, focus: 1 };
 // Hover: how quickly an image comes up (overshooting and settling), and how
 // long it takes to fall away once the cursor leaves.
 const HOLD_RISE_MS = 900;
@@ -58,9 +58,18 @@ const RELEASE_FALL_MS = 1500;
 // stage sends the field flying (see zoomPast) — nearer ones rush past
 // faster, so blur and movement tell the same story about depth.
 //
-// Resting look, from nearest to furthest back.
-const RESTING_NEAR = { blur: 8, opacity: 0.55 };
-const RESTING_FAR = { blur: 20, opacity: 0.35 };
+// Resting look, from nearest to furthest back. The blur is baked into a
+// small copy of the image by Sanity's image service (blur strength in its
+// own units, on a copy SOFT_WIDTH_PX wide inside SOFT_PAD_PX of transparent
+// padding the blur feathers out into), rather than applied live with CSS:
+// Chrome redraws every live blur on every frame, which with a field of
+// drifting images ate so much of the GPU that, mid trackpad scroll, it held
+// back the scroll stage's frames entirely. Coming into focus fades the
+// sharp image in over the soft copy.
+const RESTING_NEAR = { blur: 45, opacity: 0.55 };
+const RESTING_FAR = { blur: 100, opacity: 0.35 };
+const SOFT_WIDTH_PX = 160;
+const SOFT_PAD_PX = 24;
 // As the stage zooms the field past: how far each image flies outward
 // (as a multiple of its distance from the screen's centre), how much it
 // grows.
@@ -68,19 +77,32 @@ const RESTING_FAR = { blur: 20, opacity: 0.35 };
 // the field moving slower than the title is what sets it behind.
 const ZOOM_TRAVEL = { near: 0.9, far: 0.4 };
 const ZOOM_SCALE = { near: 1.6, far: 1.25 };
-const GONE: Keyframe = { transform: 'scale(0.85)', opacity: 0, filter: 'blur(24px)' };
+const GONE: Pose = { transform: 'scale(0.85)', opacity: 0, focus: 0 };
+
+// A card's look at a moment: its transform and opacity, plus how far the
+// sharp image has faded in over the soft one (0 resting, 1 in focus).
+interface Pose {
+  transform: string;
+  opacity: number | string;
+  focus: number | string;
+  offset?: number;
+  easing?: string;
+}
 
 interface Floater {
   wrap: HTMLElement;
   card: HTMLElement;
+  sharp: HTMLImageElement;
   word: number;
   depth: number;
   // resting: blurred in the field. revealing: mid word-reveal (rise then
   // fall in one go). held: brought up by hover and staying up. falling: on
   // its way out after a hover.
   state: 'resting' | 'revealing' | 'held' | 'falling';
-  // The rise/fall currently playing on the card, if any.
+  // The rise/fall currently playing on the card, if any, and the matching
+  // fade of its sharp image.
   anim: Animation | null;
+  focusAnim: Animation | null;
   dragging: boolean;
   x: number;
   y: number;
@@ -215,16 +237,25 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     wordNext[word] = (wordNext[word] + 1) % IMAGES_PER_WORD;
     // Warm the word's following image for when this one is replaced.
     preload(wordImages[word][wordNext[word]]);
-    try {
-      await preload(image).decode();
-    } catch {
-      return null; // Failed or still loading on a slow connection — skip it.
-    }
-
     // Varied a little so the field doesn't read as a grid of equal tiles.
     const h = baseHeight * (0.65 + Math.random() * 0.5);
     // Clamped so very tall or panoramic images still read as photos.
     const w = h * Math.min(1.6, Math.max(0.7, image.aspectRatio));
+    const depth = Math.random();
+
+    // The soft copy, cropped to the card's shape and blurred to its depth.
+    const softH = Math.round((SOFT_WIDTH_PX * h) / w);
+    const blur = Math.round(RESTING_NEAR.blur + (RESTING_FAR.blur - RESTING_NEAR.blur) * depth);
+    const soft = new Image();
+    soft.decoding = 'async';
+    soft.src =
+      `${image.url.split('?')[0]}?w=${SOFT_WIDTH_PX + SOFT_PAD_PX * 2}&h=${softH + SOFT_PAD_PX * 2}` +
+      `&fit=crop&pad=${SOFT_PAD_PX}&bg=00000000&blur=${blur}&fm=webp&q=70`;
+    try {
+      await Promise.all([preload(image).decode(), soft.decode()]);
+    } catch {
+      return null; // Failed or still loading on a slow connection — skip it.
+    }
 
     // Two layers: the outer one drifts (a slow CSS loop with its own random
     // direction and speed), the inner card blurs, fades and rises — so the
@@ -239,14 +270,23 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       `--drift-duration:${10 + Math.random() * 6}s;animation-delay:${-Math.random() * 16}s`;
     const card = document.createElement('div');
     card.className = 'hero-popup';
-    const img = document.createElement('img');
-    img.src = image.url;
-    img.alt = '';
-    img.draggable = false;
-    card.appendChild(img);
+    // Scaled up from its small size, padding and all, so the image part
+    // lines up with the card and the blur spills softly past its edges.
+    const scale = w / SOFT_WIDTH_PX;
+    soft.className = 'hero-popup-soft';
+    soft.alt = '';
+    soft.draggable = false;
+    soft.style.cssText =
+      `left:${-SOFT_PAD_PX * scale}px;top:${-SOFT_PAD_PX * scale}px;` +
+      `width:${(SOFT_WIDTH_PX + SOFT_PAD_PX * 2) * scale}px;height:${(softH + SOFT_PAD_PX * 2) * scale}px`;
+    const sharp = document.createElement('img');
+    sharp.className = 'hero-popup-sharp';
+    sharp.src = image.url;
+    sharp.alt = '';
+    sharp.draggable = false;
+    card.append(soft, sharp);
     wrap.appendChild(card);
-    const depth = Math.random();
-    const floater: Floater = { wrap, card, word, depth, state: 'resting', anim: null, dragging: false, x: 0, y: 0, w, h };
+    const floater: Floater = { wrap, card, sharp, word, depth, state: 'resting', anim: null, focusAnim: null, dragging: false, x: 0, y: 0, w, h };
     // Hovering brings an image up and holds it there until the cursor
     // leaves; it can be clicked and dragged about while it's up. Desktop
     // only — on touch there's nothing to hover, and a tap shouldn't be
@@ -260,22 +300,19 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     return floater;
   }
 
-  function resting(f: Floater): Keyframe {
-    const far = f.depth;
-    const blur = RESTING_NEAR.blur + (RESTING_FAR.blur - RESTING_NEAR.blur) * far;
-    const opacity = RESTING_NEAR.opacity + (RESTING_FAR.opacity - RESTING_NEAR.opacity) * far;
-    return { transform: 'scale(0.92)', opacity, filter: `blur(${blur}px)` };
+  function resting(f: Floater): Pose {
+    const opacity = RESTING_NEAR.opacity + (RESTING_FAR.opacity - RESTING_NEAR.opacity) * f.depth;
+    return { transform: 'scale(0.92)', opacity, focus: 0 };
   }
 
   function fadeIn(floater: Floater, delay = 0) {
     layer.appendChild(floater.wrap);
     // Joins in mid-zoom if the stage is already under way.
     applyZoom(floater, layer.getBoundingClientRect());
-    floater.card.animate([{ transform: 'scale(0.8)', opacity: 0, filter: 'blur(24px)' }, resting(floater)], {
+    play(floater, [{ transform: 'scale(0.8)', opacity: 0, focus: 0 }, resting(floater)], {
       duration: FADE_IN_MS,
       delay,
       easing: 'ease-out',
-      fill: 'both',
     });
   }
 
@@ -294,17 +331,27 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   // Where the card is right now, mid-animation or not — every move below
   // starts from here, so catching an image partway through anything carries
   // on smoothly rather than jumping.
-  function currentFrame(f: Floater): Keyframe {
+  function currentFrame(f: Floater): Pose {
     const now = getComputedStyle(f.card);
-    return { transform: now.transform, opacity: now.opacity, filter: now.filter };
+    return { transform: now.transform, opacity: now.opacity, focus: getComputedStyle(f.sharp).opacity };
   }
 
-  function play(f: Floater, keyframes: Keyframe[], options: KeyframeAnimationOptions, onDone?: () => void) {
-    const previous = f.anim;
-    const anim = f.card.animate(keyframes, { ...options, fill: 'both' });
-    // Cancelled only once the new one has taken over, so there's no frame
+  // Plays a run of poses: the card's transform and opacity, and alongside
+  // it the sharp image's fade.
+  function play(f: Floater, poses: Pose[], options: KeyframeAnimationOptions, onDone?: () => void) {
+    const previous = [f.anim, f.focusAnim];
+    const timing = (p: Pose) => ({ ...(p.offset !== undefined && { offset: p.offset }), ...(p.easing && { easing: p.easing }) });
+    const anim = f.card.animate(
+      poses.map((p) => ({ transform: p.transform, opacity: p.opacity, ...timing(p) })),
+      { ...options, fill: 'both' }
+    );
+    f.focusAnim = f.sharp.animate(
+      poses.map((p) => ({ opacity: p.focus, ...timing(p) })),
+      { ...options, fill: 'both' }
+    );
+    // Cancelled only once the new ones have taken over, so there's no frame
     // where neither holds the card.
-    previous?.cancel();
+    previous.forEach((a) => a?.cancel());
     f.anim = anim;
     anim.finished
       .then(() => {

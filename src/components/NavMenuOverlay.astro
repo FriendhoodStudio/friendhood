@@ -22,7 +22,7 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
 
 <div
   data-nav-overlay
-  class="pointer-events-none fixed inset-0 z-40 flex flex-col items-center justify-start overflow-y-auto bg-back/60 px-[var(--page-margin)] pt-[max(148px,min(var(--spacing-vertical-xl),12vh))] pb-[130px] text-center opacity-0 backdrop-blur-[25px] transition-opacity duration-400 ease-in-out group-data-[open=true]:pointer-events-auto group-data-[open=true]:opacity-100"
+  class="pointer-events-none fixed inset-0 z-40 flex flex-col items-center justify-start overflow-y-auto bg-back/60 px-[var(--page-margin)] pt-[max(148px,min(var(--spacing-vertical-xl),12vh))] pb-[130px] text-center invisible opacity-0 backdrop-blur-[25px] transition-[opacity,visibility] duration-400 ease-in-out group-data-[open=true]:pointer-events-auto group-data-[open=true]:visible group-data-[open=true]:opacity-100"
 >
   <div class="flex flex-1 flex-col items-center gap-vertical-l">
     <nav class="flex flex-col items-center gap-[15px]">

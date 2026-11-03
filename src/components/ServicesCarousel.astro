@@ -13,7 +13,7 @@ const { services } = Astro.props;
 <div
   data-services-overlay
   data-open="false"
-  class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/50 opacity-0 backdrop-blur-[25px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100"
+  class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/50 invisible opacity-0 backdrop-blur-[25px] transition-[opacity,visibility] duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:visible data-[open=true]:opacity-100"
 >
   {/* Position is native — a real overflow-x:auto strip with scroll-snap,
       not a JS-owned "offset" fighting or replacing the browser's own

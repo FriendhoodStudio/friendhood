@@ -265,7 +265,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     data-reel-overlay
     data-open="false"
     inert
-    class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/95 px-0 py-[14px] opacity-0 backdrop-blur-[10px] transition-opacity duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:opacity-100 sm:p-[24px]"
+    class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/95 px-0 py-[14px] invisible opacity-0 backdrop-blur-[10px] transition-[opacity,visibility] duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:visible data-[open=true]:opacity-100 sm:p-[24px]"
   >
     <button
       type="button"
@@ -584,7 +584,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
   /* Floating project images — created by initHeroPopups, so :global (Astro's
      scoping only reaches elements in this file's own markup). The outer
      .hero-float drifts on a slow loop (direction, distance and speed set per
-     image by the script); the inner .hero-popup card is what blurs, fades and
+     image by the script); the inner .hero-popup card is what fades and
      pops, starting hidden until the script fades it in. */
   :global(.hero-float) {
     position: absolute;
@@ -602,22 +602,30 @@ const afterParts = headlineAfter.split(/(\s+)/);
   :global(.hero-float.is-dragging) {
     cursor: grabbing;
   }
-  /* The rounded corners live on the img itself, not as overflow: hidden on
-     the card: the card is what gets blurred, and clipping it sliced the
-     blur off at the card's edges (very visible on iOS Safari) — leaving
-     crisp-edged boxes of fuzz instead of soft shapes. Unclipped, the blur
-     feathers out past the image's edges. */
+  /* No overflow: hidden on the card: the soft copy's blur feathers out past
+     the card's edges, and clipping it left crisp-edged boxes of fuzz. The
+     rounded corners live on the sharp image instead. */
   :global(.hero-popup) {
+    position: relative;
     width: 100%;
     height: 100%;
     opacity: 0;
   }
+  /* The soft copy (blurred by the image service, with transparent padding
+     the blur feathers into — sized and placed by the script) and the sharp
+     image on top of it, faded in as the image comes into focus. */
   :global(.hero-popup img) {
+    position: absolute;
     display: block;
+    max-width: none;
+  }
+  :global(.hero-popup .hero-popup-sharp) {
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
     border-radius: 8px;
+    opacity: 0;
   }
   /* A loose loop rather than a straight back-and-forth: out along one axis,
      across, back along the other, with a slight sway — so it reads as
@@ -778,9 +786,15 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // through the hand-over, ahead of the next section arriving.
       const handoverFade = 1 - clamp(after / HANDOVER_FADE_BY, 0, 1);
       if (glow) glow.style.opacity = String(handoverFade);
-      if (headline) headline.style.color = mix(darken);
+      // Text colour changes in steps rather than every frame — a new colour
+      // means repainting the text, the slowest thing a frame can ask for,
+      // and enough of them made Chrome hold the stage's frames back during
+      // a trackpad scroll. The headline is mostly gone by the time the
+      // backdrop darkens, so it keeps its colour; the tagline swaps while
+      // it's faded out between the headline and the statement.
+      if (headline) headline.style.color = mix(0);
       if (tagline) {
-        tagline.style.color = mix(darken);
+        tagline.style.color = mix(darken > 0.5 ? 1 : 0);
         // Fades at the start, comes back under the statement, and fades
         // again early in the hand-over as it scrolls away.
         tagline.style.opacity = String(Math.max(1 - clamp(q / 0.12, 0, 1), statementIn) * (1 - clamp(after / 0.3, 0, 1)));
