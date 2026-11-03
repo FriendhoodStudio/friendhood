@@ -522,19 +522,19 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
   }
 
   /* Pop-up project images — created by initHeroPopups, so :global (Astro's
-     scoping only reaches elements in this file's own markup). The outer box
-     is the mask; the img inside rolls up through it. */
+     scoping only reaches elements in this file's own markup). Starts hidden;
+     the script grows and fades each one in. */
   :global(.hero-popup) {
     position: absolute;
     overflow: hidden;
     border-radius: 8px;
+    opacity: 0;
   }
   :global(.hero-popup img) {
     display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transform: translateY(105%);
   }
 </style>
 
