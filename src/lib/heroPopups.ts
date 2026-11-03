@@ -16,7 +16,6 @@ const IMAGES_PER_WORD = 3;
 const REVEAL_DELAY_MS = 300;
 const REVEAL_MS = 3000;
 const FADE_IN_MS = 1200;
-const FADE_OUT_MS = 800;
 // How far each image wanders from its spot while floating. The spacing
 // below allows for two neighbours drifting towards each other at once.
 const DRIFT_PX = 6;
@@ -44,6 +43,7 @@ const PARALLAX_MIN = 0.25;
 const PARALLAX_MAX = 0.75;
 
 const RESTING: Keyframe = { transform: 'scale(0.92)', opacity: 0.45, filter: 'blur(14px)' };
+const GONE: Keyframe = { transform: 'scale(0.85)', opacity: 0, filter: 'blur(24px)' };
 
 interface Floater {
   wrap: HTMLElement;
@@ -216,36 +216,26 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     fadeIn(floater, delay);
   }
 
-  function removeFloater(floater: Floater) {
-    floaters = floaters.filter((f) => f !== floater);
-    floater.card
-      .animate([RESTING, { transform: 'scale(0.85)', opacity: 0, filter: 'blur(24px)' }], {
-        duration: FADE_OUT_MS,
-        easing: 'ease-in',
-        fill: 'forwards',
-      })
-      .finished.then(() => floater.wrap.remove())
-      .catch(() => floater.wrap.remove());
-  }
-
-  // One smooth rise and fall: sharpens and grows forward, then sinks straight
-  // back into the blur, with no hold or settle in between. Then it makes way
-  // for the word's next image.
+  // One smooth movement: rises out of the blur, sharpening and growing, then
+  // carries straight on falling away — shrinking, blurring and fading until
+  // it's gone — with no hold or stop at the blurred resting state between.
+  // Then the word's next image drifts in.
   function riseAndFall(floater: Floater, delay: number) {
     floater.wrap.style.zIndex = '1';
     floater.card
       .animate(
         [
           { ...RESTING, easing: 'ease-in-out' },
-          { transform: `scale(${REVEAL_SCALE})`, opacity: 1, filter: 'blur(0px)', offset: 0.5, easing: 'ease-in-out' },
-          RESTING,
+          { transform: `scale(${REVEAL_SCALE})`, opacity: 1, filter: 'blur(0px)', offset: 0.5, easing: 'ease-in' },
+          GONE,
         ],
-        { duration: REVEAL_MS, delay }
+        { duration: REVEAL_MS, delay, fill: 'forwards' }
       )
       .finished.then(() => {
         if (!floaters.includes(floater)) return;
-        removeFloater(floater);
-        addFloater(floater.word, FADE_OUT_MS / 2);
+        floaters = floaters.filter((f) => f !== floater);
+        floater.wrap.remove();
+        addFloater(floater.word);
       })
       .catch(() => {});
   }
