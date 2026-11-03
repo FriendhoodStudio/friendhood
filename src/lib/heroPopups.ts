@@ -6,10 +6,10 @@ import type { HeroPopUpImage } from '../types/hero';
  * image rises forward — sharpening and growing — and sinks back in one
  * smooth movement; then it dissolves and the word's next image drifts in
  * wherever there's most room, waiting for the word to come round again. As
- * you scroll, the hero's stage sends the whole field zooming past (zoomPast). On desktop, hovering an image brings
- * it up and holds it there — it can be clicked and dragged about — and once
- * the cursor leaves it falls away and its word's next image takes its
- * place. Nothing overlaps the headline or
+ * you scroll, the hero's stage sends the whole field zooming past (zoomPast). Hovering an image (or pressing and
+ * holding it on a touch screen) brings it up and holds it there — it can be
+ * dragged about — and once let go it falls away and its word's next image
+ * takes its place. Nothing overlaps the headline or
  * another image. */
 
 // How many images each word cycles through, one on screen at a time.
@@ -53,6 +53,10 @@ const REVEALED: Pose = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, focus:
 // long it takes to fall away once the cursor leaves.
 const HOLD_RISE_MS = 900;
 const RELEASE_FALL_MS = 1500;
+// Touch: how long a finger has to rest on an image to pick it up, and how
+// far it can wander meanwhile before it counts as a scroll instead.
+const HOLD_TO_DRAG_MS = 250;
+const HOLD_SLOP_PX = 10;
 // Each image gets a depth (0 nearest, 1 furthest back) that sets how blurred
 // and faint it rests, and how hard it zooms past when the hero's scroll
 // stage sends the field flying (see zoomPast) — nearer ones rush past
@@ -291,15 +295,16 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     wrap.appendChild(card);
     const floater: Floater = { wrap, card, soft, sharp, word, depth, state: 'resting', anim: null, focusAnims: [], dragging: false, x: 0, y: 0, w, h };
     // Hovering brings an image up and holds it there until the cursor
-    // leaves; it can be clicked and dragged about while it's up. Desktop
-    // only — on touch there's nothing to hover, and a tap shouldn't be
-    // swallowed by a decorative image.
-    if (canHover) {
-      wrap.style.pointerEvents = 'auto';
-      wrap.addEventListener('pointerenter', () => hold(floater));
-      wrap.addEventListener('pointerleave', () => release(floater));
-      wrap.addEventListener('pointerdown', (e) => startDrag(floater, e));
-    }
+    // leaves; it can be clicked and dragged about while it's up. On touch,
+    // pressing and holding a finger on one does the same (see watchTouch).
+    // The mouse handlers ignore touch, which a hybrid laptop sends both of.
+    wrap.style.pointerEvents = 'auto';
+    wrap.addEventListener('pointerenter', (e) => e.pointerType !== 'touch' && hold(floater));
+    wrap.addEventListener('pointerleave', (e) => e.pointerType !== 'touch' && release(floater));
+    wrap.addEventListener('pointerdown', (e) => startDrag(floater, e));
+    wrap.addEventListener('touchstart', (e) => watchTouch(floater, e), { passive: true });
+    // Android opens the image menu on a long press, right as a drag starts.
+    wrap.addEventListener('contextmenu', (e) => floater.dragging && e.preventDefault());
     return floater;
   }
 
@@ -328,8 +333,6 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     fadeIn(floater, delay);
     return floater;
   }
-
-  const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   // Where the card is right now, mid-animation or not — every move below
   // starts from here, so catching an image partway through anything carries
@@ -419,37 +422,84 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     play(f, [currentFrame(f), GONE], { duration: RELEASE_FALL_MS, easing: 'ease-in' }, () => retire(f));
   }
 
-  // Click and drag a held image anywhere in the hero. Pointer capture keeps
-  // the drag going even if the cursor outruns the image. Letting go of the
-  // click lets go of the image: it falls away from where it was dropped.
-  function startDrag(f: Floater, e: PointerEvent) {
-    if (e.button !== 0 || !floaters.includes(f)) return;
-    e.preventDefault();
+  // Picks a held image up to be dragged anywhere in the hero from (x, y).
+  // Letting go lets go of the image: it falls away from where it was dropped.
+  function beginDrag(f: Floater, x: number, y: number) {
     hold(f);
     f.dragging = true;
     f.wrap.classList.add('is-dragging');
-    f.wrap.setPointerCapture(e.pointerId);
-    const start = { x: e.clientX, y: e.clientY, left: f.x, top: f.y };
+    const start = { x, y, left: f.x, top: f.y };
     const b = bounds();
-
-    const move = (ev: PointerEvent) => {
-      f.x = Math.min(Math.max(start.left + ev.clientX - start.x, -f.w / 2), b.width - f.w / 2);
-      f.y = Math.min(Math.max(start.top + ev.clientY - start.y, -f.h / 2), b.height - f.h / 2);
-      f.wrap.style.left = `${f.x}px`;
-      f.wrap.style.top = `${f.y}px`;
+    return {
+      move(cx: number, cy: number) {
+        f.x = Math.min(Math.max(start.left + cx - start.x, -f.w / 2), b.width - f.w / 2);
+        f.y = Math.min(Math.max(start.top + cy - start.y, -f.h / 2), b.height - f.h / 2);
+        f.wrap.style.left = `${f.x}px`;
+        f.wrap.style.top = `${f.y}px`;
+      },
+      end() {
+        f.dragging = false;
+        f.wrap.classList.remove('is-dragging');
+        release(f);
+      },
     };
+  }
+
+  // Mouse: click and drag. Pointer capture keeps the drag going even if the
+  // cursor outruns the image.
+  function startDrag(f: Floater, e: PointerEvent) {
+    if (e.pointerType === 'touch' || e.button !== 0 || !floaters.includes(f)) return;
+    e.preventDefault();
+    const drag = beginDrag(f, e.clientX, e.clientY);
+    f.wrap.setPointerCapture(e.pointerId);
+
+    const move = (ev: PointerEvent) => drag.move(ev.clientX, ev.clientY);
     const end = (ev: PointerEvent) => {
-      f.dragging = false;
-      f.wrap.classList.remove('is-dragging');
       f.wrap.removeEventListener('pointermove', move);
       f.wrap.removeEventListener('pointerup', end);
       f.wrap.removeEventListener('pointercancel', end);
       if (f.wrap.hasPointerCapture(ev.pointerId)) f.wrap.releasePointerCapture(ev.pointerId);
-      release(f);
+      drag.end();
     };
     f.wrap.addEventListener('pointermove', move);
     f.wrap.addEventListener('pointerup', end);
     f.wrap.addEventListener('pointercancel', end);
+  }
+
+  // Touch: press and hold still on an image to pick it up, then drag it
+  // about. A finger that moves off before then is a scroll or swipe, and is
+  // left to the page. Once the image is up, cancelling the touch moves stops
+  // the page scrolling under the drag (the browser only lets that happen
+  // before it has started scrolling, which the hold makes sure of).
+  function watchTouch(f: Floater, e: TouchEvent) {
+    if (e.touches.length !== 1 || !floaters.includes(f)) return;
+    const { identifier, clientX: x0, clientY: y0 } = e.touches[0];
+    let drag: ReturnType<typeof beginDrag> | null = null;
+    const timer = window.setTimeout(() => (drag = beginDrag(f, x0, y0)), HOLD_TO_DRAG_MS);
+    const ours = (ev: TouchEvent) => Array.from(ev.changedTouches).find((t) => t.identifier === identifier);
+
+    const move = (ev: TouchEvent) => {
+      const t = ours(ev);
+      if (!t) return;
+      if (drag) {
+        ev.preventDefault();
+        drag.move(t.clientX, t.clientY);
+      } else if (Math.hypot(t.clientX - x0, t.clientY - y0) > HOLD_SLOP_PX) {
+        stop();
+      }
+    };
+    const end = (ev: TouchEvent) => ours(ev) && stop();
+    function stop() {
+      window.clearTimeout(timer);
+      f.wrap.removeEventListener('touchmove', move);
+      f.wrap.removeEventListener('touchend', end);
+      f.wrap.removeEventListener('touchcancel', end);
+      drag?.end();
+      drag = null;
+    }
+    f.wrap.addEventListener('touchmove', move, { passive: false });
+    f.wrap.addEventListener('touchend', end);
+    f.wrap.addEventListener('touchcancel', end);
   }
 
   // Each word change brings that word's image up. If it's already up
@@ -515,6 +565,9 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     const layerRect = layer.getBoundingClientRect();
     floaters.forEach((f) => applyZoom(f, layerRect));
     layer.style.opacity = amount ? String(1 - amount) : '';
+    // Hands are off while they're flying past, so a faded-out image can't
+    // sit over (and swallow taps on) the showreel button.
+    layer.classList.toggle('is-zooming', amount > 0);
   }
 
   // Word reveals hold off while the stage is under way.
