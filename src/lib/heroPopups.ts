@@ -53,6 +53,9 @@ const HOLD_RISE_MS = 900;
 const RELEASE_FALL_MS = 1500;
 // How long the headline takes to spring back home after being shoved.
 const HEADLINE_SPRING_MS = 900;
+// How long an image takes to glide out of the way of a headline being
+// moved with its control bar.
+const MAKE_ROOM_MS = 350;
 // How far down the page (as a share of the screen's height) the field has
 // fully faded away by.
 const SCROLL_FADE_END = 0.25;
@@ -354,19 +357,32 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     play(f, [currentFrame(f), GONE], { duration: RELEASE_FALL_MS, easing: 'ease-in' }, () => retire(f));
   }
 
+  // Where the headline's been placed by its control bar (see
+  // heroHeadlineControls), which a shove is measured from and springs back
+  // to. 0,0 until someone moves it.
+  function headlineHome() {
+    return { x: Number(headline.dataset.homeX) || 0, y: Number(headline.dataset.homeY) || 0 };
+  }
+
+  function placeHeadline() {
+    const home = headlineHome();
+    headline.style.translate = `${home.x + headlineShove.x}px ${home.y + headlineShove.y}px`;
+  }
+
   // The dragged image is solid: wherever it runs into the headline, the
   // headline is shoved out of its way, along whichever axis needs the
   // smaller move (so it slides off the side being pushed), and kept on
   // screen.
   function shoveHeadline(f: Floater) {
+    const home = headlineHome();
     if (headlineSpring) {
       // Caught again mid spring-back: carry on from where it's got to.
       headlineSpring.commitStyles();
       headlineSpring.cancel();
       headlineSpring = null;
       const [x = 0, y = 0] = (headline.style.translate || '0px 0px').split(' ').map(parseFloat);
-      headlineShove.x = x;
-      headlineShove.y = y;
+      headlineShove.x = x - home.x;
+      headlineShove.y = y - home.y;
     }
     // The card's visual box (it's scaled up around its centre while held),
     // and the headline as it currently sits, shove included.
@@ -384,7 +400,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     const homeTop = h.top - headlineShove.y;
     headlineShove.x = Math.min(Math.max(x, -homeLeft), window.innerWidth - homeLeft - h.width);
     headlineShove.y = Math.min(Math.max(y, -homeTop), window.innerHeight - homeTop - h.height);
-    headline.style.translate = `${headlineShove.x}px ${headlineShove.y}px`;
+    placeHeadline();
   }
 
   // Let go: the headline springs back home, overshooting slightly past it
@@ -394,16 +410,18 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     if (x === 0 && y === 0) return;
     headlineShove.x = 0;
     headlineShove.y = 0;
+    const home = headlineHome();
+    const at = (dx: number, dy: number) => `${home.x + dx}px ${home.y + dy}px`;
     const anim = headline.animate(
       [
-        { translate: `${x}px ${y}px` },
-        { translate: `${-x * 0.06}px ${-y * 0.06}px`, offset: 0.6 },
-        { translate: `${x * 0.02}px ${y * 0.02}px`, offset: 0.85 },
-        { translate: '0px 0px' },
+        { translate: at(x, y) },
+        { translate: at(-x * 0.06, -y * 0.06), offset: 0.6 },
+        { translate: at(x * 0.02, y * 0.02), offset: 0.85 },
+        { translate: at(0, 0) },
       ],
       { duration: HEADLINE_SPRING_MS, easing: 'ease-out' }
     );
-    headline.style.translate = '';
+    placeHeadline();
     headlineSpring = anim;
     anim.finished
       .then(() => {
@@ -421,6 +439,9 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     hold(f);
     f.dragging = true;
     f.wrap.classList.add('is-dragging');
+    // Follows the cursor directly, not via any glide left over from being
+    // nudged aside by the headline.
+    f.wrap.style.transition = '';
     f.wrap.setPointerCapture(e.pointerId);
     const start = { x: e.clientX, y: e.clientY, left: f.x, top: f.y };
     const b = bounds();
@@ -525,5 +546,32 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     resizeTimer = window.setTimeout(build, 300);
   });
 
-  return { showWord };
+  // While the headline is being moved with its control bar, any resting
+  // image it runs into glides out of its way — pushed off along whichever
+  // axis needs the smaller move, kept inside the hero.
+  function makeRoomForHeadline() {
+    const layerRect = layer.getBoundingClientRect();
+    const h = headline.getBoundingClientRect();
+    const clear = {
+      left: h.left - layerRect.left - HEADLINE_CLEARANCE_PX,
+      top: h.top - layerRect.top - HEADLINE_CLEARANCE_PX,
+      right: h.right - layerRect.left + HEADLINE_CLEARANCE_PX,
+      bottom: h.bottom - layerRect.top + HEADLINE_CLEARANCE_PX,
+    };
+    for (const f of floaters) {
+      if (f.dragging || f.state === 'held') continue;
+      const overlapX = Math.min(f.x + f.w, clear.right) - Math.max(f.x, clear.left);
+      const overlapY = Math.min(f.y + f.h, clear.bottom) - Math.max(f.y, clear.top);
+      if (overlapX <= 0 || overlapY <= 0) continue;
+      if (overlapX < overlapY) f.x += f.x + f.w / 2 < (clear.left + clear.right) / 2 ? -overlapX : overlapX;
+      else f.y += f.y + f.h / 2 < (clear.top + clear.bottom) / 2 ? -overlapY : overlapY;
+      f.x = Math.min(Math.max(f.x, 0), layerRect.width - f.w);
+      f.y = Math.min(Math.max(f.y, 0), layerRect.height - f.h);
+      f.wrap.style.transition = `left ${MAKE_ROOM_MS}ms ease-out, top ${MAKE_ROOM_MS}ms ease-out`;
+      f.wrap.style.left = `${f.x}px`;
+      f.wrap.style.top = `${f.y}px`;
+    }
+  }
+
+  return { showWord, makeRoomForHeadline };
 }
