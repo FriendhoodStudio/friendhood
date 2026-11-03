@@ -29,16 +29,17 @@ export default defineType({
     }),
     defineField({
       name: 'tagline',
-      title: 'Tagline',
-      description: 'Small line shown above the hero media, e.g. "Move into the friendhood ↴".',
+      title: 'Footer line',
+      description:
+        'The small line at the bottom of the hero, e.g. "Find your possibility". The down arrow after it is added automatically.',
       type: 'string',
       validation: (rule) => rule.required(),
     }),
     defineField({
       name: 'statement',
-      title: 'Statement',
+      title: 'Secondary headline',
       description:
-        'The large line the showreel zooms into as you scroll, e.g. "Get your brand in the hands and hearts of the people that matter most".',
+        'The large line the showreel zooms into as you scroll down, e.g. "Get your brand in the hands and hearts of the people that matter most".',
       type: 'text',
       rows: 2,
     }),
@@ -117,9 +118,9 @@ export default defineType({
     }),
     defineField({
       name: 'popUpImagesEnabled',
-      title: 'Pop-up project images',
+      title: 'Show pop-up images',
       description:
-        'Two project images roll up around the headline each time the hover word changes. Turn off to show just the headline.',
+        'Images that drift up into focus around the headline, a pair at a time, before you scroll. Turn off to show just the headline.',
       type: 'boolean',
       initialValue: true,
     }),
@@ -127,7 +128,7 @@ export default defineType({
       name: 'popUpImages',
       title: 'Pop-up images',
       description:
-        'Optional. Leave empty to pick automatically from published case studies (each one\'s hero image plus a few from its body). Add images here to use only these instead.',
+        'Leave empty to pick automatically from published case studies (each one\'s hero image plus up to four from its body). Add images here to use only these instead, in any order — they\'re shuffled on the page. Animated GIFs are skipped.',
       type: 'array',
       of: [
         {
