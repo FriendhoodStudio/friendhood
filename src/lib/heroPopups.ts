@@ -2,14 +2,16 @@ import type { HeroPopUpImage } from '../types/hero';
 
 /** Two project images grow in around the hero headline just after each word
  * change, with the same overshoot-and-settle as the site's buttons and the
- * word's own width change, and shrink away the moment the next word starts —
- * so each pair belongs to exactly one word. Images come from a shuffled deck
+ * word's own width change, then shrink and fade straight back out — so each
+ * pair belongs to exactly one word. Images come from a shuffled deck
  * (every image shows once before any repeats). */
 
 // Delays after the word starts rolling (its own roll is 650ms, peaking at
 // ~455ms): the first image lands just behind the word, the second follows.
 const PAIR_DELAYS_MS = [320, 520];
-const GROW_IN_MS = 650;
+// One continuous grow, overshoot, settle and fade — no hold — short enough
+// that both images are gone before the next word (every 1500ms) arrives.
+const LIFETIME_MS = 1050;
 const SHRINK_OUT_MS = 250;
 // Padding kept clear around the headline.
 const HEADLINE_CLEARANCE_PX = 16;
@@ -81,8 +83,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     return new DOMRect(minX + Math.random() * (maxX - minX), minY + Math.random() * (maxY - minY), width, height);
   }
 
-  // Quick shrink-and-fade as the next word starts, clearing the way for the
-  // next pair.
+  // Safety net for a pair still fading when the next word starts (e.g. a
+  // slow image decode delayed it): finishes it off quickly.
   function clearVisible() {
     visible.splice(0).forEach(({ el }) => {
       el.getAnimations().forEach((anim) => anim.commitStyles?.());
@@ -127,18 +129,27 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     layer.appendChild(el);
     visible.push({ el, rect });
 
-    // Grows past full size then settles back, fading in over the first part
-    // — the same keyframe shape as the headline word's width change and the
-    // nav/footer button release.
-    el.animate(
+    // Grows past full size and settles back (the same overshoot shape as
+    // the headline word's width change and the nav/footer button release),
+    // then carries straight on into shrinking and fading out. Blurred at
+    // both ends so the fades read soft rather than as a hard cut.
+    const anim = el.animate(
       [
-        { transform: 'scale(0.4)', opacity: 0 },
-        { transform: 'scale(1.06)', opacity: 1, offset: 0.6 },
-        { transform: 'scale(0.98)', opacity: 1, offset: 0.85 },
-        { transform: 'scale(1)', opacity: 1 },
+        { transform: 'scale(0.4)', opacity: 0, filter: 'blur(12px)', easing: 'ease-out' },
+        { transform: 'scale(1.06)', opacity: 1, filter: 'blur(0px)', offset: 0.35, easing: 'ease-in-out' },
+        { transform: 'scale(0.98)', opacity: 1, filter: 'blur(0px)', offset: 0.5, easing: 'ease-out' },
+        { transform: 'scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0.58, easing: 'ease-in' },
+        { transform: 'scale(0.8)', opacity: 0, filter: 'blur(12px)' },
       ],
-      { duration: GROW_IN_MS, easing: 'ease-out', fill: 'both' }
+      { duration: LIFETIME_MS, fill: 'both' }
     );
+    anim.finished
+      .then(() => {
+        const index = visible.findIndex((p) => p.el === el);
+        if (index >= 0) visible.splice(index, 1);
+        el.remove();
+      })
+      .catch(() => {});
   }
 
   // Pauses while the hero is scrolled away or the tab is hidden, so pairs
