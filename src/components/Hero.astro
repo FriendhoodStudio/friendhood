@@ -677,8 +677,9 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const LINE_TRAVEL = 0.75;
     // How much the headline grows as it passes the viewer.
     const LINE_GROW = 1.6;
-    // On phones, where it zooms as one block instead, it grows more.
-    const BLOCK_GROW = 2.4;
+    // On phones, where it zooms as one block instead — kept gentle, as the
+    // narrow screen fills up fast.
+    const BLOCK_GROW = 1.1;
     // Line index of each headline word, for the split (see updateStage).
     let pieceLines: number[] = [];
     const easeIn = (t: number) => t * t;
@@ -767,7 +768,11 @@ const afterParts = headlineAfter.split(/(\s+)/);
           piece.style.filter = `blur(${out * 8}px)`;
           // Moving lines stay solid until they're mostly off screen; a
           // middle line has nowhere to go, so it fades sooner.
-          piece.style.opacity = String(side ? 1 - clamp((out - 0.5) / 0.5, 0, 1) : 1 - out);
+          // As one block on phones it clears quickly, before it's grown
+          // big enough to sprawl across the narrow screen.
+          piece.style.opacity = String(
+            asBlock ? 1 - clamp(out / 0.55, 0, 1) : side ? 1 - clamp((out - 0.5) / 0.5, 0, 1) : 1 - out
+          );
         }
       }
       popups?.zoomPast(out);
