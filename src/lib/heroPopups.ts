@@ -51,6 +51,8 @@ const REVEALED: Keyframe = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, fi
 // long it takes to fall away once the cursor leaves.
 const HOLD_RISE_MS = 900;
 const RELEASE_FALL_MS = 1500;
+// How long the headline takes to spring back home after being shoved.
+const HEADLINE_SPRING_MS = 900;
 // How far down the page (as a share of the screen's height) the field has
 // fully faded away by.
 const SCROLL_FADE_END = 0.25;
@@ -90,6 +92,9 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   let deck: HeroPopUpImage[] = [];
   const preloaded = new Map<string, HTMLImageElement>();
   let floaters: Floater[] = [];
+  // How far a dragged image has shoved the headline from its home spot.
+  const headlineShove = { x: 0, y: 0 };
+  let headlineSpring: Animation | null = null;
   let heroInView = true;
   let scrolledAway = false;
   let baseHeight = 0;
@@ -121,7 +126,10 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
 
   function bounds() {
     const layerRect = layer.getBoundingClientRect();
-    const h = headline.getBoundingClientRect();
+    // The headline's home spot, not wherever a drag has shoved it to — new
+    // images keep clear of where it'll spring back to.
+    const shoved = headline.getBoundingClientRect();
+    const h = new DOMRect(shoved.x - headlineShove.x, shoved.y - headlineShove.y, shoved.width, shoved.height);
     return {
       width: layerRect.width,
       height: layerRect.height,
@@ -346,6 +354,64 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     play(f, [currentFrame(f), GONE], { duration: RELEASE_FALL_MS, easing: 'ease-in' }, () => retire(f));
   }
 
+  // The dragged image is solid: wherever it runs into the headline, the
+  // headline is shoved out of its way, along whichever axis needs the
+  // smaller move (so it slides off the side being pushed), and kept on
+  // screen.
+  function shoveHeadline(f: Floater) {
+    if (headlineSpring) {
+      // Caught again mid spring-back: carry on from where it's got to.
+      headlineSpring.commitStyles();
+      headlineSpring.cancel();
+      headlineSpring = null;
+      const [x = 0, y = 0] = (headline.style.translate || '0px 0px').split(' ').map(parseFloat);
+      headlineShove.x = x;
+      headlineShove.y = y;
+    }
+    // The card's visual box (it's scaled up around its centre while held),
+    // and the headline as it currently sits, shove included.
+    const img = f.card.getBoundingClientRect();
+    const h = headline.getBoundingClientRect();
+    const overlapX = Math.min(img.right, h.right) - Math.max(img.left, h.left);
+    const overlapY = Math.min(img.bottom, h.bottom) - Math.max(img.top, h.top);
+    if (overlapX <= 0 || overlapY <= 0) return;
+
+    let { x, y } = headlineShove;
+    if (overlapX < overlapY) x += img.left + img.width / 2 < h.left + h.width / 2 ? overlapX : -overlapX;
+    else y += img.top + img.height / 2 < h.top + h.height / 2 ? overlapY : -overlapY;
+
+    const homeLeft = h.left - headlineShove.x;
+    const homeTop = h.top - headlineShove.y;
+    headlineShove.x = Math.min(Math.max(x, -homeLeft), window.innerWidth - homeLeft - h.width);
+    headlineShove.y = Math.min(Math.max(y, -homeTop), window.innerHeight - homeTop - h.height);
+    headline.style.translate = `${headlineShove.x}px ${headlineShove.y}px`;
+  }
+
+  // Let go: the headline springs back home, overshooting slightly past it
+  // and settling — the same overshoot-and-settle as the site's buttons.
+  function springHeadlineHome() {
+    const { x, y } = headlineShove;
+    if (x === 0 && y === 0) return;
+    headlineShove.x = 0;
+    headlineShove.y = 0;
+    const anim = headline.animate(
+      [
+        { translate: `${x}px ${y}px` },
+        { translate: `${-x * 0.06}px ${-y * 0.06}px`, offset: 0.6 },
+        { translate: `${x * 0.02}px ${y * 0.02}px`, offset: 0.85 },
+        { translate: '0px 0px' },
+      ],
+      { duration: HEADLINE_SPRING_MS, easing: 'ease-out' }
+    );
+    headline.style.translate = '';
+    headlineSpring = anim;
+    anim.finished
+      .then(() => {
+        if (headlineSpring === anim) headlineSpring = null;
+      })
+      .catch(() => {});
+  }
+
   // Click and drag a held image anywhere in the hero. Pointer capture keeps
   // the drag going even if the cursor outruns the image. Letting go of the
   // click lets go of the image: it falls away from where it was dropped.
@@ -364,6 +430,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       f.y = Math.min(Math.max(start.top + ev.clientY - start.y, -f.h / 2), b.height - f.h / 2);
       f.wrap.style.left = `${f.x}px`;
       f.wrap.style.top = `${f.y}px`;
+      shoveHeadline(f);
     };
     const end = (ev: PointerEvent) => {
       f.dragging = false;
@@ -373,6 +440,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       f.wrap.removeEventListener('pointercancel', end);
       if (f.wrap.hasPointerCapture(ev.pointerId)) f.wrap.releasePointerCapture(ev.pointerId);
       release(f);
+      springHeadlineHome();
     };
     f.wrap.addEventListener('pointermove', move);
     f.wrap.addEventListener('pointerup', end);
