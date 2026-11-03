@@ -437,15 +437,15 @@ const { services } = Astro.props;
   // peeking card reading as "the next card" rather than washing out into
   // background blur.
   //
-  // On phones each card shrinks towards the centre card — anchored on the
+  // On phones and desktop each card shrinks towards the centre card — anchored on the
   // edge facing it, sliding with its position — rather than around its own
   // middle, which pulled the edges apart and opened up far more space than
   // the track's gap. Anchored this way, the space between cards stays the
-  // gap itself.
-  const phoneCards = window.matchMedia('(max-width: 767px)');
+  // gap itself. Tablet keeps the shrink around the middle.
+  const anchoredCards = window.matchMedia('(max-width: 767px), (min-width: 1200px)');
   function cardVisualState(delta: number) {
     const t = Math.min(Math.abs(delta), 1);
-    const originX = phoneCards.matches ? 50 - Math.max(-1, Math.min(1, delta)) * 50 : 50;
+    const originX = anchoredCards.matches ? 50 - Math.max(-1, Math.min(1, delta)) * 50 : 50;
     return { scale: 1 - t * 0.15, opacity: 1 - t * 0.45, origin: `${originX}% 50%` };
   }
 
