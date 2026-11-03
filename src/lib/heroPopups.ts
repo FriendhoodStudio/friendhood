@@ -1,20 +1,20 @@
 import type { HeroPopUpImage } from '../types/hero';
 
 /** A loose field of project images floats around the hero headline, blurred
- * and faded back, each drifting on its own slow loop. Every headline word owns
- * three of them. When a word comes up, its three rise forward — sharpening and
- * growing slightly — and sink back in one smooth movement; then they dissolve
- * and three new images for that word drift in, waiting for the word to come
- * round again. Each newcomer lands in a random spot and its neighbours glide
+ * and faded back, each drifting on its own slow loop — one per headline word,
+ * each word cycling through its own set of three. When a word comes up, its
+ * image rises forward — sharpening and growing slightly — and sinks back in
+ * one smooth movement; then it dissolves and the word's next image drifts in,
+ * waiting for the word to come round again. Each newcomer lands in a random spot and its neighbours glide
  * aside to make room, so the field gently re-jostles. Images come from a
  * shuffled deck (every image shows once before any repeats), and nothing
  * overlaps the headline or another image. */
 
+// How many images each word cycles through, one on screen at a time.
 const IMAGES_PER_WORD = 3;
-// A word's three images rise one after another, starting just behind the
-// word's own 750ms roll (which peaks at ~525ms).
+// The word's image rises just behind the word's own 750ms roll (which
+// peaks at ~525ms).
 const REVEAL_DELAY_MS = 300;
-const REVEAL_STAGGER_MS = 180;
 const REVEAL_MS = 3000;
 const FADE_IN_MS = 1200;
 const FADE_OUT_MS = 800;
@@ -30,7 +30,7 @@ const IMAGE_GAP_PX = 8 + DRIFT_PX * 2;
 const EDGE_INSET_PX = 32;
 // Share of the free space around the headline the field fills — sets the
 // image size, so it scales with the number of words and the screen.
-const FIELD_COVERAGE = 0.26;
+const FIELD_COVERAGE = 0.3;
 const RELAX_ITERATIONS = 150;
 
 const RESTING: Keyframe = { transform: 'scale(0.92)', opacity: 0.45, filter: 'blur(14px)' };
@@ -53,6 +53,9 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   let floaters: Floater[] = [];
   let heroInView = true;
   let baseHeight = 0;
+  // Each word's own set of images, and which one it shows next.
+  const wordImages: HeroPopUpImage[][] = [];
+  const wordNext: number[] = [];
   let currentWord = 0;
 
   function shuffle() {
@@ -66,8 +69,6 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   function draw(): HeroPopUpImage {
     if (deck.length === 0) shuffle();
     const next = deck.pop()!;
-    // Warm the next few so they've decoded by the time they're needed.
-    deck.slice(-IMAGES_PER_WORD).forEach((image) => preload(image));
     return next;
   }
 
@@ -100,10 +101,10 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   function measureBaseHeight() {
     const b = bounds();
     const free = Math.max(0, (b.width - EDGE_INSET_PX * 2) * (b.height - EDGE_INSET_PX * 2) - b.headline.w * b.headline.h);
-    const perImage = (free * FIELD_COVERAGE) / (wordCount * IMAGES_PER_WORD);
+    const perImage = (free * FIELD_COVERAGE) / wordCount;
     // Area = h × (h × ~1.3 average aspect), solved for h.
     const mobile = b.width < 768;
-    baseHeight = Math.min(mobile ? 110 : 190, Math.max(mobile ? 44 : 70, Math.sqrt(perImage / 1.3)));
+    baseHeight = Math.min(mobile ? 120 : 240, Math.max(mobile ? 64 : 110, Math.sqrt(perImage / 1.3)));
   }
 
   // Push apart anything overlapping (another image or the headline) and keep
@@ -171,7 +172,14 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   }
 
   async function createFloater(word: number): Promise<Floater | null> {
-    const image = draw();
+    if (!wordImages[word]) {
+      wordImages[word] = Array.from({ length: IMAGES_PER_WORD }, () => draw());
+      wordNext[word] = 0;
+    }
+    const image = wordImages[word][wordNext[word]];
+    wordNext[word] = (wordNext[word] + 1) % IMAGES_PER_WORD;
+    // Warm the word's following image for when this one is replaced.
+    preload(wordImages[word][wordNext[word]]);
     const source = preload(image);
     try {
       await source.decode();
@@ -290,7 +298,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     if (!heroInView || document.hidden) return;
     floaters
       .filter((f) => f.word === word)
-      .forEach((f, i) => riseAndFall(f, REVEAL_DELAY_MS + i * REVEAL_STAGGER_MS));
+      .forEach((f) => riseAndFall(f, REVEAL_DELAY_MS));
   }
 
   // Lays the whole field out at once: every word's images, settled into
@@ -300,7 +308,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     floaters = [];
     measureBaseHeight();
     const created = await Promise.all(
-      Array.from({ length: wordCount * IMAGES_PER_WORD }, (_, i) => createFloater(i % wordCount))
+      Array.from({ length: wordCount }, (_, word) => createFloater(word))
     );
     floaters = created.filter((f): f is Floater => f !== null);
     relax();
