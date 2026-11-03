@@ -721,9 +721,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const HANDOVER_FADE_BY = 0.6;
     // How much the headline grows as it passes the viewer.
     const LINE_GROW = 1.6;
-    // On phones, where it zooms as one block instead — kept gentle, as the
-    // narrow screen fills up fast.
-    const BLOCK_GROW = 1.1;
+    // On phones the lines travel less far and grow much less — the narrow
+    // screen fills up fast, and a full-strength split sprawled.
+    const PHONE_LINE_TRAVEL = 0.45;
+    const PHONE_LINE_GROW = 0.35;
     // How many steps the headline's colour takes from dark to light.
     const COLOUR_STEPS = 12;
     // Line index of each headline word, for the split (see updateStage).
@@ -829,13 +830,15 @@ const afterParts = headlineAfter.split(/(\s+)/);
         }
         const lineCount = pieceLines[pieceLines.length - 1] + 1;
         const middle = (lineCount - 1) / 2;
-        const travel = window.innerHeight * LINE_TRAVEL;
-        // On phones the headline doesn't split — it stays one block and
-        // zooms towards the viewer as a whole.
-        const asBlock = window.innerWidth < 768;
-        const grow = asBlock ? BLOCK_GROW : LINE_GROW;
+        const phone = window.innerWidth < 768;
+        const travel = window.innerHeight * (phone ? PHONE_LINE_TRAVEL : LINE_TRAVEL);
+        const grow = phone ? PHONE_LINE_GROW : LINE_GROW;
         for (const [i, piece] of pieces.entries()) {
-          const side = asBlock ? 0 : Math.sign(pieceLines[i] - middle);
+          // Which way each line goes, and how far: on phones, where the
+          // headline wraps to more lines, the outer lines travel further
+          // than the inner ones, so it opens up between every line rather
+          // than tearing in two.
+          const side = phone && middle >= 1 ? (pieceLines[i] - middle) / middle : Math.sign(pieceLines[i] - middle);
           if (!out) {
             piece.style.translate = '';
             piece.style.scale = '';
@@ -853,11 +856,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
           piece.style.filter = `blur(${out * 8}px)`;
           // Moving lines stay solid until they're mostly off screen; a
           // middle line has nowhere to go, so it fades sooner.
-          // As one block on phones it clears quickly, before it's grown
-          // big enough to sprawl across the narrow screen.
-          piece.style.opacity = String(
-            asBlock ? 1 - clamp(out / 0.55, 0, 1) : side ? 1 - clamp((out - 0.5) / 0.5, 0, 1) : 1 - out
-          );
+          piece.style.opacity = String(side ? 1 - clamp((out - 0.5) / 0.5, 0, 1) : 1 - out);
         }
       }
       popups?.zoomPast(out);
