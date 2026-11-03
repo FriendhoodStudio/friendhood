@@ -737,7 +737,14 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
     const popupHeadline = document.querySelector<HTMLElement>('.hero-headline-shadow');
     const popups =
       popupLayer && popupData && popupHeadline
-        ? initHeroPopups(popupLayer, popupHeadline, JSON.parse(popupData.textContent || '[]') as HeroPopUpImage[])
+        ? initHeroPopups(
+            popupLayer,
+            popupHeadline,
+            JSON.parse(popupData.textContent || '[]') as HeroPopUpImage[],
+            // The track's last frame is a duplicate of the first (for the
+            // seamless loop), so it isn't a word of its own.
+            track.children.length - 1
+          )
         : null;
     const frameCount = track.children.length;
     let index = 0;
@@ -929,7 +936,8 @@ const loopWords = hoverWords.length > 0 ? [...hoverWords, hoverWords[0]] : [];
       if (index >= frameCount - 1) resetToFirstFrame();
       index++;
       playWordRoll(-index * frameStep);
-      popups?.onWordAdvance();
+      // index lands on the looping duplicate of word 0 once per cycle.
+      popups?.showWord(index % (frameCount - 1));
       const width = frameWidths[index];
       if (width) animateWordWidth(width);
     }
