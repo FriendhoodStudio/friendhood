@@ -347,8 +347,8 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   }
 
   // Click and drag a held image anywhere in the hero. Pointer capture keeps
-  // the drag going even if the cursor outruns the image; letting go off the
-  // image releases it as if the mouse had just left.
+  // the drag going even if the cursor outruns the image. Letting go of the
+  // click lets go of the image: it falls away from where it was dropped.
   function startDrag(f: Floater, e: PointerEvent) {
     if (e.button !== 0 || !floaters.includes(f)) return;
     e.preventDefault();
@@ -372,9 +372,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       f.wrap.removeEventListener('pointerup', end);
       f.wrap.removeEventListener('pointercancel', end);
       if (f.wrap.hasPointerCapture(ev.pointerId)) f.wrap.releasePointerCapture(ev.pointerId);
-      const r = f.wrap.getBoundingClientRect();
-      const over = ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
-      if (!over) release(f);
+      release(f);
     };
     f.wrap.addEventListener('pointermove', move);
     f.wrap.addEventListener('pointerup', end);
