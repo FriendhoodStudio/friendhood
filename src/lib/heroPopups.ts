@@ -6,7 +6,9 @@ import type { HeroPopUpImage } from '../types/hero';
  * image rises forward — sharpening and growing — and sinks back in one
  * smooth movement; then it dissolves and the word's next image drifts in
  * wherever there's most room, waiting for the word to come round again. The
- * whole field fades away as you scroll. Nothing overlaps the headline or
+ * whole field fades away as you scroll. On desktop, hovering an image sets
+ * it off early — it rises and falls away the same way, and its word's next
+ * image takes its place. Nothing overlaps the headline or
  * another image. */
 
 // How many images each word cycles through, one on screen at a time.
@@ -45,10 +47,6 @@ const ALIGN_PENALTY = 80;
 // headline, so growing near it never covers the text.
 const REVEAL_SCALE = 1.5;
 const REVEALED: Keyframe = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, filter: 'blur(0px)' };
-// Hovering an image brings it up the same way, and it settles back when
-// the cursor leaves.
-const HOVER_RISE_MS = 600;
-const HOVER_SETTLE_MS = 900;
 // How far down the page (as a share of the screen's height) the field has
 // fully faded away by.
 const SCROLL_FADE_END = 0.25;
@@ -67,10 +65,8 @@ interface Floater {
   card: HTMLElement;
   word: number;
   depth: number;
-  // Mid word-reveal (which hovering never interrupts), and the hover rise
-  // or settle currently playing, if any.
+  // Mid rise-and-fall, so a word change or hover can't set it off twice.
   revealing: boolean;
-  hoverAnim: Animation | null;
   x: number;
   y: number;
   w: number;
@@ -229,11 +225,14 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     // The standalone translate property, so the parallax stacks with the
     // drift loop's transform on the same element instead of replacing it.
     wrap.style.translate = `0 ${window.scrollY * depth}px`;
-    const floater: Floater = { wrap, card, word, depth, revealing: false, hoverAnim: null, x: 0, y: 0, w, h };
+    const floater: Floater = { wrap, card, word, depth, revealing: false, x: 0, y: 0, w, h };
+    // Hovering sets an image off early: it rises and falls away just as if
+    // its word had come up, and the word's next image takes its place.
     if (canHover) {
       wrap.style.pointerEvents = 'auto';
-      wrap.addEventListener('pointerenter', () => hoverRise(floater));
-      wrap.addEventListener('pointerleave', () => hoverSettle(floater));
+      wrap.addEventListener('pointerenter', () => {
+        if (!floater.revealing) riseAndFall(floater, 0);
+      });
     }
     return floater;
   }
@@ -266,42 +265,12 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   // tap shouldn't be swallowed by a decorative image.
   const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  function hoverRise(floater: Floater) {
-    if (floater.revealing) return;
-    floater.wrap.style.zIndex = '1';
-    // A single keyframe animates from wherever the image currently is
-    // (including partway through a settle), so it never jumps.
-    floater.hoverAnim = floater.card.animate([REVEALED], {
-      duration: HOVER_RISE_MS,
-      easing: 'ease-out',
-      fill: 'forwards',
-    });
-  }
-
-  // Eases back to the blurred resting state. Its own animation is left in
-  // place afterwards to hold it there: the browser automatically discards
-  // older finished animations (like the original fade-in) once a newer one
-  // fully overrides them, so cancelling this would leave the image with
-  // nothing holding it visible.
-  function hoverSettle(floater: Floater) {
-    if (floater.revealing || !floater.hoverAnim) return;
-    const anim = floater.card.animate([RESTING], { duration: HOVER_SETTLE_MS, easing: 'ease-in-out', fill: 'forwards' });
-    floater.hoverAnim = anim;
-    anim.finished
-      .then(() => {
-        if (floater.hoverAnim === anim) floater.wrap.style.zIndex = '';
-      })
-      .catch(() => {});
-  }
-
   function riseAndFall(floater: Floater, delay: number) {
-    // A word reveal takes over from any hover, starting from wherever the
-    // image is right now (resting, or partway up from a hover) so it never
-    // jumps.
+    // Starts from wherever the image is right now (it may still be fading
+    // in if it's hovered straight away), so it never jumps.
     floater.revealing = true;
     const now = getComputedStyle(floater.card);
     const from: Keyframe = { transform: now.transform, opacity: now.opacity, filter: now.filter };
-    floater.hoverAnim = null;
     floater.wrap.style.zIndex = '1';
     floater.card
       .animate(
@@ -316,18 +285,21 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
         if (!floaters.includes(floater)) return;
         floaters = floaters.filter((f) => f !== floater);
         floater.wrap.remove();
-        addFloater(floater.word);
+        // Unless its word already has a new image waiting (placed when the
+        // word came up while this one was still falling from a hover).
+        if (!floaters.some((f) => f.word === floater.word)) addFloater(floater.word);
       })
       .catch(() => {});
   }
 
-  // Driven only by the headline's word changes: each change brings that
-  // word's image up, and nothing rises on its own. If the word has no image
-  // waiting (there was no clear space for it last time), one is placed now
-  // and rises straight away, so a word change never goes without one.
+  // Each word change brings that word's image up. If the word has no image
+  // waiting (a hover already set it off, or there was no clear space for it
+  // last time), one is placed now and rises straight away, so a word change
+  // never goes without one.
   async function showWord(word: number) {
     if (!heroInView || scrolledAway || document.hidden) return;
-    const waiting = floaters.find((f) => f.word === word);
+    // Skips an image already on its way out (set off early by a hover).
+    const waiting = floaters.find((f) => f.word === word && !f.revealing);
     if (waiting) {
       riseAndFall(waiting, REVEAL_DELAY_MS);
       return;
