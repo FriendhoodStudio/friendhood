@@ -903,87 +903,229 @@ const afterParts = headlineAfter.split(/(\s+)/);
       window.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('resize', onScroll);
 
-      // Resting points: when a scroll comes to a stop partway through one of
-      // the stage's zooms, the page glides on to the next stage in the
-      // direction you were going — the headline, the reel landed (the
-      // middle of its beat) or the statement in focus — so each swipe
-      // locks onto a stage rather than leaving you halfway through a zoom.
-      // Only a small nudge (under SETTLE_NUDGE_PX) glides back instead. It
-      // waits for the scroll to finish, momentum included, never acts while
-      // a finger is still down, and leaves the page alone outside the
-      // stage, so a big swipe still carries straight through. (CSS scroll
-      // snapping was tried first: its "proximity" mode only catches a stop
-      // within about a quarter of a screen of a point, and "mandatory"
-      // would hold the whole page.)
+      // Resting points: the headline, the reel landed (the middle of its
+      // beat), the statement in focus, and the services section arrived at
+      // the top of the screen. Inside the stage each swipe moves exactly one
+      // stage: the page glides there itself (eased in and out) and the rest
+      // of that swipe, momentum included, is swallowed — so nothing carries
+      // past the statement or the services section. Below the services
+      // section scrolling is untouched. On a trackpad/mouse wheel this takes
+      // over the wheel; on touch it follows the finger and glides on as it
+      // lifts. Anything else that leaves the page mid-zoom (keys, the
+      // scrollbar, a native fling coming back up from below) gets the same
+      // glide once the scroll has stopped. Off with reduced motion. (CSS
+      // scroll snapping was tried first: "proximity" only catches stops
+      // near a point, and "mandatory" would hold the whole page.)
       const REST_POINTS = [0, (REEL_LANDED_AT + REEL_LEAVES_AT) / 2, 0.975];
       const SETTLE_NUDGE_PX = 80;
-      let restY = window.scrollY;
-      let fingerDown = false;
-      // Where a glide of ours is headed, so the scroll events it makes
-      // don't set off another settle partway (which would read as heading
-      // back). Any scroll of your own takes over from it.
-      let glidingTo: number | null = null;
-      const settle = () => {
-        if (reduceMotion || fingerDown) return;
-        if (glidingTo !== null) {
-          if (Math.abs(window.scrollY - glidingTo) > 2) return;
-          glidingTo = null;
-        }
+      const SWIPE_MIN_PX = 40;
+      const SWIPE_MIN_SPEED = 0.3; // px per ms
+      const scrollLocked = () => document.documentElement.style.overflow === 'hidden';
+      // Where the stage sits and where its resting points are, in page px.
+      const measure = () => {
         const travel = stage.offsetHeight - window.innerHeight;
         const fadePx = Math.max(0, -parseFloat(getComputedStyle(stage).marginBottom) || 0);
         const phases = travel - fadePx;
         const top = stage.getBoundingClientRect().top + window.scrollY;
-        const scrolled = window.scrollY - top;
-        const points = REST_POINTS.map((r) => r * phases);
-        if (phases <= 0 || scrolled <= 0 || scrolled >= phases || points.some((pt) => Math.abs(pt - scrolled) < 2)) {
+        // Last point: the services section's top at the top of the screen.
+        const points = [...REST_POINTS.map((r) => r * phases), travel];
+        return { top, travel, phases, points, scrolled: window.scrollY - top };
+      };
+      // The next resting point from `scrolled` in direction `dir`, or null
+      // when that way leads out of the stage (left to normal scrolling).
+      const nextPoint = (m: ReturnType<typeof measure>, dir: number) => {
+        if (m.phases <= 0) return null;
+        if (dir > 0) return m.scrolled < m.travel - 2 ? (m.points.find((pt) => pt > m.scrolled + 2) ?? null) : null;
+        if (m.scrolled > m.travel + 2) return null;
+        return m.points.filter((pt) => pt < m.scrolled - 2).pop() ?? null;
+      };
+
+      const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+      let glideRaf = 0;
+      let glidingTo: number | null = null;
+      const stopGlide = () => {
+        cancelAnimationFrame(glideRaf);
+        glidingTo = null;
+      };
+      const glideTo = (y: number) => {
+        stopGlide();
+        const from = window.scrollY;
+        const dist = y - from;
+        if (Math.abs(dist) < 1) return;
+        const duration = Math.min(1000, 450 + Math.abs(dist) * 0.25);
+        const t0 = performance.now();
+        glidingTo = y;
+        const step = (now: number) => {
+          const t = Math.min(1, (now - t0) / duration);
+          window.scrollTo({ top: from + dist * easeInOut(t), behavior: 'instant' });
+          if (t < 1) glideRaf = requestAnimationFrame(step);
+          else glidingTo = null;
+        };
+        glideRaf = requestAnimationFrame(step);
+      };
+      const active = () => !reduceMotion && !scrollLocked();
+
+      // Wheel / trackpad. A swipe that starts a glide owns the wheel until
+      // it goes quiet or a fresh swipe starts (a jump in strength, or a
+      // gap) — that's the trackpad's momentum tail, swallowed.
+      let lastWheelAt = 0;
+      let lastWheelAbs = 0;
+      let swallowing = false;
+      // Whether the last wheel event was left to the browser, so a swipe
+      // coming back up from below that crosses into the stage stops at the
+      // services section rather than heading on up.
+      let lastWheelNative = false;
+      window.addEventListener(
+        'wheel',
+        (e) => {
+          if (!active() || e.ctrlKey) return;
+          const now = performance.now();
+          const abs = Math.abs(e.deltaY);
+          const gap = now - lastWheelAt;
+          const prevAbs = lastWheelAbs;
+          lastWheelAt = now;
+          lastWheelAbs = abs;
+          if (Math.abs(e.deltaX) > abs) return;
+          if (glidingTo !== null) {
+            e.preventDefault();
+            swallowing = true;
+            return;
+          }
+          if (swallowing) {
+            if (gap < 160 && abs <= prevAbs * 1.4 + 3) {
+              e.preventDefault();
+              return;
+            }
+            swallowing = false;
+          }
+          if (abs < 1) return;
+          const m = measure();
+          const cameFromBelow = lastWheelNative && gap < 160 && e.deltaY < 0 && m.scrolled < m.travel + 2;
+          const target = cameFromBelow ? m.travel : nextPoint(m, Math.sign(e.deltaY));
+          lastWheelNative = target === null;
+          if (target === null) return;
+          e.preventDefault();
+          swallowing = true;
+          glideTo(m.top + target);
+        },
+        { passive: false }
+      );
+      window.addEventListener('keydown', stopGlide);
+
+      // Touch. Decided on the first move: a mostly-vertical drag inside the
+      // stage is ours (the page follows the finger, then glides on — or
+      // back, for a small or slow drag — as it lifts); anything else is
+      // left to the browser. A pop-up image being dragged keeps it.
+      let fingerDown = false;
+      let touch: { y: number; x: number; scroll: number; mode: 'undecided' | 'own' | 'none'; samples: { y: number; t: number }[] } | null = null;
+      window.addEventListener(
+        'touchstart',
+        (e) => {
+          fingerDown = true;
+          stopGlide();
+          touch = e.touches.length === 1 && active()
+            ? { y: e.touches[0].clientY, x: e.touches[0].clientX, scroll: window.scrollY, mode: 'undecided', samples: [] }
+            : null;
+        },
+        { passive: true }
+      );
+      window.addEventListener(
+        'touchmove',
+        (e) => {
+          if (!touch || touch.mode === 'none') return;
+          if (e.defaultPrevented || e.touches.length !== 1) {
+            touch.mode = 'none';
+            return;
+          }
+          const { clientX: x, clientY: y } = e.touches[0];
+          if (touch.mode === 'undecided') {
+            const dy = y - touch.y;
+            const m = measure();
+            touch.mode =
+              Math.abs(x - touch.x) > Math.abs(dy) || dy === 0 || nextPoint(m, -Math.sign(dy)) === null ? 'none' : 'own';
+            if (touch.mode === 'none') return;
+          }
+          e.preventDefault();
+          window.scrollTo({ top: touch.scroll - (y - touch.y), behavior: 'instant' });
+          const now = performance.now();
+          touch.samples.push({ y, t: now });
+          while (touch.samples.length > 2 && now - touch.samples[0].t > 100) touch.samples.shift();
+        },
+        { passive: false }
+      );
+      const lift = () => {
+        fingerDown = false;
+        const t = touch;
+        touch = null;
+        if (t?.mode !== 'own') {
+          settleWhenQuiet();
+          return;
+        }
+        const last = t.samples[t.samples.length - 1];
+        const first = t.samples[0];
+        const moved = t.y - (last?.y ?? t.y); // + is down the page
+        const speed = last && first && last.t > first.t ? (first.y - last.y) / (last.t - first.t) : 0;
+        const m = measure();
+        const start = t.scroll - m.top;
+        // The stage the swipe started from (or nearest, if it started mid-zoom).
+        const origin = m.points.reduce((a, b) => (Math.abs(b - start) < Math.abs(a - start) ? b : a));
+        let target = origin;
+        const dir = Math.abs(speed) > SWIPE_MIN_SPEED ? Math.sign(speed) : Math.abs(moved) > SWIPE_MIN_PX ? Math.sign(moved) : 0;
+        if (dir) {
+          const next = nextPoint({ ...m, scrolled: origin }, dir);
+          if (next !== null) target = next;
+        }
+        glideTo(m.top + target);
+      };
+      window.addEventListener('touchend', lift, { passive: true });
+      window.addEventListener('touchcancel', lift, { passive: true });
+
+      // Fallback for everything else: once a scroll stops partway through a
+      // zoom, glide on to the next stage in the direction it was going (a
+      // nudge under SETTLE_NUDGE_PX glides back).
+      let restY = window.scrollY;
+      let lastScrolled = window.scrollY - (stage.getBoundingClientRect().top + window.scrollY);
+      const settle = () => {
+        if (!active() || fingerDown || glidingTo !== null) return;
+        const m = measure();
+        if (m.phases <= 0 || m.scrolled <= 0 || m.scrolled >= m.travel || m.points.some((pt) => Math.abs(pt - m.scrolled) < 2)) {
           restY = window.scrollY;
           return;
         }
-        const below = points.filter((pt) => pt < scrolled).pop();
-        const above = points.find((pt) => pt > scrolled);
         const down = window.scrollY >= restY;
-        const from = down ? below : above;
-        let target = down ? above : below;
-        if (from !== undefined && Math.abs(scrolled - from) < SETTLE_NUDGE_PX) target = from;
-        // Past the last point, heading down: already on the way out.
-        if (target === undefined) return;
-        restY = top + target;
-        glidingTo = restY;
-        window.scrollTo({ top: restY, behavior: 'smooth' });
+        const from = down ? m.points.filter((pt) => pt < m.scrolled).pop() : m.points.find((pt) => pt > m.scrolled);
+        let target = nextPoint(m, down ? 1 : -1);
+        if (from !== undefined && Math.abs(m.scrolled - from) < SETTLE_NUDGE_PX) target = from;
+        if (target === null) return;
+        restY = m.top + target;
+        glideTo(restY);
       };
-      // Settles once a scroll has fully finished: on scrollend where the
-      // browser has it, and otherwise (and after a finger lifts, in case
-      // the scroll ended while it was still down) once scroll events have
-      // gone quiet — any momentum keeps pushing that back.
       const hasScrollEnd = 'onscrollend' in window;
       let settleTimer = 0;
       const settleWhenQuiet = () => {
         window.clearTimeout(settleTimer);
-        settleTimer = window.setTimeout(settle, 200);
+        settleTimer = window.setTimeout(settle, 120);
       };
       if (hasScrollEnd) window.addEventListener('scrollend', settle);
       window.addEventListener(
         'scroll',
-        () => (hasScrollEnd ? window.clearTimeout(settleTimer) : settleWhenQuiet()),
-        { passive: true }
-      );
-      const takeOver = () => (glidingTo = null);
-      window.addEventListener('wheel', takeOver, { passive: true });
-      window.addEventListener('keydown', takeOver);
-      window.addEventListener(
-        'touchstart',
         () => {
-          fingerDown = true;
-          takeOver();
+          if (hasScrollEnd) window.clearTimeout(settleTimer);
+          else settleWhenQuiet();
+          // A native scroll coming back up from below (a fling, keys)
+          // stops at the services section rather than flying on into the
+          // stage.
+          const m = measure();
+          const crossedUp = lastScrolled > m.travel + 2 && m.scrolled <= m.travel;
+          lastScrolled = m.scrolled;
+          if (crossedUp && active() && !fingerDown && glidingTo === null) {
+            swallowing = true;
+            glideTo(m.top + m.travel);
+          }
+          if (glidingTo === null && !fingerDown && Math.abs(window.scrollY - restY) > 0 && m.points.some((pt) => Math.abs(pt - m.scrolled) < 2)) restY = window.scrollY;
         },
         { passive: true }
       );
-      const lift = () => {
-        fingerDown = false;
-        settleWhenQuiet();
-      };
-      window.addEventListener('touchend', lift, { passive: true });
-      window.addEventListener('touchcancel', lift, { passive: true });
     }
   }
 
