@@ -998,6 +998,16 @@ const afterParts = headlineAfter.split(/(\s+)/);
       const nextAhead = (m: ReturnType<typeof measure>, dir: number) =>
         (dir > 0 ? m.points.find((pt) => pt > m.scrolled + 2) : m.points.filter((pt) => pt < m.scrolled - 2).pop()) ?? null;
 
+      // Sticky stops: heading down, a swipe never carries past the statement
+      // or the services section, however hard — it eases to a stop on the
+      // first one ahead of where it began, and the next swipe moves on.
+      // (Indexes into the points.)
+      const STICKY_DOWN = [2, 3];
+      const stickyAhead = (m: ReturnType<typeof measure>, fromScrolled: number) => {
+        const pt = STICKY_DOWN.map((i) => m.points[i]).find((p) => p > fromScrolled + 2);
+        return pt === undefined ? null : m.top + pt;
+      };
+
       // Wheel / trackpad: left to the browser while the swipe is under way.
       // Once its momentum tail sets in (a few events in a row, close
       // together and each weaker than the last) the rest of the tail is
@@ -1008,6 +1018,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
       let lastWheelAbs = 0;
       let decaying = 0;
       let steering = false;
+      // The sticky stop ahead of the current swipe (page px), if any.
+      let wheelWall: number | null = null;
       window.addEventListener(
         'wheel',
         (e) => {
@@ -1029,12 +1041,22 @@ const afterParts = headlineAfter.split(/(\s+)/);
             steering = false;
           }
           if (glidingTo !== null) stopGlide();
+          if (fresh) wheelWall = dy > 0 ? stickyAhead(measure(), window.scrollY - measure().top) : null;
+          // Heading into a sticky stop: ease on to it at this speed and
+          // absorb the rest of the swipe.
+          if (dy > 0 && wheelWall !== null && wheelWall - window.scrollY < abs * 8) {
+            e.preventDefault();
+            steering = true;
+            if (wheelWall - window.scrollY > 1) glideTo(wheelWall, dy / Math.min(Math.max(gap, 8), 50));
+            return;
+          }
           decaying = gap < 60 && abs < prevAbs ? decaying + 1 : 0;
           if (decaying < 3 || abs < 0.5) return;
           const m = measure();
           const dir = Math.sign(dy);
           // What's left of a momentum tail is roughly 18 of its events.
-          const target = landingFor(m, dir, m.scrolled + dy * 18);
+          let target = landingFor(m, dir, m.scrolled + dy * 18);
+          if (target !== null && dir > 0 && wheelWall !== null) target = Math.min(target, wheelWall - m.top);
           if (target === null) return;
           e.preventDefault();
           steering = true;
@@ -1056,6 +1078,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
         x: number;
         scroll: number;
         mode: 'undecided' | 'own' | 'none';
+        wall?: number | null;
         samples: { y: number; t: number }[];
       } | null = null;
       window.addEventListener(
@@ -1084,10 +1107,14 @@ const afterParts = headlineAfter.split(/(\s+)/);
             const dir = -Math.sign(dy);
             const inside = dir > 0 ? m.scrolled < m.travel - 2 : m.scrolled > 2 && m.scrolled <= m.travel + 2;
             touch.mode = Math.abs(x - touch.x) > Math.abs(dy) || dy === 0 || m.phases <= 0 || !inside ? 'none' : 'own';
+            touch.wall = stickyAhead(m, touch.scroll - m.top);
             if (touch.mode === 'none') return;
           }
           e.preventDefault();
-          window.scrollTo({ top: Math.max(0, touch.scroll - (y - touch.y)), behavior: 'instant' });
+          const raw = Math.max(0, touch.scroll - (y - touch.y));
+          // A little give past a sticky stop, then it settles back on it.
+          const wall = touch.wall ?? Infinity;
+          window.scrollTo({ top: raw > wall ? wall + (raw - wall) * 0.25 : raw, behavior: 'instant' });
           const now = performance.now();
           touch.samples.push({ y, t: now });
           while (touch.samples.length > 2 && now - touch.samples[0].t > 80) touch.samples.shift();
@@ -1113,6 +1140,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
         const moved = window.scrollY - t.scroll;
         const dir = Math.abs(speed) > 0.15 ? Math.sign(speed) : 0;
         let target = dir ? landingFor(m, dir, projected) : null;
+        const wall = t.wall == null ? null : t.wall - m.top;
+        if (wall !== null && (dir > 0 || m.scrolled > wall) && (target === null || target > wall)) target = wall;
         if (target === null && !dir && m.scrolled > 0 && m.scrolled < m.travel) {
           // Stopped mid-zoom before lifting: on to the next stage the way
           // it was going, or back for a small nudge.
