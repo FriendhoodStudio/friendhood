@@ -17,7 +17,7 @@ const IMAGES_PER_WORD = 3;
 // The word's image rises just behind the word's own 750ms roll (which
 // peaks at ~525ms).
 const REVEAL_DELAY_MS = 300;
-const REVEAL_MS = 3000;
+const REVEAL_MS = 2400;
 const FADE_IN_MS = 700;
 // Gap between the field's images fading in, one after another.
 const FADE_IN_STAGGER_MS = 90;
@@ -53,8 +53,8 @@ const REVEAL_SCALE = 1.5;
 const REVEALED: Pose = { transform: `scale(${REVEAL_SCALE})`, opacity: 1, focus: 1 };
 // Hover: how quickly an image comes up (overshooting and settling), and how
 // long it takes to fall away once the cursor leaves.
-const HOLD_RISE_MS = 900;
-const RELEASE_FALL_MS = 1500;
+const HOLD_RISE_MS = 750;
+const RELEASE_FALL_MS = 1200;
 // Touch: how long a finger has to rest on an image to pick it up (it starts
 // rising as soon as it's touched), and how far it can wander meanwhile
 // before it counts as a scroll instead.
@@ -87,6 +87,11 @@ const SOFT_PAD_PX = 24;
 const ZOOM_TRAVEL = { near: 0.9, far: 0.4 };
 const ZOOM_SCALE = { near: 1.6, far: 1.25 };
 const GONE: Pose = { transform: 'scale(0.85)', opacity: 0, focus: 0 };
+// Falling away, an image goes soft first: it's fully back to its blurred
+// copy this far into the fall, while it's still clearly visible, and only
+// then fades out — rather than blurring and fading together, which hid the
+// blur.
+const SOFT_BY = 0.45;
 
 // A card's look at a moment: its transform and opacity, plus how far the
 // sharp image has faded in over the soft one (0 resting, 1 in focus).
@@ -303,7 +308,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       `--drift-x:${(Math.random() < 0.5 ? -1 : 1) * DRIFT_PX * (0.6 + Math.random() * 0.4)}px;` +
       `--drift-y:${(Math.random() < 0.5 ? -1 : 1) * DRIFT_PX * (0.6 + Math.random() * 0.4)}px;` +
       `--drift-rotate:${(Math.random() * 2 - 1) * 0.5}deg;` +
-      `--drift-duration:${10 + Math.random() * 6}s;animation-delay:${-Math.random() * 16}s`;
+      `--drift-duration:${8 + Math.random() * 5}s;animation-delay:${-Math.random() * 13}s`;
     const card = document.createElement('div');
     card.className = 'hero-popup';
     // Scaled up from its small size, padding and all, so the image part
@@ -379,16 +384,27 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
   // it the crossfade from soft to sharp — the soft copy fades out as the
   // sharp image fades in, or its blur would spill out round the sharp
   // image's edges like a shadow.
-  function play(f: Floater, poses: Pose[], options: KeyframeAnimationOptions, onDone?: () => void) {
+  // `focus` optionally gives the sharp/soft crossfade its own keyframes
+  // (offsets across the whole animation), so it can run ahead of the move.
+  function play(
+    f: Floater,
+    poses: Pose[],
+    options: KeyframeAnimationOptions,
+    onDone?: () => void,
+    focus?: { focus: number | string; offset?: number; easing?: string }[]
+  ) {
     const previous = [f.anim, ...f.focusAnims];
     const timing = (p: Pose) => ({ ...(p.offset !== undefined && { offset: p.offset }), ...(p.easing && { easing: p.easing }) });
     const anim = f.card.animate(
       poses.map((p) => ({ transform: p.transform, opacity: p.opacity, ...timing(p) })),
       { ...options, fill: 'both' }
     );
+    const focusFrames = focus ?? poses;
+    // The crossfade's easing lives on its keyframes, not the whole run.
+    const focusOptions = focus ? { ...options, easing: 'linear' } : options;
     f.focusAnims = [
-      f.sharp.animate(poses.map((p) => ({ opacity: p.focus, ...timing(p) })), { ...options, fill: 'both' }),
-      f.soft.animate(poses.map((p) => ({ opacity: 1 - Number(p.focus), ...timing(p) })), { ...options, fill: 'both' }),
+      f.sharp.animate(focusFrames.map((p) => ({ opacity: p.focus, ...timing(p as Pose) })), { ...focusOptions, fill: 'both' }),
+      f.soft.animate(focusFrames.map((p) => ({ opacity: 1 - Number(p.focus), ...timing(p as Pose) })), { ...focusOptions, fill: 'both' }),
     ];
     // Cancelled only once the new ones have taken over, so there's no frame
     // where neither holds the card.
@@ -422,7 +438,13 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       f,
       [{ ...currentFrame(f), easing: 'ease-in-out' }, { ...REVEALED, offset: 0.5, easing: 'ease-in' }, GONE],
       { duration: REVEAL_MS, delay },
-      () => retire(f)
+      () => retire(f),
+      [
+        { focus: currentFrame(f).focus, easing: 'ease-in-out' },
+        { focus: 1, offset: 0.5, easing: 'ease-in-out' },
+        { focus: 0, offset: 0.5 + 0.5 * SOFT_BY },
+        { focus: 0 },
+      ]
     );
   }
 
@@ -452,7 +474,11 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     if (f.state !== 'held' || f.dragging) return;
     f.state = 'falling';
     f.wrap.style.zIndex = '1';
-    play(f, [currentFrame(f), GONE], { duration: RELEASE_FALL_MS, easing: 'ease-in' }, () => retire(f));
+    play(f, [currentFrame(f), GONE], { duration: RELEASE_FALL_MS, easing: 'ease-in' }, () => retire(f), [
+      { focus: currentFrame(f).focus, easing: 'ease-in-out' },
+      { focus: 0, offset: SOFT_BY },
+      { focus: 0 },
+    ]);
   }
 
   // Picks a held image up to be dragged anywhere in the hero from (x, y).
