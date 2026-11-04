@@ -13,7 +13,7 @@ const { services } = Astro.props;
 <div
   data-services-overlay
   data-open="false"
-  class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-back/50 invisible opacity-0 backdrop-blur-[25px] transition-[opacity,visibility] duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:visible data-[open=true]:opacity-100"
+  class="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center invisible opacity-0 transition-[opacity,visibility] duration-400 ease-in-out data-[open=true]:pointer-events-auto data-[open=true]:visible data-[open=true]:opacity-100"
 >
   {/* Position is native — a real overflow-x:auto strip with scroll-snap,
       not a JS-owned "offset" fighting or replacing the browser's own
@@ -54,9 +54,17 @@ const { services } = Astro.props;
       scroll into a clone (pixel-identical to the real card it doubles
       for) and correctLoopPosition (see script) silently re-centres onto
       the real one the instant the scroll goes idle. */}
+  {/* The page blur sits on its own static layer BEHIND the track, not on
+      the overlay itself. On the overlay, every card moving above it
+      re-dirtied the same surface, so a full-screen 25px blur was re-run
+      every scroll frame — GPU time stolen from painting the cards as they
+      slid in, which showed up as cards arriving blank (no image, no text)
+      on a fast trackpad swipe. As a sibling underneath, nothing over it
+      ever changes it, so it's blurred once and reused. */}
+  <div class="pointer-events-none absolute inset-0 bg-back/50 backdrop-blur-[25px]" aria-hidden="true"></div>
   <div
     data-services-track
-    class="flex w-full snap-x snap-mandatory gap-horizontal-m overflow-x-auto md:max-[1199px]:gap-[var(--spacing-gutter)]"
+    class="relative flex w-full snap-x snap-mandatory gap-horizontal-m overflow-x-auto md:max-[1199px]:gap-[var(--spacing-gutter)]"
     style="touch-action: pan-x; scrollbar-width: none; user-select: none;"
   >
     {[0, 1, 2].map((copyIndex) => services.map((service, i) => (
@@ -114,7 +122,7 @@ const { services } = Astro.props;
             {/* Was a plain bar sitting in its own yellow strip above the
                 image; now the image runs flush to the card's own top edge
                 (no more strip), so this moved onto the photo itself as a
-                floating pill — same backdrop-blur/border/bg-grey-600
+                floating pill — same border/dark-chip
                 treatment as the copy-email button just below it, so it
                 stays legible over whatever the image happens to be. */}
             {/* No background chip — just the bar itself, wide enough to be
@@ -140,7 +148,7 @@ const { services } = Astro.props;
               <div class="group relative">
                 <button
                   type="button"
-                  class="copy-email-btn pointer-events-auto flex h-[52px] w-[52px] cursor-pointer items-center justify-center rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px] transition-[scale] duration-300 ease-out hover:scale-110"
+                  class="copy-email-btn pointer-events-auto flex h-[52px] w-[52px] cursor-pointer items-center justify-center rounded-full border border-front/15 bg-[#29282d]/85 transition-[scale] duration-300 ease-out hover:scale-110"
                   data-copy-email
                   data-email="hello@friendhood.co.uk"
                   aria-label="Copy email address"
@@ -153,7 +161,7 @@ const { services } = Astro.props;
                 </button>
                 <span
                   data-copy-email-status
-                  class="pointer-events-none absolute right-0 top-full mt-2 whitespace-nowrap rounded-m border border-front/15 bg-grey-600 px-3 py-1 opacity-0 backdrop-blur-[14px] transition-opacity duration-300 ease-out group-hover:opacity-100"
+                  class="pointer-events-none absolute right-0 top-full mt-2 whitespace-nowrap rounded-m border border-front/15 bg-[#29282d]/85 px-3 py-1 opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100"
                 >
                   <span class="relative block h-[18px] overflow-hidden">
                     {/* leading-[18px] (not leading-none) — same fix as the
@@ -626,7 +634,22 @@ const { services } = Astro.props;
   const OPEN_SETTLE_MS = 400;
   let openedAt = 0;
 
+  // Decoded once, up front, rather than lazily as each card scrolls in —
+  // a fast swipe could bring a clone card into view before its image had
+  // decoded, so it arrived blank and popped in a beat later. 18 small
+  // (900px) images; decoding them all on first open is cheap.
+  let imagesWarmed = false;
+  function warmImages() {
+    if (imagesWarmed || !track) return;
+    imagesWarmed = true;
+    track.querySelectorAll<HTMLImageElement>('[data-service-card] img').forEach((img) => {
+      img.loading = 'eager';
+      img.decode().catch(() => {});
+    });
+  }
+
   function openAt(index: number) {
+    warmImages();
     setOpen(true);
     openedAt = performance.now();
     const card = realCards[index];
@@ -647,6 +670,8 @@ const { services } = Astro.props;
   }
 
   document.querySelectorAll<HTMLElement>('[data-service-trigger]').forEach((trigger) => {
+    // Head start: hovering a tile is a strong hint a click is coming.
+    trigger.addEventListener('pointerenter', warmImages, { once: true });
     trigger.addEventListener('click', () => {
       const index = Number(trigger.dataset.index) || 0;
       openAt(index);
