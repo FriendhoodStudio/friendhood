@@ -905,23 +905,23 @@ const afterParts = headlineAfter.split(/(\s+)/);
 
       // Resting points: the headline, the reel landed (the middle of its
       // beat), the statement in focus, and the services section arrived at
-      // the top of the screen. Your own scroll still drives the zoom, at
-      // your pace — the points just act as stops: one swipe can't carry
-      // past the next one (its momentum runs out there), and if a swipe
-      // stops between two, the page carries on at the speed it was going
-      // and eases into the next (or back, for a small nudge). On touch the
-      // page follows the finger 1:1, with a little give past a stop, and
-      // carries the flick's speed on into the stop as it lifts. Anything
-      // else that leaves the page mid-zoom (keys, the scrollbar, a fling
-      // coming back up from below) eases on once it has stopped. Below the
-      // services section scrolling is untouched. Off with reduced motion.
-      // (CSS scroll snapping was tried first: "proximity" only catches
-      // stops near a point, and "mandatory" would hold the whole page.)
+      // the top of the screen. Scrolling stays yours — the page moves 1:1
+      // with the wheel or finger, nothing holds it — the points only help
+      // the last bit of the way: as a swipe runs out (a trackpad's momentum
+      // tail, or a finger lifting) the page works out where it would have
+      // come to rest and carries its own speed on to the stage nearest
+      // that, instead of stopping halfway through a zoom. A strong enough
+      // swipe still carries through a stage. Anything else that leaves the
+      // page mid-zoom (keys, the scrollbar, a mouse wheel) eases on once it
+      // has stopped. Below the services section scrolling is untouched.
+      // Off with reduced motion. (CSS scroll snapping was tried first:
+      // "proximity" only catches stops near a point, and "mandatory" would
+      // hold the whole page.)
       const REST_POINTS = [0, (REEL_LANDED_AT + REEL_LEAVES_AT) / 2, 0.975];
       const SETTLE_NUDGE_PX = 80;
-      const SWIPE_MIN_PX = 40;
-      const SWIPE_MIN_SPEED = 0.3; // px per ms
-      const CATCH_BELOW = 1.5;
+      // How far a fling would carry on, per px/ms of speed — about what
+      // the browsers' own momentum does.
+      const FLING_CARRY_MS = 500;
       const scrollLocked = () => document.documentElement.style.overflow === 'hidden';
       // Where the stage sits and where its resting points are, in page px.
       const measure = () => {
@@ -933,18 +933,6 @@ const afterParts = headlineAfter.split(/(\s+)/);
         const points = [...REST_POINTS.map((r) => r * phases), travel];
         return { top, travel, phases, points, scrolled: window.scrollY - top };
       };
-      // The next resting point from `scrolled` in direction `dir`, or null
-      // when that way leads out of the stage (left to normal scrolling).
-      const nextPoint = (m: ReturnType<typeof measure>, dir: number) => {
-        if (m.phases <= 0) return null;
-        if (dir > 0) return m.scrolled < m.travel - 2 ? (m.points.find((pt) => pt > m.scrolled + 2) ?? null) : null;
-        // Heading back up from below the services stop counts too (within
-        // CATCH_BELOW screens), so a hard swipe back up is caught from its
-        // start and stops at services, rather than flying on into the stage.
-        if (m.scrolled > m.travel + window.innerHeight * CATCH_BELOW) return null;
-        return m.points.filter((pt) => pt < m.scrolled - 2).pop() ?? null;
-      };
-
       let glideRaf = 0;
       let glidingTo: number | null = null;
       const stopGlide = () => {
@@ -957,77 +945,69 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // starts at that speed and comes to rest exactly on the point.
       const glideTo = (y: number, speed = 0) => {
         stopGlide();
-        const from = window.scrollY;
-        const dist = y - from;
-        if (Math.abs(dist) < 1) return;
-        const v = Math.max(0, speed * Math.sign(dist));
-        const duration = v > 0.05
-          ? Math.min(1100, Math.max(380, (2 * Math.abs(dist)) / v))
-          : Math.min(1000, 450 + Math.abs(dist) * 0.25);
-        // Starting slope, capped so the curve never overshoots the point.
-        const m0 = Math.min(v * duration, 2.5 * Math.abs(dist)) * Math.sign(dist);
-        const t0 = performance.now();
+        if (Math.abs(y - window.scrollY) < 1) return;
         glidingTo = y;
+        let from = 0;
+        let dist = 0;
+        let duration = 0;
+        let m0 = 0;
+        let t0 = 0;
         const step = (now: number) => {
+          if (!t0) {
+            // Set off from where the page actually is on the first frame:
+            // the browser may still have been applying the scroll that led
+            // here when the glide was asked for.
+            t0 = now;
+            from = window.scrollY;
+            dist = y - from;
+            const v = Math.max(0, speed * Math.sign(dist));
+            duration = v > 0.05
+              ? Math.min(1100, Math.max(380, (2 * Math.abs(dist)) / v))
+              : Math.min(1000, 450 + Math.abs(dist) * 0.25);
+            // Starting slope, capped so the curve never overshoots the point.
+            m0 = Math.min(v * duration, 2.5 * Math.abs(dist)) * Math.sign(dist);
+          }
           const t = Math.min(1, (now - t0) / duration);
-          const pos = (t * t * t - 2 * t * t + t) * m0 + (3 * t * t - 2 * t * t * t) * dist;
-          window.scrollTo({ top: from + pos, behavior: 'instant' });
+          let pos = from + (t * t * t - 2 * t * t + t) * m0 + (3 * t * t - 2 * t * t * t) * dist;
+          // Never a step backwards.
+          pos = dist > 0 ? Math.max(pos, Math.min(window.scrollY, y)) : Math.min(pos, Math.max(window.scrollY, y));
+          window.scrollTo({ top: pos, behavior: 'instant' });
           if (t < 1) glideRaf = requestAnimationFrame(step);
           else glidingTo = null;
         };
         glideRaf = requestAnimationFrame(step);
       };
       const active = () => !reduceMotion && !scrollLocked();
-      // The stops either side of a position (page px), for one swipe: it
-      // can move between them but not past. A side that leads out of the
-      // stage holds at the position itself.
-      const wallsFrom = (m: ReturnType<typeof measure>) => {
-        const up = nextPoint(m, -1);
-        const down = nextPoint(m, 1);
-        // Below the services stop: free scrolling, with a stop at services.
-        if (m.scrolled > m.travel + 2) return { up: m.top + m.travel, down: Infinity, origin: m.top + m.travel, below: true };
-        return {
-          below: false,
-          up: m.top + (up ?? m.scrolled),
-          down: m.top + (down ?? m.scrolled),
-          origin: m.top + m.points.reduce((a, b) => (Math.abs(b - m.scrolled) < Math.abs(a - m.scrolled) ? b : a)),
-        };
-      };
-      // Where a swipe that's ended between stops should come to rest: on in
-      // the direction it went, or back where it started for a small nudge.
-      const restFor = (w: ReturnType<typeof wallsFrom>, startY: number, dir: number, moved: number) => {
-        if (dir > 0 && Math.abs(moved) >= SETTLE_NUDGE_PX / 2) return w.down;
-        if (dir < 0 && Math.abs(moved) >= SETTLE_NUDGE_PX / 2) return w.up;
-        return Math.abs(startY - w.origin) < 2 ? w.origin : window.scrollY - startY > 0 ? w.down : w.up;
+      const maxScroll = () => document.documentElement.scrollHeight - window.innerHeight;
+      // Where a swipe heading `dir` that would come to rest at `projected`
+      // (stage px) should land: the resting point nearest that — on ahead,
+      // or back to the one it's leaving if it wouldn't have got far — or
+      // null to leave it be (heading out of the stage, or already there).
+      const landingFor = (m: ReturnType<typeof measure>, dir: number, projected: number) => {
+        if (m.phases <= 0 || !dir) return null;
+        if (dir > 0 && (m.scrolled >= m.travel - 2 || projected > m.travel + window.innerHeight * 0.5)) return null;
+        if (dir < 0 && (m.scrolled > m.travel + 2 || m.scrolled <= 2)) return null;
+        // Leaning forward: a stage ahead wins once the swipe would have got
+        // a bit over a third of the way there.
+        const cost = (pt: number) => Math.abs(pt - projected) * ((pt - m.scrolled) * dir > 2 ? 0.6 : 1);
+        const nearest = m.points.reduce((a, b) => (cost(b) < cost(a) ? b : a));
+        return Math.abs(nearest - m.scrolled) < 2 ? null : nearest;
       };
 
-      // Wheel / trackpad: the page moves with the wheel, but only between
-      // the two stops either side of where the swipe began. Once it's held
-      // at one, the rest of that swipe (the trackpad's momentum) is
-      // absorbed; a fresh swipe — after a gap, or a jump in strength while
-      // held — moves on. A mouse wheel's big notched steps go one stop at a
-      // time. When a swipe dies away between stops, the page carries on at
-      // its speed into the next one.
+      // The next resting point on from `scrolled` in direction `dir`.
+      const nextAhead = (m: ReturnType<typeof measure>, dir: number) =>
+        (dir > 0 ? m.points.find((pt) => pt > m.scrolled + 2) : m.points.filter((pt) => pt < m.scrolled - 2).pop()) ?? null;
+
+      // Wheel / trackpad: left to the browser while the swipe is under way.
+      // Once its momentum tail sets in (a few events in a row, close
+      // together and each weaker than the last) the rest of the tail is
+      // taken over and the page carries that speed on to the stage nearest
+      // where it would have stopped. A fresh swipe (a gap, or a jump in
+      // strength) hands back straight away.
       let lastWheelAt = 0;
       let lastWheelAbs = 0;
-      let wheel: {
-        walls: ReturnType<typeof wallsFrom>;
-        startY: number;
-        dir: number;
-        held: boolean;
-        speed: number;
-        notched: boolean;
-      } | null = null;
-      let wheelEndTimer = 0;
-      const endWheel = () => {
-        window.clearTimeout(wheelEndTimer);
-        const g = wheel;
-        if (!g || g.notched || g.walls.below) return;
-        g.notched = true; // the rest of this swipe is just absorbed
-        const y = window.scrollY;
-        if (Math.abs(y - g.walls.up) < 2 || Math.abs(y - g.walls.down) < 2) return;
-        glideTo(restFor(g.walls, g.startY, g.dir, y - g.startY), g.speed);
-      };
+      let decaying = 0;
+      let steering = false;
       window.addEventListener(
         'wheel',
         (e) => {
@@ -1039,58 +1019,43 @@ const afterParts = headlineAfter.split(/(\s+)/);
           const prevAbs = lastWheelAbs;
           lastWheelAt = now;
           lastWheelAbs = abs;
-          if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || abs < 0.5) return;
-          const fresh = !wheel || gap > 160 || ((wheel.held || wheel.notched) && abs > prevAbs * 1.4 + 3);
-          if (fresh) {
-            stopGlide();
-            const m = measure();
-            const dir = Math.sign(dy);
-            if (nextPoint(m, dir) === null) {
-              wheel = null;
-              return; // out of the stage that way: normal scrolling
-            }
-            wheel = { walls: wallsFrom(m), startY: window.scrollY, dir, held: false, speed: 0, notched: false };
-            // A mouse wheel's notch: straight on to the next stop.
-            if (abs >= 50 && gap > 160) {
+          if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+          const fresh = gap > 160 || abs > prevAbs * 1.4 + 3;
+          if (steering) {
+            if (!fresh) {
               e.preventDefault();
-              wheel.notched = true;
-              glideTo(dir > 0 ? wheel.walls.down : wheel.walls.up);
               return;
             }
+            steering = false;
           }
-          const g = wheel!;
+          if (glidingTo !== null) stopGlide();
+          decaying = gap < 60 && abs < prevAbs ? decaying + 1 : 0;
+          if (decaying < 3 || abs < 0.5) return;
+          const m = measure();
+          const dir = Math.sign(dy);
+          // What's left of a momentum tail is roughly 18 of its events.
+          const target = landingFor(m, dir, m.scrolled + dy * 18);
+          if (target === null) return;
           e.preventDefault();
-          if (g.notched || glidingTo !== null) return;
-          const y = Math.min(g.walls.down, Math.max(g.walls.up, window.scrollY + dy));
-          window.scrollTo({ top: y, behavior: 'instant' });
-          g.held = y === g.walls.down || y === g.walls.up;
-          g.speed = dy / Math.min(Math.max(gap, 8), 50);
-          if (Math.sign(dy) === g.dir || Math.abs(y - g.startY) < 2) g.dir = Math.sign(dy);
-          // Dying away between stops: ease on from here rather than
-          // crawling the last stretch on the momentum's tail.
-          if (!g.held && abs < 4 && abs < prevAbs) endWheel();
-          else {
-            window.clearTimeout(wheelEndTimer);
-            wheelEndTimer = window.setTimeout(endWheel, 90);
-          }
+          steering = true;
+          glideTo(m.top + target, dy / Math.min(Math.max(gap, 8), 50));
         },
         { passive: false }
       );
       window.addEventListener('keydown', stopGlide);
 
-      // Touch. Decided on the first move: a mostly-vertical drag inside the
-      // stage is ours (the page follows the finger between the stops
-      // either side, with a little give past them, and carries the flick
-      // on into a stop as it lifts); anything else is left to the browser.
-      // A pop-up image being dragged keeps it.
-      const GIVE = 0.25;
+      // Touch: inside the stage the page follows the finger 1:1 (taken over
+      // so the lift can be steered — the browser's own fling can't be
+      // without the two fighting); as it lifts, the flick carries on at its
+      // speed to the stage nearest where it would have come to rest. A
+      // flick out of the stage carries on like a normal fling. A pop-up
+      // image being dragged keeps the touch.
       let fingerDown = false;
       let touch: {
         y: number;
         x: number;
         scroll: number;
         mode: 'undecided' | 'own' | 'none';
-        walls?: ReturnType<typeof wallsFrom>;
         samples: { y: number; t: number }[];
       } | null = null;
       window.addEventListener(
@@ -1116,16 +1081,13 @@ const afterParts = headlineAfter.split(/(\s+)/);
           if (touch.mode === 'undecided') {
             const dy = y - touch.y;
             const m = measure();
-            touch.mode =
-              Math.abs(x - touch.x) > Math.abs(dy) || dy === 0 || nextPoint(m, -Math.sign(dy)) === null ? 'none' : 'own';
+            const dir = -Math.sign(dy);
+            const inside = dir > 0 ? m.scrolled < m.travel - 2 : m.scrolled > 2 && m.scrolled <= m.travel + 2;
+            touch.mode = Math.abs(x - touch.x) > Math.abs(dy) || dy === 0 || m.phases <= 0 || !inside ? 'none' : 'own';
             if (touch.mode === 'none') return;
-            touch.walls = wallsFrom(m);
           }
           e.preventDefault();
-          const w = touch.walls!;
-          const raw = touch.scroll - (y - touch.y);
-          const top = raw > w.down ? w.down + (raw - w.down) * GIVE : raw < w.up ? w.up + (raw - w.up) * GIVE : raw;
-          window.scrollTo({ top, behavior: 'instant' });
+          window.scrollTo({ top: Math.max(0, touch.scroll - (y - touch.y)), behavior: 'instant' });
           const now = performance.now();
           touch.samples.push({ y, t: now });
           while (touch.samples.length > 2 && now - touch.samples[0].t > 80) touch.samples.shift();
@@ -1136,27 +1098,30 @@ const afterParts = headlineAfter.split(/(\s+)/);
         fingerDown = false;
         const t = touch;
         touch = null;
-        if (t?.mode !== 'own' || !t.walls) {
+        if (t?.mode !== 'own') {
           settleWhenQuiet();
           return;
         }
         const last = t.samples[t.samples.length - 1];
         const first = t.samples[0];
-        const moved = t.y - (last?.y ?? t.y); // + is down the page
         // The finger's speed as it lifted (px per ms, + is down the page);
         // a finger that stopped before lifting has none.
         const fresh = last && performance.now() - last.t < 60;
         const speed = fresh && first && last.t > first.t ? (first.y - last.y) / (last.t - first.t) : 0;
-        if (t.walls.below) {
-          // Below services: carry on like a normal fling (roughly as far
-          // as the browser's own momentum would go), but stop at services.
-          const target = Math.max(t.walls.up, window.scrollY + speed * 400);
-          glideTo(target, speed);
-          return;
+        const m = measure();
+        const projected = m.scrolled + speed * FLING_CARRY_MS;
+        const moved = window.scrollY - t.scroll;
+        const dir = Math.abs(speed) > 0.15 ? Math.sign(speed) : 0;
+        let target = dir ? landingFor(m, dir, projected) : null;
+        if (target === null && !dir && m.scrolled > 0 && m.scrolled < m.travel) {
+          // Stopped mid-zoom before lifting: on to the next stage the way
+          // it was going, or back for a small nudge.
+          const way = Math.abs(moved) >= SETTLE_NUDGE_PX ? Math.sign(moved) : -Math.sign(moved);
+          target = way ? nextAhead(m, way) : null;
         }
-        const dir = Math.abs(speed) > SWIPE_MIN_SPEED ? Math.sign(speed) : Math.abs(moved) > SWIPE_MIN_PX ? Math.sign(moved) : 0;
-        const target = dir > 0 ? t.walls.down : dir < 0 ? t.walls.up : restFor(t.walls, t.scroll, 0, 0);
-        glideTo(target, speed);
+        if (target !== null) glideTo(m.top + target, speed);
+        // Heading out of the stage: carry on like a normal fling.
+        else if (dir) glideTo(Math.min(maxScroll(), Math.max(0, window.scrollY + speed * FLING_CARRY_MS)), speed);
       };
       window.addEventListener('touchend', lift, { passive: true });
       window.addEventListener('touchcancel', lift, { passive: true });
@@ -1168,12 +1133,18 @@ const afterParts = headlineAfter.split(/(\s+)/);
       let lastY = window.scrollY;
       let lastDir = 1;
       const settle = () => {
-        if (!active() || fingerDown || glidingTo !== null || performance.now() - lastWheelAt < 250) return;
+        if (!active() || fingerDown || glidingTo !== null) return;
+        // Mid-swipe on a wheel: check again once it's gone quiet.
+        if (performance.now() - lastWheelAt < 250) {
+          window.clearTimeout(settleTimer);
+          settleTimer = window.setTimeout(settle, 260);
+          return;
+        }
         const m = measure();
         if (m.phases <= 0 || m.scrolled <= 0 || m.scrolled >= m.travel || m.points.some((pt) => Math.abs(pt - m.scrolled) < 2)) return;
         const down = lastDir > 0;
         const from = down ? m.points.filter((pt) => pt < m.scrolled).pop() : m.points.find((pt) => pt > m.scrolled);
-        let target = nextPoint(m, down ? 1 : -1);
+        let target = nextAhead(m, down ? 1 : -1);
         if (from !== undefined && Math.abs(m.scrolled - from) < SETTLE_NUDGE_PX) target = from;
         if (target === null) return;
         glideTo(m.top + target);
