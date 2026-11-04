@@ -902,6 +902,88 @@ const afterParts = headlineAfter.split(/(\s+)/);
       updateStage();
       window.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('resize', onScroll);
+
+      // Resting points: when a scroll comes to a stop partway through one of
+      // the stage's zooms, the page glides on to the next stage in the
+      // direction you were going — the headline, the reel landed (the
+      // middle of its beat) or the statement in focus — so each swipe
+      // locks onto a stage rather than leaving you halfway through a zoom.
+      // Only a small nudge (under SETTLE_NUDGE_PX) glides back instead. It
+      // waits for the scroll to finish, momentum included, never acts while
+      // a finger is still down, and leaves the page alone outside the
+      // stage, so a big swipe still carries straight through. (CSS scroll
+      // snapping was tried first: its "proximity" mode only catches a stop
+      // within about a quarter of a screen of a point, and "mandatory"
+      // would hold the whole page.)
+      const REST_POINTS = [0, (REEL_LANDED_AT + REEL_LEAVES_AT) / 2, 0.975];
+      const SETTLE_NUDGE_PX = 80;
+      let restY = window.scrollY;
+      let fingerDown = false;
+      // Where a glide of ours is headed, so the scroll events it makes
+      // don't set off another settle partway (which would read as heading
+      // back). Any scroll of your own takes over from it.
+      let glidingTo: number | null = null;
+      const settle = () => {
+        if (reduceMotion || fingerDown) return;
+        if (glidingTo !== null) {
+          if (Math.abs(window.scrollY - glidingTo) > 2) return;
+          glidingTo = null;
+        }
+        const travel = stage.offsetHeight - window.innerHeight;
+        const fadePx = Math.max(0, -parseFloat(getComputedStyle(stage).marginBottom) || 0);
+        const phases = travel - fadePx;
+        const top = stage.getBoundingClientRect().top + window.scrollY;
+        const scrolled = window.scrollY - top;
+        const points = REST_POINTS.map((r) => r * phases);
+        if (phases <= 0 || scrolled <= 0 || scrolled >= phases || points.some((pt) => Math.abs(pt - scrolled) < 2)) {
+          restY = window.scrollY;
+          return;
+        }
+        const below = points.filter((pt) => pt < scrolled).pop();
+        const above = points.find((pt) => pt > scrolled);
+        const down = window.scrollY >= restY;
+        const from = down ? below : above;
+        let target = down ? above : below;
+        if (from !== undefined && Math.abs(scrolled - from) < SETTLE_NUDGE_PX) target = from;
+        // Past the last point, heading down: already on the way out.
+        if (target === undefined) return;
+        restY = top + target;
+        glidingTo = restY;
+        window.scrollTo({ top: restY, behavior: 'smooth' });
+      };
+      // Settles once a scroll has fully finished: on scrollend where the
+      // browser has it, and otherwise (and after a finger lifts, in case
+      // the scroll ended while it was still down) once scroll events have
+      // gone quiet — any momentum keeps pushing that back.
+      const hasScrollEnd = 'onscrollend' in window;
+      let settleTimer = 0;
+      const settleWhenQuiet = () => {
+        window.clearTimeout(settleTimer);
+        settleTimer = window.setTimeout(settle, 200);
+      };
+      if (hasScrollEnd) window.addEventListener('scrollend', settle);
+      window.addEventListener(
+        'scroll',
+        () => (hasScrollEnd ? window.clearTimeout(settleTimer) : settleWhenQuiet()),
+        { passive: true }
+      );
+      const takeOver = () => (glidingTo = null);
+      window.addEventListener('wheel', takeOver, { passive: true });
+      window.addEventListener('keydown', takeOver);
+      window.addEventListener(
+        'touchstart',
+        () => {
+          fingerDown = true;
+          takeOver();
+        },
+        { passive: true }
+      );
+      const lift = () => {
+        fingerDown = false;
+        settleWhenQuiet();
+      };
+      window.addEventListener('touchend', lift, { passive: true });
+      window.addEventListener('touchcancel', lift, { passive: true });
     }
   }
 
