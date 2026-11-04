@@ -18,7 +18,9 @@ const IMAGES_PER_WORD = 3;
 // peaks at ~525ms).
 const REVEAL_DELAY_MS = 300;
 const REVEAL_MS = 3000;
-const FADE_IN_MS = 1200;
+const FADE_IN_MS = 700;
+// Gap between the field's images fading in, one after another.
+const FADE_IN_STAGGER_MS = 90;
 // How far each image wanders from its spot while floating. The spacing
 // below allows for two neighbours drifting towards each other at once.
 const DRIFT_PX = 6;
@@ -147,6 +149,35 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     return deck.pop()!;
   }
 
+  // Each image keeps one depth, and its soft copy's blur is rounded to a
+  // few set strengths, so the soft copies' URLs repeat from visit to visit
+  // and Sanity's CDN serves them ready-made instead of making a fresh one
+  // (which is slow) every time.
+  const depths = new Map<string, number>();
+  function depthFor(image: HeroPopUpImage) {
+    if (!depths.has(image.url)) depths.set(image.url, Math.round(Math.random() * 3) / 3);
+    return depths.get(image.url)!;
+  }
+  function softUrl(image: HeroPopUpImage, depth: number) {
+    const softH = Math.round(SOFT_WIDTH_PX / Math.min(1.6, Math.max(0.7, image.aspectRatio)));
+    const blur = Math.round(RESTING_NEAR.blur + (RESTING_FAR.blur - RESTING_NEAR.blur) * depth);
+    return (
+      `${image.url.split('?')[0]}?w=${SOFT_WIDTH_PX + SOFT_PAD_PX * 2}&h=${softH + SOFT_PAD_PX * 2}` +
+      `&fit=crop&pad=${SOFT_PAD_PX}&bg=00F9F7F2&blur=${blur}&fm=webp&q=70`
+    );
+  }
+  const softPreloaded = new Map<string, HTMLImageElement>();
+  function preloadSoft(image: HeroPopUpImage) {
+    const url = softUrl(image, depthFor(image));
+    if (!softPreloaded.has(url)) {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url;
+      softPreloaded.set(url, img);
+    }
+    return softPreloaded.get(url)!;
+  }
+
   function preload(image: HeroPopUpImage) {
     if (preloaded.has(image.url)) return preloaded.get(image.url)!;
     const img = new Image();
@@ -249,16 +280,13 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
     const h = baseHeight * (0.65 + Math.random() * 0.5);
     // Clamped so very tall or panoramic images still read as photos.
     const w = h * Math.min(1.6, Math.max(0.7, image.aspectRatio));
-    const depth = Math.random();
+    const depth = depthFor(image);
 
     // The soft copy, cropped to the card's shape and blurred to its depth.
     const softH = Math.round((SOFT_WIDTH_PX * h) / w);
-    const blur = Math.round(RESTING_NEAR.blur + (RESTING_FAR.blur - RESTING_NEAR.blur) * depth);
     const soft = new Image();
     soft.decoding = 'async';
-    soft.src =
-      `${image.url.split('?')[0]}?w=${SOFT_WIDTH_PX + SOFT_PAD_PX * 2}&h=${softH + SOFT_PAD_PX * 2}` +
-      `&fit=crop&pad=${SOFT_PAD_PX}&bg=00F9F7F2&blur=${blur}&fm=webp&q=70`;
+    soft.src = softUrl(image, depth);
     try {
       await Promise.all([preload(image).decode(), soft.decode()]);
     } catch {
@@ -530,22 +558,47 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
 
   // Lays the whole field out at once, each image placed in turn in the most
   // open spot left, then faded in one after another.
+  // One per word, or on phones a random handful of the words.
+  const pickWords = () =>
+    Array.from({ length: wordCount }, (_, word) => word)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, maxOnScreen());
+  // The first field's images start downloading straight away, while the
+  // page (and its fonts) are still loading, rather than once it's laid out.
+  let firstWords: number[] | null = pickWords();
+  for (const word of firstWords) {
+    if (!wordImages[word]) {
+      wordImages[word] = Array.from({ length: IMAGES_PER_WORD }, () => draw());
+      wordNext[word] = 0;
+    }
+    const image = wordImages[word][wordNext[word]];
+    preload(image);
+    preloadSoft(image);
+  }
+
+  // Lays the field out, each image placed in the most open spot left and
+  // fading in as soon as it's ready (one after another) — none waits for
+  // the slowest to load.
+  let buildId = 0;
   async function build() {
+    const id = ++buildId;
     floaters.forEach((f) => f.wrap.remove());
     floaters = [];
     measureBaseHeight();
-    // One per word, or on phones a random handful of the words.
-    const words = Array.from({ length: wordCount }, (_, word) => word)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, maxOnScreen());
-    const created = await Promise.all(words.map((word) => createFloater(word)));
-    for (const f of created) {
-      if (f && moveToOpenSpot(f)) floaters.push(f);
-    }
-    floaters
-      .slice()
-      .sort(() => Math.random() - 0.5)
-      .forEach((f, i) => fadeIn(f, i * 60));
+    const words = firstWords ?? pickWords();
+    firstWords = null;
+    let nextSlot = 0;
+    await Promise.all(
+      words.map(async (word) => {
+        const f = await createFloater(word);
+        if (id !== buildId || !f || !moveToOpenSpot(f)) return;
+        floaters.push(f);
+        const now = performance.now();
+        nextSlot = Math.max(nextSlot, now);
+        fadeIn(f, nextSlot - now);
+        nextSlot += FADE_IN_STAGGER_MS;
+      })
+    );
   }
 
   // The hero's scroll stage sends the field flying past the viewer: at
