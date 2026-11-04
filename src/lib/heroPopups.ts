@@ -17,7 +17,7 @@ const IMAGES_PER_WORD = 3;
 // The word's image rises just behind the word's own 750ms roll (which
 // peaks at ~525ms).
 const REVEAL_DELAY_MS = 300;
-const REVEAL_MS = 2400;
+const REVEAL_MS = 3000;
 const FADE_IN_MS = 700;
 // Gap between the field's images fading in, one after another.
 const FADE_IN_STAGGER_MS = 90;
@@ -87,10 +87,9 @@ const SOFT_PAD_PX = 24;
 const ZOOM_TRAVEL = { near: 0.9, far: 0.4 };
 const ZOOM_SCALE = { near: 1.6, far: 1.25 };
 const GONE: Pose = { transform: 'scale(0.85)', opacity: 0, focus: 0 };
-// Falling away, an image goes soft first: it's fully back to its blurred
-// copy this far into the fall, while it's still clearly visible, and only
-// then fades out — rather than blurring and fading together, which hid the
-// blur.
+// Let go after a hover, an image goes soft first: it's fully back to its
+// blurred copy this far into the fall, while it's still clearly visible,
+// and only then fades out. (A word reveal's fall blurs and fades together.)
 const SOFT_BY = 0.45;
 
 // A card's look at a moment: its transform and opacity, plus how far the
@@ -438,13 +437,7 @@ export function initHeroPopups(layer: HTMLElement, headline: HTMLElement, images
       f,
       [{ ...currentFrame(f), easing: 'ease-in-out' }, { ...REVEALED, offset: 0.5, easing: 'ease-in' }, GONE],
       { duration: REVEAL_MS, delay },
-      () => retire(f),
-      [
-        { focus: currentFrame(f).focus, easing: 'ease-in-out' },
-        { focus: 1, offset: 0.5, easing: 'ease-in-out' },
-        { focus: 0, offset: 0.5 + 0.5 * SOFT_BY },
-        { focus: 0 },
-      ]
+      () => retire(f)
     );
   }
 
