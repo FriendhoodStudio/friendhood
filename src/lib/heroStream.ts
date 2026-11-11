@@ -87,7 +87,7 @@ const SWAP_MS = 90;
 // you've settled on it): a pill with the project's name running through it
 // like a ticker tape, fading out at either end.
 const LABEL_DELAY_MS = 650;
-const LABEL_IN_MS = 900;
+const LABEL_IN_MS = 600;
 const LABEL_CLASS =
   'absolute bottom-[18px] inset-x-0 mx-auto w-[87%] block overflow-hidden rounded-full border border-front/15 bg-grey-600 py-2 font-body text-[0.9375rem] leading-[1.2] text-front backdrop-blur-[14px] whitespace-nowrap pointer-events-none';
 // The ticker's speed, how many copies of the name run round it (enough to
