@@ -316,7 +316,10 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   // drift and gap, all varied around the column's width.
   function fill(item: Item, image: HeroPopUpImage, col: Column) {
     // Never smaller than fits the label with room around it.
-    const w = Math.max(col.w, minWidth, minHeight * ratio(image));
+    // The minimum shrinks with depth too, so where it's what sets the size
+    // (phones) the back layer still comes out smaller than the near one.
+    const depthScale = look(col.depth).scale / NEAR.scale;
+    const w = Math.max(col.w, minWidth * depthScale, minHeight * ratio(image));
     const h = w / ratio(image);
     const x = (col.w - w) / 2 + (Math.random() * 2 - 1) * col.w * ITEM_DRIFT_SHARE;
     const scale = w / SOFT_W;
