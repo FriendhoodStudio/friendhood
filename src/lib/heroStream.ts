@@ -54,6 +54,10 @@ const FAR = { blur: 48, opacity: 0.25, speed: 15, scale: 0.6 };
 // nearer columns, for a little parallax.
 const PARALLAX_PX = 28;
 const PARALLAX_EASE_PER_S = 3;
+// On phones: how far the phone has to lean (degrees) for the full effect,
+// and how hard a full lean pushes the images sideways (px/s each second).
+const TILT_FULL_DEG = 25;
+const TILT_PUSH_PX_S2 = 60;
 // Hover: how much the image grows, how long it takes to come into focus
 // and go soft again, and how quickly its column slows and recovers.
 const HOVER_SCALE = 1.12;
@@ -169,6 +173,37 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     },
     { passive: true }
   );
+
+  // On a phone, tilting it stands in for the mouse: leaning it left or right
+  // shifts the layers for the same parallax, and the images drift the way
+  // it leans (see TILT_PUSH_PX_S2 in move). Safari on iPhone only gives the
+  // tilt once asked, from a tap, so it's asked on the first tap anywhere.
+  let tilt = 0;
+  if (!reduceMotion && window.matchMedia('(pointer: coarse)').matches && 'DeviceOrientationEvent' in window) {
+    const onTilt = (e: DeviceOrientationEvent) => {
+      if (e.gamma == null) return;
+      // The phone's left/right lean, in degrees, turned sideways if it's
+      // held in landscape.
+      const angle = (screen.orientation?.angle ?? 0) % 180 === 0 ? e.gamma : (e.beta ?? 0) * (screen.orientation.angle === 90 ? 1 : -1);
+      tilt = clamp(angle / TILT_FULL_DEG, -1, 1);
+      pointerX = -tilt;
+    };
+    const ask = (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission;
+    if (typeof ask === 'function') {
+      document.addEventListener(
+        'touchend',
+        () => {
+          ask.call(DeviceOrientationEvent).then(
+            (answer) => answer === 'granted' && window.addEventListener('deviceorientation', onTilt),
+            () => {}
+          );
+        },
+        { once: true, passive: true }
+      );
+    } else {
+      window.addEventListener('deviceorientation', onTilt);
+    }
+  }
 
   // Behind the headline (z-20) rather than in front of it, clipped to the
   // hero, and running the full height of the screen: from the very top
@@ -678,6 +713,8 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
         const ease = Math.min(1, dt * COURSE_EASE_PER_S);
         item.vy += (-item.rise * pace - item.vy) * ease;
         item.vx += (item.wander * pace - item.vx) * ease;
+        // Leaning the phone sends the images drifting that way.
+        item.vx += tilt * TILT_PUSH_PX_S2 * pace * dt;
         item.x += item.vx * dt;
         item.y += item.vy * dt;
         // Off the sides of the screen.
