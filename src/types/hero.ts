@@ -25,4 +25,7 @@ export interface HeroPopUpImage {
   url: string;
   alt: string;
   aspectRatio: number;
+  /** The case study the image came from, when it was picked from one. */
+  href?: string;
+  project?: string;
 }

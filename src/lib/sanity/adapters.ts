@@ -262,7 +262,7 @@ export interface RawHero extends RawMedia {
   reelVideoUrl?: string;
   popUpImagesEnabled?: boolean;
   popUpImages?: RawPopUpImage[] | null;
-  projectPopUpImages?: { title: string; images: RawPopUpImage[] | null }[];
+  projectPopUpImages?: { title: string; slug?: string; images: RawPopUpImage[] | null }[];
 }
 
 interface RawPopUpImage {
@@ -275,19 +275,22 @@ interface RawPopUpImage {
 // keeps ~70 of them cheap to fetch one pair at a time.
 function toPopUpImages(raw: RawHero): HeroPopUpImage[] {
   if (raw.popUpImagesEnabled === false) return [];
-  const custom = (raw.popUpImages ?? []).map((image) => ({ image, fallbackAlt: '' }));
+  const custom = (raw.popUpImages ?? []).map((image) => ({ image, fallbackAlt: '', project: undefined }));
+  // Images picked from case studies remember which one they came from, so
+  // they can link to it.
   const fromProjects = (raw.projectPopUpImages ?? []).flatMap((project) =>
-    (project.images ?? []).map((image) => ({ image, fallbackAlt: project.title }))
+    (project.images ?? []).map((image) => ({ image, fallbackAlt: project.title, project }))
   );
   return (custom.length > 0 ? custom : fromProjects)
     .filter(({ image }) => image?.asset)
     // Animated GIFs are left out: playing while blurred and drifting they
     // read as flicker, fighting the calm of the field.
     .filter(({ image }) => !String((image.asset as { _ref?: string })._ref ?? '').endsWith('-gif'))
-    .map(({ image, fallbackAlt }) => ({
+    .map(({ image, fallbackAlt, project }) => ({
       url: urlFor(image.asset!).width(600).fit('max').url(),
       alt: image.alt || fallbackAlt,
       aspectRatio: image.aspectRatio || 4 / 3,
+      ...(project?.slug ? { href: `/work/${project.slug}`, project: project.title } : {}),
     }));
 }
 

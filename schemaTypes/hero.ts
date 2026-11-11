@@ -120,7 +120,7 @@ export default defineType({
       name: 'popUpImagesEnabled',
       title: 'Show pop-up images',
       description:
-        'Images that drift up into focus around the headline, a pair at a time, before you scroll. Turn off to show just the headline.',
+        'Project images that rise behind the headline as soft bubbles, coming into focus (and linking to their case study) on hover. Turn off to show just the headline.',
       type: 'boolean',
       initialValue: true,
     }),

@@ -86,11 +86,11 @@ const afterParts = headlineAfter.split(/(\s+)/);
       rather than an exact centre between two measured points. margin-top
       nudges it down slightly for nav clearance. */}
   <div class="hero-headline-area absolute inset-0 flex items-center justify-center px-[var(--page-margin)]">
-    {/* Project images that roll up around the headline as the word changes
-        — filled in by initHeroPopups (see the script below). In front of
-        the headline (z-30 vs its z-20), so an image dragged onto it sits on
-        top of the text; resting images are still placed clear of it and of
-        each other. Decorative, so hidden from screen readers. */}
+    {/* Project images, filled in by the script below: by default a stream
+        of soft bubbles rising behind the headline (initHeroStream, which
+        sets the layer's own stacking and size), or with ?hero=field the
+        earlier floating field that rolls up around it as the word changes
+        (initHeroPopups). Decorative, so hidden from screen readers. */}
     {popUpImages.length > 1 && (
       <Fragment>
         <div class="hero-popup-layer pointer-events-none absolute inset-y-0 z-30" aria-hidden="true" data-hero-popups></div>
@@ -657,6 +657,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
 <script>
   import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock';
   import { initHeroPopups } from '../lib/heroPopups';
+  import { initHeroStream } from '../lib/heroStream';
   import type { HeroPopUpImage } from '../types/hero';
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -667,7 +668,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
 
   // Set once the floating images are running (see the word cycle below), so
   // the stage can send them flying past too.
-  let popups: ReturnType<typeof initHeroPopups> = null;
+  let popups: { showWord(index: number): void; zoomPast(progress: number): void; setPaused(value: boolean): void } | null = null;
   // True while the scroll stage's transition is under way: the headline's
   // word cycle holds still, since a new word's width can re-wrap the lines
   // and send a word to the other line (and the other direction) mid-split.
@@ -1220,16 +1221,23 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const popupLayer = document.querySelector<HTMLElement>('[data-hero-popups]');
     const popupData = document.querySelector<HTMLScriptElement>('[data-hero-popup-images]');
     const popupHeadline = document.querySelector<HTMLElement>('.hero-headline-shadow');
+    // Project images rise behind the headline as soft bubbles (see
+    // heroStream.ts). The earlier floating field (heroPopups.ts) can still
+    // be seen with ?hero=field.
+    const useStream = new URLSearchParams(window.location.search).get('hero') !== 'field';
+    const popupImages = popupData ? (JSON.parse(popupData.textContent || '[]') as HeroPopUpImage[]) : [];
     popups =
       popupLayer && popupData && popupHeadline
-        ? initHeroPopups(
-            popupLayer,
-            popupHeadline,
-            JSON.parse(popupData.textContent || '[]') as HeroPopUpImage[],
-            // The track's last frame is a duplicate of the first (for the
-            // seamless loop), so it isn't a word of its own.
-            track.children.length - 1
-          )
+        ? useStream
+          ? initHeroStream(popupLayer, popupImages)
+          : initHeroPopups(
+              popupLayer,
+              popupHeadline,
+              popupImages,
+              // The track's last frame is a duplicate of the first (for the
+              // seamless loop), so it isn't a word of its own.
+              track.children.length - 1
+            )
         : null;
     const frameCount = track.children.length;
     let index = 0;
