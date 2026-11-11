@@ -47,7 +47,9 @@ const BOUNCE = 0.55;
 // passes in front of a far one, as it would. (Colliding across depths also
 // jammed narrow screens, where the near column got held to the far one's
 // pace.) As a share of the near-to-far range.
-const BUMP_DEPTH = 0.4;
+const BUMP_DEPTH = 0.3;
+// How far back the back layer of images sits, between NEAR (0) and FAR (1).
+const BACK_DEPTH = 0.55;
 // Resting look and speed (px/s), from nearest column to furthest back.
 // The spread is wide so the stream reads as layers: near images are big,
 // clearer and quick, far ones small, hazy and slow, and nearer columns sit
@@ -436,10 +438,12 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     if (!width || !height) return;
     const count = clamp(Math.round(width / COLUMN_PITCH_PX), MIN_COLUMNS, MAX_COLUMNS);
     const pitch = width / count;
-    // Depths spread evenly from near to far, shuffled across the columns, so
-    // there's always a clear near and far layer, with a little randomness.
+    // Two layers, near and back, shared out evenly and shuffled across the
+    // columns, with a little randomness within each. The back layer sits
+    // part-way to FAR rather than all the way, so nothing ends up tiny and
+    // very hazy.
     const depths = Array.from({ length: count }, (_, i) =>
-      clamp((count > 1 ? i / (count - 1) : 0.3) + (Math.random() * 2 - 1) * 0.08, 0, 1)
+      clamp((i % 2 ? BACK_DEPTH : 0) + (Math.random() * 2 - 1) * 0.05, 0, 1)
     );
     for (let i = depths.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
