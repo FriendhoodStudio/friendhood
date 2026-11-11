@@ -275,7 +275,14 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     // only some rise at the sides.
     const all = columns.flatMap((c) => c.items).filter((other) => other !== item);
     const overNow = all.filter((other) => other.over).length;
-    item.over = (centre < title.l || centre > title.r) && overNow + 1 <= Math.max(1, Math.round(OVER_SHARE * (all.length + 1)));
+    // And only where there's room for the whole image beside the headline:
+    // on a phone the words span nearly the full width, and an image
+    // squeezed between them and the screen's edge was pushed back and forth
+    // by both every frame (a flicker), so there none come in front.
+    const roomLeft = title.l >= w;
+    const roomRight = width - title.r >= w;
+    const side = (centre < title.l && roomLeft) || (centre > title.r && roomRight);
+    item.over = side && overNow + 1 <= Math.max(1, Math.round(OVER_SHARE * (all.length + 1)));
     if (!item.focused) {
       home(item, col).append(item.wrap);
       item.card.getAnimations().forEach((a) => a.cancel());
