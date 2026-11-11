@@ -58,6 +58,12 @@ const PARALLAX_EASE_PER_S = 3;
 // and how hard a full lean pushes the images sideways (px/s each second).
 const TILT_FULL_DEG = 25;
 const TILT_PUSH_PX_S2 = 60;
+// Tilting forwards or back: how far (degrees) from the resting angle for
+// the full change, the slowest and fastest the stream goes, and how
+// quickly the resting angle catches up with how the phone is being held.
+const PITCH_FULL_DEG = 20;
+const PITCH_PACE = [0.25, 2.5];
+const REST_SETTLE_PER_S = 0.08;
 // Hover: how much the image grows, how long it takes to come into focus
 // and go soft again, and how quickly its column slows and recovers.
 const HOVER_SCALE = 1.12;
@@ -179,6 +185,11 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   // it leans (see TILT_PUSH_PX_S2 in move). Safari on iPhone only gives the
   // tilt once asked, from a tap, so it's asked on the first tap anywhere.
   let tilt = 0;
+  // Speed multiplier from tilting forwards or back, and the resting angle
+  // it's measured from.
+  let pace = 1;
+  let restBeta: number | null = null;
+  let lastBetaAt = 0;
   if (!reduceMotion && window.matchMedia('(pointer: coarse)').matches && 'DeviceOrientationEvent' in window) {
     const onTilt = (e: DeviceOrientationEvent) => {
       if (e.gamma == null) return;
@@ -187,6 +198,16 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       const angle = (screen.orientation?.angle ?? 0) % 180 === 0 ? e.gamma : (e.beta ?? 0) * (screen.orientation.angle === 90 ? 1 : -1);
       tilt = clamp(angle / TILT_FULL_DEG, -1, 1);
       pointerX = -tilt;
+      // Forwards and back (held upright): measured from however the phone
+      // is naturally being held, which the reading slowly settles towards.
+      // Leaning the top away speeds the stream up; towards you slows it.
+      if ((screen.orientation?.angle ?? 0) % 180 === 0 && e.beta != null) {
+        const now = performance.now();
+        if (restBeta == null) restBeta = e.beta;
+        else restBeta += (e.beta - restBeta) * Math.min(1, ((now - lastBetaAt) / 1000) * REST_SETTLE_PER_S);
+        lastBetaAt = now;
+        pace = clamp(1 + (restBeta - e.beta) / PITCH_FULL_DEG, PITCH_PACE[0], PITCH_PACE[1]);
+      }
     };
     const ask = (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission;
     if (typeof ask === 'function') {
@@ -709,12 +730,12 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
         }
         // Back towards its own course after a knock (and to a stop, with
         // the rest, under reduced motion).
-        const pace = col.speed ? col.speedNow / col.speed : 0;
+        const colPace = col.speed ? col.speedNow / col.speed : 0;
         const ease = Math.min(1, dt * COURSE_EASE_PER_S);
-        item.vy += (-item.rise * pace - item.vy) * ease;
-        item.vx += (item.wander * pace - item.vx) * ease;
+        item.vy += (-item.rise * colPace * pace - item.vy) * ease;
+        item.vx += (item.wander * colPace - item.vx) * ease;
         // Leaning the phone sends the images drifting that way.
-        item.vx += tilt * TILT_PUSH_PX_S2 * pace * dt;
+        item.vx += tilt * TILT_PUSH_PX_S2 * colPace * dt;
         item.x += item.vx * dt;
         item.y += item.vy * dt;
         // Off the sides of the screen.
