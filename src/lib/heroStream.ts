@@ -647,6 +647,8 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   }
 
   function build() {
+    // Each fresh layout floats up from empty again, with its head start.
+    introStart = 0;
     measureTitle();
     touchFocused = touchCol = null;
     layer.replaceChildren();
@@ -684,9 +686,11 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       const col: Column = { el, front, over, items: [], depth, speed, speedNow: reduceMotion ? 0 : speed, centre, w, hovered: 0, shift: 0 };
       // Listed straight away, so its images count towards OVER_SHARE as they're made.
       columns.push(col);
-      // Start part-way through, so the columns don't all begin level.
-      let y = -Math.random() * height * 0.5;
-      while (y < height * 1.4) {
+      // The screen starts clear and the images float up into it from just
+      // below, the columns staggered so they don't arrive level. (With
+      // reduced motion nothing moves, so there they start in place.)
+      let y = reduceMotion ? -Math.random() * height * 0.5 : height * (1.02 + Math.random() * 0.35);
+      while (y < (reduceMotion ? height * 1.4 : height * 2.6)) {
         const item = makeItem(col);
         item.y = y;
         col.items.push(item);
@@ -738,7 +742,18 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     }
   }
 
+  // A head start as the stream first floats up into the empty screen: the
+  // rise begins INTRO_BOOST times faster and eases back to normal over
+  // INTRO_S seconds, so the screen fills in a few seconds, not half a minute.
+  const INTRO_BOOST = 3;
+  const INTRO_S = 5;
+  let intro = reduceMotion ? 1 : INTRO_BOOST;
+  let introStart = 0;
+
   function frame(now: number) {
+    if (!introStart) introStart = now;
+    const introLeft = Math.max(0, 1 - (now - introStart) / 1000 / INTRO_S);
+    intro = 1 + (INTRO_BOOST - 1) * introLeft * introLeft;
     raf = 0;
     const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
     last = now;
@@ -778,7 +793,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
         const colPace = col.speed ? col.speedNow / col.speed : 0;
         const ease = Math.min(1, dt * COURSE_EASE_PER_S);
         // Rising speed answers tilting quickly, so a change is felt at once.
-        item.vy += (-item.rise * colPace * pace - item.vy) * Math.min(1, dt * (pace === 1 ? COURSE_EASE_PER_S : PITCH_EASE_PER_S));
+        item.vy += (-item.rise * colPace * pace * intro - item.vy) * Math.min(1, dt * (pace === 1 ? COURSE_EASE_PER_S : PITCH_EASE_PER_S));
         item.vx += (item.wander * colPace - item.vx) * ease;
         // Leaning the phone sends the images drifting that way.
         item.vx += tilt * TILT_PUSH_PX_S2 * colPace * dt;
