@@ -15,46 +15,39 @@ const COLUMN_PITCH_PX = 380;
 const MIN_COLUMNS = 2;
 const MAX_COLUMNS = 5;
 // Image width as a share of a column's pitch (the rest is the gap between
-// columns). Each image then varies a touch around that (only a touch, so
-// size keeps tracking depth: big and clear near, small and hazy far), how far it sits
-// off the column's centre line, and the gap above it, so the stream doesn't
-// read as a tidy grid.
+// columns). All images in a layer are the same size (so there are just two
+// sizes, near and back); each varies in how far it sits off the column's
+// centre line and the gap above it, so the stream doesn't read as a grid.
 const IMAGE_WIDTH_SHARE = 0.68;
-const ITEM_WIDTH_RANGE = [0.95, 1.05];
 const ITEM_DRIFT_SHARE = 0.55;
-// Each image also sways gently side to side as it rises, by up to this
-// share of its column's width, over roughly this many seconds a swing, so
-// the stream reads as drifting rather than running on rails.
-const SWAY_SHARE = 0.12;
-const SWAY_PERIOD_S = [9, 15];
-const IMAGE_GAP_RANGE = [0.6, 1.6];
-// How much a column's speed may differ from its depth's speed.
-const SPEED_JITTER = 0.25;
+const IMAGE_GAP_RANGE = [0.4, 1.1];
 // How far a column may sit off the centre of its slot, as a share of pitch.
 const COLUMN_JITTER = 0.2;
-// Images are pushed about rather than placed: each eases towards its
-// column's rising speed and (sideways) back towards its own line plus sway,
-// and when two touch they bounce apart. How quickly an image takes up its
-// column's speed, how strongly it's pulled back to its line, how fast
-// sideways movement dies away, the space kept between images, and how
-// bouncy a knock is (0 dead, 1 fully elastic).
-const RISE_EASE_PER_S = 1.2;
-const HOME_SPRING = 0.8;
-const SIDE_DAMPING_PER_S = 1.4;
+// Images move freely, like things floating up through water: each rises
+// at its own speed (its column's, give or take ITEM_SPEED_JITTER) and
+// drifts sideways at its own pace (WANDER_PX_S, either way). Nothing
+// overlaps: when two touch, near or back, they bounce apart and head off
+// in new directions, then ease back to their own rise and drift over a few
+// seconds; they also bounce off the sides of the screen. How quickly an image eases back to
+// its own course, the space kept between images, and how bouncy a knock is
+// (0 dead, 1 fully elastic).
+const ITEM_SPEED_JITTER = 0.35;
+const WANDER_PX_S = [4, 12];
+const COURSE_EASE_PER_S = 0.9;
 const BUMP_GAP_PX = 10;
-const BOUNCE = 0.55;
-// Only images at about the same depth knock into each other; a near one
-// passes in front of a far one, as it would. (Colliding across depths also
-// jammed narrow screens, where the near column got held to the far one's
-// pace.) As a share of the near-to-far range.
-const BUMP_DEPTH = 0.3;
+const BOUNCE = 0.45;
+
 // How far back the back layer of images sits, between NEAR (0) and FAR (1).
-const BACK_DEPTH = 0.55;
+const BACK_DEPTH = 0.4;
+// Share of all the images that pass in front of the headline (sharp and
+// solid), drawn from those rising to either side of it; everything else
+// passes behind.
+const OVER_SHARE = 0.1;
 // Resting look and speed (px/s), from nearest column to furthest back.
 // The spread is wide so the stream reads as layers: near images are big,
 // clearer and quick, far ones small, hazy and slow, and nearer columns sit
 // in front where they overlap.
-const NEAR = { blur: 32, opacity: 0.65, speed: 42, scale: 1.2 };
+const NEAR = { blur: 32, opacity: 0.65, speed: 42, scale: 1.05 };
 const FAR = { blur: 48, opacity: 0.25, speed: 15, scale: 0.6 };
 // Moving the mouse shifts each column sideways by up to this much, more for
 // nearer columns, for a little parallax.
@@ -77,16 +70,24 @@ const UNFOCUS_MS = 700;
 // loaded as soon as an image enters the stream (they're small, 600px
 // wide), so it's ready the moment it's hovered.
 const SWAP_MS = 90;
-// "See the project" comes up in the middle of a image in focus, after a
-// pause, so a passing mouse just sees the image and the label only appears
-// once you've settled on it.
+// The label comes up along the bottom of an image in focus, after a pause
+// (so a passing mouse just sees the image and the label only appears once
+// you've settled on it): a pill with the project's name running through it
+// like a ticker tape, fading out at either end.
 const LABEL_DELAY_MS = 650;
 const LABEL_IN_MS = 900;
 const LABEL_CLASS =
-  'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-front/15 bg-grey-600 px-3.5 py-2 font-body text-[0.9375rem] leading-[1.2] text-front backdrop-blur-[14px] whitespace-nowrap pointer-events-none';
-// No image is smaller than one that fits the label with this much room
-// all round it.
-const LABEL_CLEARANCE_PX = 15;
+  'absolute bottom-[18px] left-[18px] w-3/4 block overflow-hidden rounded-full border border-front/15 bg-grey-600 py-2 font-body text-[0.9375rem] leading-[1.2] text-front backdrop-blur-[14px] whitespace-nowrap pointer-events-none';
+// The ticker's speed, how many copies of the name run round it (enough to
+// fill the pill however short the name), and how far in from each end of
+// the pill the name fades.
+const TICKER_PX_S = 28;
+const TICKER_COPIES = 8;
+const TICKER_FADE = 'linear-gradient(to right, transparent, #000 18%, #000 82%, transparent)';
+// The label is inset this far from the image's edges, and no image is
+// narrower than LABEL_MIN_WIDTH_PX plus that either side.
+const LABEL_CLEARANCE_PX = 18;
+const LABEL_MIN_WIDTH_PX = 150;
 const SPEED_EASE_PER_S = 4;
 // As the stage zooms past, each column grows around the screen's centre, so
 // it swells and spreads outward, and the stream carries on rising, faster
@@ -107,27 +108,32 @@ interface Item {
   soft: HTMLImageElement;
   sharp: HTMLImageElement;
   label: HTMLElement;
+  /** The strip of repeated project names that runs through the label. */
+  ticker: HTMLElement;
+  stroke: HTMLElement;
   image: HeroPopUpImage;
   /** Position (x from the column's left edge) and velocity, in px and px/s. */
   x: number;
   y: number;
   vx: number;
   vy: number;
-  /** Where it drifts back to sideways, from the column's left edge. */
-  home: number;
+  /** Its own rising speed and sideways drift (px/s) when nothing's in the way. */
+  rise: number;
+  wander: number;
   w: number;
   h: number;
   gap: number;
-  sway: number;
-  swayRate: number;
-  swayPhase: number;
   focused: boolean;
+  /** Sits in front of the headline (multiplied over it) rather than behind. */
+  over: boolean;
 }
 
 interface Column {
   el: HTMLElement;
   /** The column's twin in the front layer, where a image in focus moves. */
   front: HTMLElement;
+  /** Its twin in the layer in front of the headline (see overLayer). */
+  over: HTMLElement;
   items: Item[];
   depth: number;
   speed: number;
@@ -136,9 +142,6 @@ interface Column {
   w: number;
   hovered: number;
   shift: number;
-  /** Sway clock: runs with the column, so a stopped column stops swaying
-   * (an image in focus holds still rather than sliding from under you). */
-  time: number;
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -187,6 +190,17 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   frontLayer.setAttribute('aria-hidden', 'true');
   frontLayer.style.cssText = 'z-index:30;overflow:hidden;top:0;bottom:0';
   layer.after(frontLayer);
+  // And one between the headline and the front layer, for the images that
+  // pass in front of the headline rather than behind it, covering its
+  // letters as they go. (Multiply was tried here, but letting the letters
+  // show through lost the effect of passing in front.)
+  const overLayer = frontLayer.cloneNode(false) as HTMLElement;
+  overLayer.style.cssText = 'z-index:25;overflow:hidden;top:0;bottom:0';
+  layer.after(overLayer);
+  const home = (item: Item, col: Column) => (item.over ? col.over : col.el);
+  // Images behind the headline are faded back by depth; those passing in
+  // front of it are solid, so they properly cover the letters.
+  const restingOpacity = (item: Item, col: Column) => (item.over ? 1 : look(col.depth).opacity);
 
   function draw() {
     if (deck.length === 0) {
@@ -208,8 +222,24 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     };
   }
 
-  function ratio(image: HeroPopUpImage) {
-    return clamp(image.aspectRatio || 4 / 3, 0.7, 1.6);
+  // Every image is cropped to the same portrait shape, 4:5 (as on the
+  // site's portrait cards).
+  function ratio(_image: HeroPopUpImage) {
+    return 4 / 5;
+  }
+
+  // The site's card corner radius, in px.
+  const cardRadius = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--radius-card')) || 30;
+
+  // A rounded rectangle the size of the image within the soft copy's
+  // padding, blurred so its edge fades over most of that padding.
+  function softMask(w: number, h: number, radius: number) {
+    const pad = SOFT_PAD_PX;
+    const svg =
+      `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>` +
+      `<filter id='f' x='-50%' y='-50%' width='200%' height='200%'><feGaussianBlur stdDeviation='${pad / 3}'/></filter>` +
+      `<rect x='${pad}' y='${pad}' width='${w - pad * 2}' height='${h - pad * 2}' rx='${radius}' fill='#000' filter='url(#f)'/></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
   }
 
   function softUrl(image: HeroPopUpImage, blur: number) {
@@ -224,7 +254,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   // drift and gap, all varied around the column's width.
   function fill(item: Item, image: HeroPopUpImage, col: Column) {
     // Never smaller than fits the label with room around it.
-    const w = Math.max(col.w * between(ITEM_WIDTH_RANGE), minWidth, minHeight * ratio(image));
+    const w = Math.max(col.w, minWidth, minHeight * ratio(image));
     const h = w / ratio(image);
     const x = (col.w - w) / 2 + (Math.random() * 2 - 1) * col.w * ITEM_DRIFT_SHARE;
     const scale = w / SOFT_WIDTH_PX;
@@ -235,21 +265,50 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     // Gaps scale with the image itself, so small screens (where images sit
     // at their minimum size in narrow columns) aren't packed tight.
     item.gap = h * between(IMAGE_GAP_RANGE);
-    item.sway = col.w * SWAY_SHARE * between([0.4, 1]);
-    item.swayRate = (Math.PI * 2) / between(SWAY_PERIOD_S);
-    item.swayPhase = Math.random() * Math.PI * 2;
-    item.home = item.x = x;
-    item.vx = 0;
-    item.vy = -col.speedNow;
+    item.x = x;
+    // Some in front of the headline, the rest behind (a fresh pick each time
+    // an image comes round again). Only images rising to the left or right
+    // of the headline can be in front, so it's never covered; they bounce
+    // off its edges rather than drift across it (see move).
+    const centre = col.centre - col.w / 2 + x + w / 2;
+    // Kept to OVER_SHARE of all images by count rather than by chance, as
+    // only some rise at the sides.
+    const all = columns.flatMap((c) => c.items).filter((other) => other !== item);
+    const overNow = all.filter((other) => other.over).length;
+    item.over = (centre < title.l || centre > title.r) && overNow + 1 <= Math.max(1, Math.round(OVER_SHARE * (all.length + 1)));
+    if (!item.focused) {
+      home(item, col).append(item.wrap);
+      item.card.getAnimations().forEach((a) => a.cancel());
+      item.card.style.opacity = String(restingOpacity(item, col));
+    }
+    item.rise = col.speed * (1 + (Math.random() * 2 - 1) * ITEM_SPEED_JITTER);
+    item.wander = between(WANDER_PX_S) * (Math.random() < 0.5 ? -1 : 1);
+    item.vx = item.wander;
+    item.vy = -item.rise;
     item.wrap.style.width = `${w}px`;
     item.wrap.style.height = `${h}px`;
     // The soft copy's blur spreads past the image, so it's left out of
     // hit-testing: only the image itself reacts to the mouse.
-    item.soft.src = softUrl(image, Math.round(look(col.depth).blur));
+    // Images in front of the headline aren't blurred at all: they show the
+    // sharp image (set below) and skip loading a soft copy.
+    if (item.over) item.soft.removeAttribute('src');
+    else item.soft.src = softUrl(image, Math.round(look(col.depth).blur));
     item.soft.style.cssText =
       `position:absolute;display:block;max-width:none;pointer-events:none;` +
       `left:${-SOFT_PAD_PX * scale}px;top:${-SOFT_PAD_PX * scale}px;` +
       `width:${(SOFT_WIDTH_PX + SOFT_PAD_PX * 2) * scale}px;height:${(softH + SOFT_PAD_PX * 2) * scale}px`;
+    if (item.over) item.soft.style.display = 'none';
+    else {
+      // Sanity blurs the image as a square, so its blur is masked by a
+      // softened rounded rectangle with the site's card radius: the blurred
+      // image still feathers out past its edges, but around the same
+      // rounded corners as the sharp one.
+      const mask = softMask(SOFT_WIDTH_PX + SOFT_PAD_PX * 2, softH + SOFT_PAD_PX * 2, cardRadius / scale);
+      item.soft.style.setProperty('-webkit-mask-image', mask);
+      item.soft.style.setProperty('mask-image', mask);
+      item.soft.style.setProperty('-webkit-mask-size', '100% 100%');
+      item.soft.style.setProperty('mask-size', '100% 100%');
+    }
     item.sharp.src = image.url;
     // Links to the case study it came from (images added by hand in Studio
     // have none, and just sit in the stream).
@@ -258,6 +317,22 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       item.wrap.setAttribute('aria-label', image.project || image.alt);
       item.wrap.style.cursor = 'pointer';
       item.label.hidden = false;
+      // The client's name, then the project's short card copy, with a dot
+      // (given some room either side) between them and between repeats.
+      const parts = [image.project || 'See project', image.detail].filter(Boolean) as string[];
+      item.ticker.replaceChildren(
+        ...Array.from({ length: TICKER_COPIES }, () => {
+          const copy = document.createElement('span');
+          copy.style.display = 'inline-flex';
+          for (const part of parts) {
+            const dot = document.createElement('span');
+            dot.textContent = '•';
+            dot.style.margin = '0 0.6em';
+            copy.append(part, dot);
+          }
+          return copy;
+        })
+      );
     } else {
       item.wrap.removeAttribute('href');
       item.wrap.removeAttribute('aria-label');
@@ -265,9 +340,10 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       item.label.hidden = true;
     }
     item.sharp.alt = '';
-    item.sharp.style.opacity = '0';
+    item.sharp.style.opacity = item.over ? '1' : '0';
     item.sharp.getAnimations().forEach((a) => a.cancel());
     item.label.getAnimations().forEach((a) => a.cancel());
+    item.ticker.getAnimations().forEach((a) => a.cancel());
     item.soft.getAnimations().forEach((a) => a.cancel());
   }
 
@@ -308,6 +384,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       });
     };
     item.sharp.decode().then(show, show);
+    item.stroke.style.opacity = '1';
     item.label.animate(
       [
         { opacity: 0, transform: 'translateY(10px) scale(0.96)' },
@@ -315,6 +392,17 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       ],
       { duration: LABEL_IN_MS, delay: LABEL_DELAY_MS, easing: 'cubic-bezier(0.3, 0.5, 0.25, 1)', fill: 'both' }
     );
+    // The names run right to left, one copy's width per loop, so it wraps
+    // round seamlessly.
+    const copy = item.ticker.firstElementChild as HTMLElement | null;
+    if (copy && !reduceMotion) {
+      item.ticker.getAnimations().forEach((a) => a.cancel());
+      const span = copy.offsetWidth;
+      item.ticker.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${-span}px)` }], {
+        duration: (span / TICKER_PX_S) * 1000,
+        iterations: Infinity,
+      });
+    }
     item.card.animate(
       [
         { transform: getComputedStyle(item.card).transform, opacity: getComputedStyle(item.card).opacity },
@@ -331,24 +419,29 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     // Back to its own depth once it has shrunk back, so it doesn't pop
     // behind its neighbours (or the headline) mid-way.
     window.setTimeout(() => {
-      if (!item.focused && item.wrap.parentElement === col.front) col.el.append(item.wrap);
+      if (!item.focused && item.wrap.parentElement === col.front) home(item, col).append(item.wrap);
     }, UNFOCUS_MS);
     item.label.getAnimations().forEach((a) => a.cancel());
     item.label.style.opacity = '0';
-    item.soft.animate([{ opacity: getComputedStyle(item.soft).opacity }, { opacity: 1 }], {
-      duration: SWAP_MS,
-      easing: 'linear',
-      fill: 'forwards',
-    });
-    item.sharp.animate([{ opacity: getComputedStyle(item.sharp).opacity }, { opacity: 0 }], {
-      duration: SWAP_MS,
-      easing: 'linear',
-      fill: 'forwards',
-    });
+    item.ticker.getAnimations().forEach((a) => a.cancel());
+    item.stroke.style.opacity = '0';
+    // Images in front of the headline stay sharp; the rest go soft again.
+    if (!item.over) {
+      item.soft.animate([{ opacity: getComputedStyle(item.soft).opacity }, { opacity: 1 }], {
+        duration: SWAP_MS,
+        easing: 'linear',
+        fill: 'forwards',
+      });
+      item.sharp.animate([{ opacity: getComputedStyle(item.sharp).opacity }, { opacity: 0 }], {
+        duration: SWAP_MS,
+        easing: 'linear',
+        fill: 'forwards',
+      });
+    }
     item.card.animate(
       [
         { transform: getComputedStyle(item.card).transform, opacity: getComputedStyle(item.card).opacity },
-        { transform: 'scale(1)', opacity: look(col.depth).opacity },
+        { transform: 'scale(1)', opacity: restingOpacity(item, col) },
       ],
       { duration: UNFOCUS_MS, easing: 'ease-in-out', fill: 'forwards' }
     );
@@ -364,23 +457,36 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     const card = document.createElement('div');
     const soft = document.createElement('img');
     const sharp = document.createElement('img');
-    // A small version of the hero's "Watch our showreel" button, centred in
+    // A small version of the hero's "Watch our showreel" button, in the corner of
     // the image.
     const label = document.createElement('span');
-    label.textContent = 'See the project';
     label.className = LABEL_CLASS;
     label.style.opacity = '0';
+    // The names run inside a window that fades them out at either end.
+    const window_ = document.createElement('span');
+    window_.className = 'block overflow-hidden';
+    window_.style.setProperty('-webkit-mask-image', TICKER_FADE);
+    window_.style.setProperty('mask-image', TICKER_FADE);
+    const ticker = document.createElement('span');
+    ticker.className = 'inline-flex will-change-transform';
+    window_.append(ticker);
+    label.append(window_);
     soft.alt = '';
     soft.decoding = 'async';
     sharp.decoding = 'async';
-    wrap.style.cssText = `position:absolute;left:0;top:0;display:block;border-radius:8px;pointer-events:auto;will-change:transform;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none`;
-    card.style.cssText = `position:relative;width:100%;height:100%;opacity:${look(col.depth).opacity}`;
-    sharp.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;opacity:0;max-width:none';
+    wrap.style.cssText = `position:absolute;left:0;top:0;display:block;border-radius:var(--radius-card);pointer-events:auto;will-change:transform;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none`;
+    card.style.cssText = 'position:relative;width:100%;height:100%';
+    sharp.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:var(--radius-card);opacity:0;max-width:none';
     sharp.draggable = false;
     soft.draggable = false;
-    card.append(soft, sharp, label);
+    // The same thin light stroke as the nav pill and the services buttons,
+    // shown while the image is in focus.
+    const stroke = document.createElement('span');
+    stroke.className = 'pointer-events-none absolute inset-0 rounded-card border border-front/15';
+    stroke.style.cssText = 'opacity:0;transition:opacity 300ms ease-out';
+    card.append(soft, sharp, stroke, label);
     wrap.append(card);
-    const item: Item = { wrap, card, soft, sharp, label, image: images[0], x: 0, y: 0, vx: 0, vy: 0, home: 0, w: 0, h: 0, gap: 0, sway: 0, swayRate: 0, swayPhase: 0, focused: false };
+    const item: Item = { wrap, card, soft, sharp, label, ticker, stroke, image: images[0], x: 0, y: 0, vx: 0, vy: 0, rise: 0, wander: 0, w: 0, h: 0, gap: 0, focused: false, over: false };
     fill(item, draw(), col);
 
     wrap.addEventListener('pointerenter', (e) => {
@@ -418,20 +524,43 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   function measureLabel() {
     const probe = document.createElement('span');
     probe.className = LABEL_CLASS;
-    probe.textContent = 'See the project';
+    probe.textContent = 'Ag';
     probe.style.visibility = 'hidden';
     layer.append(probe);
-    const { width, height } = probe.getBoundingClientRect();
+    const { height } = probe.getBoundingClientRect();
     probe.remove();
-    minWidth = width + LABEL_CLEARANCE_PX * 2;
+    minWidth = LABEL_MIN_WIDTH_PX + LABEL_CLEARANCE_PX * 2;
     minHeight = height + LABEL_CLEARANCE_PX * 2;
   }
 
+  // The headline's box in the layer's coordinates, with a little room
+  // around it, for the images in front of it to keep clear of.
+  const TITLE_CLEARANCE_PX = 16;
+  let title = { l: 0, r: 0, t: 0, b: 0 };
+  function measureTitle() {
+    const headline = layer.parentElement?.querySelector('h1');
+    if (!headline) return;
+    // The words themselves, not the heading's box (which is a fixed column
+    // width, much wider than the text).
+    const range = document.createRange();
+    range.selectNodeContents(headline);
+    const h = range.getBoundingClientRect();
+    const box = layer.getBoundingClientRect();
+    title = {
+      l: h.left - box.left - TITLE_CLEARANCE_PX,
+      r: h.right - box.left + TITLE_CLEARANCE_PX,
+      t: h.top - box.top - TITLE_CLEARANCE_PX,
+      b: h.bottom - box.top + TITLE_CLEARANCE_PX,
+    };
+  }
+
   function build() {
+    measureTitle();
     touchFocused = touchCol = null;
     layer.replaceChildren();
     measureLabel();
     frontLayer.replaceChildren();
+    overLayer.replaceChildren();
     columns = [];
     width = layer.clientWidth;
     const height = layer.clientHeight;
@@ -439,12 +568,9 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     const count = clamp(Math.round(width / COLUMN_PITCH_PX), MIN_COLUMNS, MAX_COLUMNS);
     const pitch = width / count;
     // Two layers, near and back, shared out evenly and shuffled across the
-    // columns, with a little randomness within each. The back layer sits
-    // part-way to FAR rather than all the way, so nothing ends up tiny and
-    // very hazy.
-    const depths = Array.from({ length: count }, (_, i) =>
-      clamp((i % 2 ? BACK_DEPTH : 0) + (Math.random() * 2 - 1) * 0.05, 0, 1)
-    );
+    // columns: just two image sizes. The back layer sits part-way to FAR
+    // rather than all the way, so nothing ends up tiny and very hazy.
+    const depths = Array.from({ length: count }, (_, i): number => (i % 2 ? BACK_DEPTH : 0));
     for (let i = depths.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [depths[i], depths[j]] = [depths[j], depths[i]];
@@ -452,7 +578,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     for (let c = 0; c < count; c++) {
       const depth = depths[c];
       const { scale } = look(depth);
-      const speed = look(depth).speed * (1 + (Math.random() * 2 - 1) * SPEED_JITTER);
+      const speed = look(depth).speed;
       const w = pitch * IMAGE_WIDTH_SHARE * scale;
       const centre = pitch * (c + 0.5) + (Math.random() * 2 - 1) * pitch * COLUMN_JITTER;
       const el = document.createElement('div');
@@ -460,23 +586,28 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       const front = document.createElement('div');
       front.style.cssText = el.style.cssText;
       frontLayer.append(front);
-      const col: Column = { el, front, items: [], depth, speed, speedNow: reduceMotion ? 0 : speed, centre, w, hovered: 0, shift: 0, time: Math.random() * 100 };
+      const over = document.createElement('div');
+      over.style.cssText = el.style.cssText;
+      overLayer.append(over);
+      const col: Column = { el, front, over, items: [], depth, speed, speedNow: reduceMotion ? 0 : speed, centre, w, hovered: 0, shift: 0 };
+      // Listed straight away, so its images count towards OVER_SHARE as they're made.
+      columns.push(col);
       // Start part-way through, so the columns don't all begin level.
       let y = -Math.random() * height * 0.5;
       while (y < height * 1.4) {
         const item = makeItem(col);
         item.y = y;
         col.items.push(item);
-        el.append(item.wrap);
         y += item.h + item.gap;
       }
       layer.append(el);
-      columns.push(col);
     }
     place();
     // Fade in, one column after another.
     columns.forEach((col, i) =>
-      col.el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 900, delay: 120 * i, easing: 'ease-out', fill: 'backwards' })
+      [col.el, col.over].forEach((el) =>
+        el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 900, delay: 120 * i, easing: 'ease-out', fill: 'backwards' })
+      )
     );
   }
 
@@ -498,8 +629,10 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       col.el.style.transformOrigin = `${width / 2 - (col.centre - col.w / 2)}px ${height / 2}px`;
       const rise = zoom * height * lerp(ZOOM_RISE.near, ZOOM_RISE.far, col.depth);
       col.el.style.transform = `translate3d(${col.shift}px, ${-rise}px, 0)` + (zoom > 0 ? ` scale(${1 + zoom * (grow - 1)})` : '');
-      col.front.style.transformOrigin = col.el.style.transformOrigin;
-      col.front.style.transform = col.el.style.transform;
+      for (const twin of [col.front, col.over]) {
+        twin.style.transformOrigin = col.el.style.transformOrigin;
+        twin.style.transform = col.el.style.transform;
+      }
     }
   }
 
@@ -508,9 +641,8 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
     last = now;
     for (const col of columns) {
-      const target = reduceMotion || col.hovered ? 0 : col.speed;
+      const target = reduceMotion ? 0 : col.speed;
       col.speedNow += (target - col.speedNow) * Math.min(1, dt * SPEED_EASE_PER_S);
-      if (col.speed) col.time += dt * (col.speedNow / col.speed);
       if (!reduceMotion) {
         const shiftTarget = -pointerX * PARALLAX_PX * (1 - col.depth * 0.85);
         col.shift += (shiftTarget - col.shift) * Math.min(1, dt * PARALLAX_EASE_PER_S);
@@ -519,6 +651,13 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     if (dt) move(dt);
     place();
     schedule();
+  }
+
+  function box(item: Item, left: number) {
+    const grow = item.focused ? (HOVER_SCALE - 1) / 2 : 0;
+    const l = left + item.x - item.w * grow;
+    const t = item.y - item.h * grow;
+    return { l, t, r: l + item.w * (1 + grow * 2), b: t + item.h * (1 + grow * 2) };
   }
 
   // Moves every image on by its velocity, then knocks apart any that touch.
@@ -532,12 +671,48 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
           item.vx = item.vy = 0;
           continue;
         }
-        item.vy += (-col.speedNow - item.vy) * Math.min(1, dt * RISE_EASE_PER_S);
-        const lineX = item.home + Math.sin(col.time * item.swayRate + item.swayPhase) * item.sway;
-        item.vx += (lineX - item.x) * HOME_SPRING * dt;
-        item.vx *= Math.exp(-SIDE_DAMPING_PER_S * dt);
+        // Back towards its own course after a knock (and to a stop, with
+        // the rest, under reduced motion).
+        const pace = col.speed ? col.speedNow / col.speed : 0;
+        const ease = Math.min(1, dt * COURSE_EASE_PER_S);
+        item.vy += (-item.rise * pace - item.vy) * ease;
+        item.vx += (item.wander * pace - item.vx) * ease;
         item.x += item.vx * dt;
         item.y += item.vy * dt;
+        // Off the sides of the screen.
+        const leftEdge = left + item.x;
+        if (leftEdge < 0 && item.vx < 0) {
+          item.x = -left;
+          item.vx = -item.vx;
+          item.wander = Math.abs(item.wander);
+        } else if (leftEdge + item.w > width && item.vx > 0) {
+          item.x = width - left - item.w;
+          item.vx = -item.vx;
+          item.wander = -Math.abs(item.wander);
+        }
+        // Images in front of the headline keep out of the middle of the
+        // screen (the band as wide as the headline's words), all the way up,
+        // so they never run up through the title. The band's edges work like
+        // the screen's: an image drifting in bounces back out. (Running the
+        // full height, they can only ever meet it side-on, slowly, so it
+        // never jumps.)
+        if (item.over) {
+          const l = left + item.x;
+          // If another image knocks one deep in, it's eased back out over a
+          // few frames rather than snapped.
+          const ease = Math.min(1, dt * 12);
+          if (l + item.w / 2 < (title.l + title.r) / 2) {
+            if (l + item.w > title.l) {
+              item.x += (title.l - item.w - left - item.x) * ease;
+              item.vx = -Math.abs(item.vx);
+              item.wander = -Math.abs(item.wander);
+            }
+          } else if (l < title.r) {
+            item.x += (title.r - left - item.x) * ease;
+            item.vx = Math.abs(item.vx);
+            item.wander = Math.abs(item.wander);
+          }
+        }
       }
     }
     // Every pair, as boxes with BUMP_GAP_PX kept between them: pushed apart
@@ -546,15 +721,16 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     // (the others bounce off it). Heavier (bigger) images push harder.
     for (let i = 0; i < all.length; i++) {
       const a = all[i];
-      const al = a.left + a.item.x;
       for (let j = i + 1; j < all.length; j++) {
         const b = all[j];
         if (a.item.focused && b.item.focused) continue;
-        if (Math.abs(a.col.depth - b.col.depth) > BUMP_DEPTH) continue;
-        const bl = b.left + b.item.x;
-        const ox = Math.min(al + a.item.w, bl + b.item.w) - Math.max(al, bl) + BUMP_GAP_PX;
+        // An image in focus is drawn HOVER_SCALE bigger (around its centre),
+        // so it takes up that much more room.
+        const A = box(a.item, a.left);
+        const B = box(b.item, b.left);
+        const ox = Math.min(A.r, B.r) - Math.max(A.l, B.l) + BUMP_GAP_PX;
         if (ox <= 0) continue;
-        const oy = Math.min(a.item.y + a.item.h, b.item.y + b.item.h) - Math.max(a.item.y, b.item.y) + BUMP_GAP_PX;
+        const oy = Math.min(A.b, B.b) - Math.max(A.t, B.t) + BUMP_GAP_PX;
         if (oy <= 0) continue;
         const ia = a.item.focused ? 0 : 1 / (a.item.w * a.item.h);
         const ib = b.item.focused ? 0 : 1 / (b.item.w * b.item.h);
@@ -562,10 +738,11 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
         if (!share) continue;
         const horizontal = ox < oy;
         // Which way b sits from a, along that axis.
-        const dir = horizontal
-          ? Math.sign(bl + b.item.w / 2 - (al + a.item.w / 2)) || 1
-          : Math.sign(b.item.y + b.item.h / 2 - (a.item.y + a.item.h / 2)) || 1;
-        const push = (horizontal ? ox : oy) * 0.5;
+        const dir = horizontal ? Math.sign(B.l + B.r - A.l - A.r) || 1 : Math.sign(B.t + B.b - A.t - A.b) || 1;
+        // Half the overlap is cleared each frame, so a knock eases apart over
+        // a few frames instead of jumping; up against an image in focus
+        // (which never moves, and mustn't be covered) it's cleared at once.
+        const push = (horizontal ? ox : oy) * (a.item.focused || b.item.focused ? 1 : 0.5);
         const va = horizontal ? a.item.vx : a.item.vy;
         const vb = horizontal ? b.item.vx : b.item.vy;
         const closing = (vb - va) * dir;
@@ -608,7 +785,10 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
 
   build();
   // Measured again once the real font is in, for images from then on.
-  document.fonts?.ready.then(measureLabel);
+  document.fonts?.ready.then(() => {
+    measureLabel();
+    measureTitle();
+  });
   schedule();
 
   return {
@@ -626,8 +806,10 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       // past, so a faded image can't swallow clicks on what's behind.
       layer.style.opacity = progress ? String(clamp(1 - progress * 1.25, 0, 1)) : '';
       layer.style.visibility = progress >= 0.8 ? 'hidden' : '';
-      frontLayer.style.opacity = layer.style.opacity;
-      frontLayer.style.visibility = layer.style.visibility;
+      for (const twin of [frontLayer, overLayer]) {
+        twin.style.opacity = layer.style.opacity;
+        twin.style.visibility = layer.style.visibility;
+      }
       for (const col of columns) for (const item of col.items) item.wrap.style.pointerEvents = away ? 'none' : 'auto';
       place();
     },

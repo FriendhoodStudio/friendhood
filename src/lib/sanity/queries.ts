@@ -165,6 +165,7 @@ const HERO_QUERY = `*[_type == "hero"][0]{
   "popUpImages": popUpImages[]{ asset, alt, "aspectRatio": asset->metadata.dimensions.aspectRatio },
   "projectPopUpImages": *[_type == "project" && comingSoon != true && defined(slug.current)]{
     title,
+    detail,
     "slug": slug.current,
     "images": [heroImage, ...body[_type == "mediaBlock"].items[_type == "image"]][0...5]{
       asset,

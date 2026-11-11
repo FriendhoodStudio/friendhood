@@ -239,7 +239,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
           <button
             type="button"
             data-reel-trigger
-            class="reel-trigger-btn absolute bottom-[var(--page-margin)] left-[var(--page-margin)] cursor-pointer rounded-full border border-front/15 bg-grey-600 px-btn-x py-btn-y font-body text-body-3 text-front backdrop-blur-[14px] transition-[color,opacity,visibility] duration-300 ease-out hover:text-accent-yellow data-[past=true]:invisible data-[past=true]:opacity-0"
+            class="reel-trigger-btn absolute bottom-6 left-6 cursor-pointer rounded-full border border-front/15 bg-grey-600 px-btn-x py-btn-y font-body text-body-3 text-front backdrop-blur-[14px] transition-[color,opacity,visibility] duration-300 ease-out hover:text-accent-yellow data-[past=true]:invisible data-[past=true]:opacity-0"
           >
             Watch our showreel
           </button>
@@ -303,17 +303,6 @@ const afterParts = headlineAfter.split(/(\s+)/);
      why it's a separate family name rather than a font-weight on the
      existing one). Falls back to the Regular weight, then sans-serif, if
      the Heavy file fails to load. */
-  /* The headline is drawn white in difference mode, so it always reads
-     against what's behind it: near-black over the cream page (much as the
-     light-theme dark it used to be), light once the backdrop goes dark, and
-     the inverse colours where an image rises behind a word. White beats the
-     colour the stage script sets inline as you scroll, since difference
-     already does that job. */
-  .hero-headline-shadow {
-    mix-blend-mode: difference;
-    color: #fff !important;
-  }
-
   .hero-headline-heavy-font {
     font-family: "Greed Extended Heavy", "Greed Extended", sans-serif;
   }

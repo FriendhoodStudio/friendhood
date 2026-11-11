@@ -28,4 +28,6 @@ export interface HeroPopUpImage {
   /** The case study the image came from, when it was picked from one. */
   href?: string;
   project?: string;
+  /** The project's short card copy. */
+  detail?: string;
 }

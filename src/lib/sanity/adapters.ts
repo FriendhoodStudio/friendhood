@@ -262,7 +262,7 @@ export interface RawHero extends RawMedia {
   reelVideoUrl?: string;
   popUpImagesEnabled?: boolean;
   popUpImages?: RawPopUpImage[] | null;
-  projectPopUpImages?: { title: string; slug?: string; images: RawPopUpImage[] | null }[];
+  projectPopUpImages?: { title: string; detail?: string; slug?: string; images: RawPopUpImage[] | null }[];
 }
 
 interface RawPopUpImage {
@@ -290,7 +290,7 @@ function toPopUpImages(raw: RawHero): HeroPopUpImage[] {
       url: urlFor(image.asset!).width(600).fit('max').url(),
       alt: image.alt || fallbackAlt,
       aspectRatio: image.aspectRatio || 4 / 3,
-      ...(project?.slug ? { href: `/work/${project.slug}`, project: project.title } : {}),
+      ...(project?.slug ? { href: `/work/${project.slug}`, project: project.title, detail: project.detail } : {}),
     }));
 }
 
