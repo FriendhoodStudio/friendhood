@@ -67,9 +67,10 @@ const PITCH_PACE = [0.1, 4];
 const PITCH_EASE_PER_S = 3;
 const REST_SETTLE_PER_S = 0.08;
 // Upside down: how far over the phone has to be (the sine of its forwards
-// tilt below this), and how fast the images then fall, as a multiple of
-// their usual rise.
-const UPSIDE_DOWN_SIN = -0.25;
+// tilt below this: well past lying flat, so an ordinary tilt back that
+// goes a little past flat still just speeds the stream up), and how fast
+// the images then fall, as a multiple of their usual rise.
+const UPSIDE_DOWN_SIN = -0.8;
 const FALL_PACE = 2.2;
 // Hover: how much the image grows, how long it takes to come into focus
 // and go soft again, and how quickly its column slows and recovers.
