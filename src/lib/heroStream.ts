@@ -34,7 +34,7 @@ const COLUMN_JITTER = 0.2;
 const ITEM_SPEED_JITTER = 0.35;
 const WANDER_PX_S = [4, 12];
 const COURSE_EASE_PER_S = 0.9;
-const BUMP_GAP_PX = 10;
+const BUMP_GAP_PX = 36;
 const BOUNCE = 0.45;
 
 // How far back the back layer of images sits, between NEAR (0) and FAR (1).
@@ -60,8 +60,9 @@ const PARALLAX_EASE_PER_S = 3;
 // NEAR and FAR.
 const SOFT_WIDTH_PX = 160;
 const SOFT_PAD_PX = 24;
-// How far the blurred copy may spill past the image's rounded edge.
-const SOFT_SPILL_PX = 10;
+// How far out into its padding the blurred copy is clipped (0 at the
+// image's edge, 1 at the padding's outer edge).
+const SOFT_SPILL_SHARE = 0.75;
 // Hover: how much the image grows, how long it takes to come into focus
 // and go soft again, and how quickly its column slows and recovers.
 const HOVER_SCALE = 1.12;
@@ -318,13 +319,14 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       `width:${(SOFT_WIDTH_PX + SOFT_PAD_PX * 2) * scale}px;height:${(softH + SOFT_PAD_PX * 2) * scale}px`;
     if (item.crisp) item.soft.style.display = 'none';
     // Sanity blurs the image as a square, so the blurred copy is clipped to
-    // the image's own rounded shape grown by SOFT_SPILL_PX all round: the
-    // corners follow the card radius, while the blur still spills softly
-    // past the edges. (An SVG mask did this more softly, but masks on
+    // a rounded shape to soften its corners. The clip sits most of the way
+    // out into the padding, where the blur has already faded, so it never
+    // shows as a hard edge. (An SVG mask did this more softly, but masks on
     // moving images flickered on phones.)
     else {
-      const inset = SOFT_PAD_PX * scale - SOFT_SPILL_PX;
-      item.soft.style.clipPath = `inset(${inset}px round ${cardRadius + SOFT_SPILL_PX}px)`;
+      const spill = SOFT_PAD_PX * scale * SOFT_SPILL_SHARE;
+      const inset = SOFT_PAD_PX * scale - spill;
+      item.soft.style.clipPath = `inset(${inset}px round ${cardRadius + spill}px)`;
     }
     item.sharp.src = image.url;
     // Links to the case study it came from (images added by hand in Studio
@@ -745,9 +747,6 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       for (let j = i + 1; j < all.length; j++) {
         const b = all[j];
         if (a.item.focused && b.item.focused) continue;
-        // Images in front of the headline pass over the ones behind it
-        // rather than knocking them (an image in focus still pushes all).
-        if (a.item.over !== b.item.over && !a.item.focused && !b.item.focused) continue;
         // An image in focus is drawn HOVER_SCALE bigger (around its centre),
         // so it takes up that much more room.
         const A = box(a.item, a.left);
