@@ -31,24 +31,19 @@ const COLUMN_JITTER = 0.12;
 // The spread is wide so the stream reads as layers: near images are big,
 // clearer and quick, far ones small, hazy and slow, and nearer columns sit
 // in front where they overlap.
-const NEAR = { blur: 30, opacity: 0.8, speed: 42, scale: 1.2 };
-const FAR = { blur: 100, opacity: 0.25, speed: 9, scale: 0.6 };
+const NEAR = { blur: 12, opacity: 0.8, speed: 42, scale: 1.2 };
+const FAR = { blur: 110, opacity: 0.25, speed: 9, scale: 0.6 };
 // Moving the mouse shifts each column sideways by up to this much, more for
 // nearer columns, for a little parallax.
 const PARALLAX_PX = 28;
 const PARALLAX_EASE_PER_S = 3;
-// Soft copies are blurred once, up front, rather than live with CSS (which
-// on moving images is too heavy for Chrome). Each is drawn as a circle on
-// a small transparent canvas and blurred there, so the blur works on the
-// round bubble itself: colour bleeds softly out past its edge in every
-// direction, with no ring where a blurred square was cut to a circle (as
-// with Sanity's blur plus a mask). Sizes in canvas pixels: the circle's
-// diameter, and the transparent margin the blur spreads into.
-const SOFT_DIAMETER = 96;
-const SOFT_PAD = 40;
-// Blur as a share of the diameter, at the nearest and furthest depth.
-const SOFT_BLUR_NEAR = 0.025;
-const SOFT_BLUR_FAR = 0.17;
+// Soft copies are blurred by Sanity's image service, on a small copy
+// SOFT_WIDTH_PX wide inside SOFT_PAD_PX of clear padding the blur feathers
+// out into, rather than live with CSS (too heavy for Chrome on moving
+// images). Blur strength (in Sanity's units) comes from the depth: see
+// NEAR and FAR.
+const SOFT_WIDTH_PX = 160;
+const SOFT_PAD_PX = 24;
 // Hover: how much the image grows, how long it takes to come into focus
 // and go soft again, and how quickly its column slows and recovers.
 const HOVER_SCALE = 1.12;
@@ -59,15 +54,15 @@ const UNFOCUS_MS = 700;
 // loaded as soon as an image enters the stream (they're small, 600px
 // wide), so it's ready the moment it's hovered.
 const SWAP_MS = 90;
-// "See the project" comes up in the middle of a bubble in focus, after a
+// "See the project" comes up in the middle of a image in focus, after a
 // pause, so a passing mouse just sees the image and the label only appears
 // once you've settled on it.
 const LABEL_DELAY_MS = 650;
 const LABEL_IN_MS = 900;
 const LABEL_CLASS =
   'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-front/15 bg-grey-600 px-3.5 py-2 font-body text-[0.9375rem] leading-[1.2] text-front backdrop-blur-[14px] whitespace-nowrap pointer-events-none';
-// No bubble is smaller than one that fits the label with this much room
-// all round it (measured to the circle's edge).
+// No image is smaller than one that fits the label with this much room
+// all round it.
 const LABEL_CLEARANCE_PX = 15;
 const SPEED_EASE_PER_S = 4;
 // As the stage zooms past, each column grows around the screen's centre, so
@@ -78,7 +73,7 @@ const SPEED_EASE_PER_S = 4;
 // rushing past while the stream rises more slowly behind it, each layer at
 // its own pace, is what gives the depth and parallax.
 const ZOOM_GROW = { near: 1.6, far: 1.15 };
-// How far into the zoom the stream counts as scrolled away (bubbles let go
+// How far into the zoom the stream counts as scrolled away (images let go
 // and stop taking taps).
 const ZOOM_AWAY = 0.03;
 const ZOOM_RISE = { near: 0.45, far: 0.12 };
@@ -99,7 +94,7 @@ interface Item {
 
 interface Column {
   el: HTMLElement;
-  /** The column's twin in the front layer, where a bubble in focus moves. */
+  /** The column's twin in the front layer, where a image in focus moves. */
   front: HTMLElement;
   items: Item[];
   depth: number;
@@ -145,9 +140,9 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   layer.style.overflow = 'hidden';
   layer.style.top = '0';
   layer.style.bottom = '0';
-  // A second, matching layer in front of the headline. A bubble in focus
+  // A second, matching layer in front of the headline. A image in focus
   // moves into it (into its column's twin there, which follows the column
-  // exactly), so it comes in front of the other bubbles and the headline.
+  // exactly), so it comes in front of the other images and the headline.
   const frontLayer = document.createElement('div');
   frontLayer.className = layer.className;
   // Including Astro's scoping attribute, so the hero's layer styles (its
@@ -179,34 +174,27 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     };
   }
 
-  // Every image is a circle, like a thought bubble rising from the
-  // headline, so each is cropped square (the circle is cut from that).
-  function ratio(_image: HeroPopUpImage) {
-    return 1;
+  function ratio(image: HeroPopUpImage) {
+    return clamp(image.aspectRatio || 4 / 3, 0.7, 1.6);
   }
 
-  // One soft bubble per image and blur level, made once and reused.
-  const softCache = new Map<string, Promise<string>>();
-  function softBubble(image: HeroPopUpImage, depth: number) {
-    // A handful of blur levels, so bubbles can be shared between columns.
-    const level = Math.round(depth * 4) / 4;
-    const key = `${image.url}|${level}`;
-    let made = softCache.get(key);
-    if (!made) {
-      made = makeSoftBubble(image.url, lerp(SOFT_BLUR_NEAR, SOFT_BLUR_FAR, level) * SOFT_DIAMETER);
-      softCache.set(key, made);
-    }
-    return made;
+  function softUrl(image: HeroPopUpImage, blur: number) {
+    const softH = Math.round(SOFT_WIDTH_PX / ratio(image));
+    return (
+      `${image.url.split('?')[0]}?w=${SOFT_WIDTH_PX + SOFT_PAD_PX * 2}&h=${softH + SOFT_PAD_PX * 2}` +
+      `&fit=crop&pad=${SOFT_PAD_PX}&bg=00F9F7F2&blur=${blur}&fm=webp&q=70`
+    );
   }
 
   // Sets (or swaps) the image an item shows, with its own size, sideways
   // drift and gap, all varied around the column's width.
   function fill(item: Item, image: HeroPopUpImage, col: Column) {
-    const w = Math.max(col.w * between(ITEM_WIDTH_RANGE), minDiameter);
+    // Never smaller than fits the label with room around it.
+    const w = Math.max(col.w * between(ITEM_WIDTH_RANGE), minWidth, minHeight * ratio(image));
     const h = w / ratio(image);
     const x = (col.w - w) / 2 + (Math.random() * 2 - 1) * col.w * ITEM_DRIFT_SHARE;
-    const scale = w / SOFT_DIAMETER;
-    const size = (SOFT_DIAMETER + SOFT_PAD * 2) * scale;
+    const scale = w / SOFT_WIDTH_PX;
+    const softH = Math.round(SOFT_WIDTH_PX / ratio(image));
     item.image = image;
     item.w = w;
     item.h = h;
@@ -214,20 +202,13 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     item.wrap.style.left = `${x}px`;
     item.wrap.style.width = `${w}px`;
     item.wrap.style.height = `${h}px`;
+    // The soft copy's blur spreads past the image, so it's left out of
+    // hit-testing: only the image itself reacts to the mouse.
+    item.soft.src = softUrl(image, Math.round(look(col.depth).blur));
     item.soft.style.cssText =
-      // The soft bubble spreads well past the circle, so it's left out of
-      // hit-testing: only the circle itself reacts to the mouse.
-      `position:absolute;display:block;max-width:none;pointer-events:none;opacity:0;transition:opacity 400ms ease-out;` +
-      `left:${-SOFT_PAD * scale}px;top:${-SOFT_PAD * scale}px;width:${size}px;height:${size}px`;
-    item.soft.removeAttribute('src');
-    softBubble(image, col.depth).then(
-      (url) => {
-        if (item.image !== image) return;
-        item.soft.src = url;
-        item.soft.style.opacity = '';
-      },
-      () => {}
-    );
+      `position:absolute;display:block;max-width:none;pointer-events:none;` +
+      `left:${-SOFT_PAD_PX * scale}px;top:${-SOFT_PAD_PX * scale}px;` +
+      `width:${(SOFT_WIDTH_PX + SOFT_PAD_PX * 2) * scale}px;height:${(softH + SOFT_PAD_PX * 2) * scale}px`;
     item.sharp.src = image.url;
     // Links to the case study it came from (images added by hand in Studio
     // have none, and just sit in the stream).
@@ -249,7 +230,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     item.soft.getAnimations().forEach((a) => a.cancel());
   }
 
-  // The bubble a tap has brought into focus on a touch screen, if any.
+  // The image a tap has brought into focus on a touch screen, if any.
   let touchFocused: Item | null = null;
   let touchCol: Column | null = null;
   function releaseTouch() {
@@ -268,7 +249,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     if (item.focused) return;
     item.focused = true;
     col.hovered++;
-    // In front of every other bubble, and the headline, while in focus.
+    // In front of every other image, and the headline, while in focus.
     if (item.wrap.parentElement !== col.front) col.front.append(item.wrap);
     // The soft copy is blurred past the image's edges, so it fades out as
     // the sharp one comes in: no glow around the image in focus.
@@ -343,7 +324,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     const soft = document.createElement('img');
     const sharp = document.createElement('img');
     // A small version of the hero's "Watch our showreel" button, centred in
-    // the bubble.
+    // the image.
     const label = document.createElement('span');
     label.textContent = 'See the project';
     label.className = LABEL_CLASS;
@@ -351,9 +332,9 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     soft.alt = '';
     soft.decoding = 'async';
     sharp.decoding = 'async';
-    wrap.style.cssText = `position:absolute;left:0;top:0;display:block;border-radius:50%;pointer-events:auto;will-change:transform;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none`;
+    wrap.style.cssText = `position:absolute;left:0;top:0;display:block;border-radius:8px;pointer-events:auto;will-change:transform;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none`;
     card.style.cssText = `position:relative;width:100%;height:100%;opacity:${look(col.depth).opacity}`;
-    sharp.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;opacity:0;max-width:none';
+    sharp.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;opacity:0;max-width:none';
     sharp.draggable = false;
     soft.draggable = false;
     card.append(soft, sharp, label);
@@ -368,9 +349,9 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       if (e.pointerType === 'mouse') unfocus(item, col);
     });
     // Touch has no hover, so a tap stands in for it: the first tap brings
-    // the bubble into focus (and, after the pause, its label) and holds it
+    // the image into focus (and, after the pause, its label) and holds it
     // there; a second tap opens the case study. Tapping elsewhere, another
-    // bubble, or scrolling sends it back. Acting on the finished tap rather
+    // image, or scrolling sends it back. Acting on the finished tap rather
     // than the press means a swipe to scroll never sets it off.
     let pointerType = '';
     wrap.addEventListener('pointerdown', (e) => {
@@ -390,9 +371,9 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     return item;
   }
 
-  // The smallest bubble the label fits in with LABEL_CLEARANCE_PX to spare:
-  // the circle has to reach the label's corners, plus the clearance.
-  let minDiameter = 0;
+  // The smallest image the label fits in with LABEL_CLEARANCE_PX to spare.
+  let minWidth = 0;
+  let minHeight = 0;
   function measureLabel() {
     const probe = document.createElement('span');
     probe.className = LABEL_CLASS;
@@ -401,7 +382,8 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     layer.append(probe);
     const { width, height } = probe.getBoundingClientRect();
     probe.remove();
-    minDiameter = Math.hypot(width, height) + LABEL_CLEARANCE_PX * 2;
+    minWidth = width + LABEL_CLEARANCE_PX * 2;
+    minHeight = height + LABEL_CLEARANCE_PX * 2;
   }
 
   function build() {
@@ -517,7 +499,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   }).observe(layer);
 
   build();
-  // Measured again once the real font is in, for bubbles from then on.
+  // Measured again once the real font is in, for images from then on.
   document.fonts?.ready.then(measureLabel);
   schedule();
 
@@ -527,7 +509,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     zoomPast(progress: number) {
       // Only a real scroll counts: on phones the stage can sit a hair past
       // zero at rest (the browser's toolbar, overscroll at the top), and
-      // treating that as "flying past" dropped tapped bubbles and switched
+      // treating that as "flying past" dropped tapped images and switched
       // off taps altogether.
       const away = progress > ZOOM_AWAY;
       if (away) releaseTouch();
@@ -554,83 +536,3 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   };
 }
 
-// Draws the image as a circle on a transparent canvas and blurs it there
-// (a three-pass box blur, close to a Gaussian, on premultiplied colour so
-// the edge fades to clear rather than to a dark fringe). Done by hand
-// rather than with the canvas's own filter, which older Safari lacks.
-async function makeSoftBubble(url: string, blur: number): Promise<string> {
-  const img = new Image();
-  img.decoding = 'async';
-  // Fetched through the site's own /cdn-image path (a rewrite to Sanity's
-  // image CDN, in vercel.json and the dev server's proxy): reading pixels
-  // back from a canvas needs the image to be same-origin or CORS-allowed,
-  // and Sanity only allows the origins listed in the project's settings.
-  // Not marked crossOrigin: it's same-origin now, and a CORS-mode request
-  // would pass the site's Origin header on to Sanity, which refuses it.
-  const path = url.split('?')[0].replace(/^https:\/\/cdn\.sanity\.io\/images\//, '/cdn-image/');
-  img.src = `${path}?w=${SOFT_DIAMETER * 2}&h=${SOFT_DIAMETER * 2}&fit=crop&fm=jpg&q=75`;
-  await img.decode();
-  const size = SOFT_DIAMETER + SOFT_PAD * 2;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-  ctx.beginPath();
-  ctx.arc(size / 2, size / 2, SOFT_DIAMETER / 2, 0, Math.PI * 2);
-  ctx.clip();
-  ctx.drawImage(img, SOFT_PAD, SOFT_PAD, SOFT_DIAMETER, SOFT_DIAMETER);
-  const data = ctx.getImageData(0, 0, size, size);
-  blurRGBA(data.data, size, size, blur);
-  ctx.putImageData(data, 0, 0);
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-  if (!blob) throw new Error('soft bubble');
-  return URL.createObjectURL(blob);
-}
-
-function blurRGBA(px: Uint8ClampedArray, w: number, h: number, sigma: number) {
-  const n = w * h;
-  const ch = [0, 1, 2, 3].map(() => new Float32Array(n));
-  for (let i = 0; i < n; i++) {
-    const a = px[i * 4 + 3] / 255;
-    ch[0][i] = px[i * 4] * a;
-    ch[1][i] = px[i * 4 + 1] * a;
-    ch[2][i] = px[i * 4 + 2] * a;
-    ch[3][i] = px[i * 4 + 3];
-  }
-  // Box radius for three passes approximating a Gaussian of this sigma.
-  const radius = Math.max(1, Math.round(Math.sqrt((12 * sigma * sigma) / 3 + 1) / 2));
-  const tmp = new Float32Array(n);
-  for (const c of ch) {
-    for (let pass = 0; pass < 3; pass++) {
-      boxPass(c, tmp, w, h, radius, true);
-      boxPass(tmp, c, w, h, radius, false);
-    }
-  }
-  for (let i = 0; i < n; i++) {
-    const a = ch[3][i];
-    const k = a > 0 ? 255 / a : 0;
-    px[i * 4] = ch[0][i] * k;
-    px[i * 4 + 1] = ch[1][i] * k;
-    px[i * 4 + 2] = ch[2][i] * k;
-    px[i * 4 + 3] = a;
-  }
-}
-
-function boxPass(src: Float32Array, dst: Float32Array, w: number, h: number, r: number, horizontal: boolean) {
-  const lines = horizontal ? h : w;
-  const len = horizontal ? w : h;
-  const step = horizontal ? 1 : w;
-  const span = r * 2 + 1;
-  for (let line = 0; line < lines; line++) {
-    const start = horizontal ? line * w : line;
-    let sum = 0;
-    // Outside the canvas counts as clear.
-    for (let k = 0; k <= r && k < len; k++) sum += src[start + k * step];
-    for (let i = 0; i < len; i++) {
-      dst[start + i * step] = sum / span;
-      const add = i + r + 1;
-      const drop = i - r;
-      if (add < len) sum += src[start + add * step];
-      if (drop >= 0) sum -= src[start + drop * step];
-    }
-  }
-}
