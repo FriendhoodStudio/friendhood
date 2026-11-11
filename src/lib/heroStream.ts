@@ -64,6 +64,11 @@ const TILT_PUSH_PX_S2 = 60;
 const PITCH_FULL_DEG = 20;
 const PITCH_PACE = [0.25, 2.5];
 const REST_SETTLE_PER_S = 0.08;
+// Upside down: how far over the phone has to be (the sine of its forwards
+// tilt below this), and how fast the images then fall, as a multiple of
+// their usual rise.
+const UPSIDE_DOWN_SIN = -0.25;
+const FALL_PACE = 2.2;
 // Hover: how much the image grows, how long it takes to come into focus
 // and go soft again, and how quickly its column slows and recovers.
 const HOVER_SCALE = 1.12;
@@ -206,6 +211,14 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       // Leaning the top away speeds the stream up; towards you slows it.
       if ((screen.orientation?.angle ?? 0) % 180 === 0 && e.beta != null) {
         const now = performance.now();
+        // Turned upside down (the top of the screen pointing down), the
+        // images fall instead, as if gravity had taken over; the resting
+        // angle holds still meanwhile, so turning back picks up as before.
+        if (Math.sin((e.beta * Math.PI) / 180) < UPSIDE_DOWN_SIN) {
+          pace = -FALL_PACE;
+          lastBetaAt = now;
+          return;
+        }
         if (restBeta == null) restBeta = e.beta;
         else restBeta += (e.beta - restBeta) * Math.min(1, ((now - lastBetaAt) / 1000) * REST_SETTLE_PER_S);
         lastBetaAt = now;
@@ -686,6 +699,16 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
         fill(gone, draw(), col);
         gone.y = Math.max(lowest, height * 1.05);
         col.items.push(gone);
+      }
+      // And, while they're falling (phone upside down), ones that drop out
+      // of the bottom come back in above the top.
+      const fallen = col.items.find((item) => !item.focused && item.y > height * 1.15);
+      if (fallen && pace < 0) {
+        const highest = Math.min(...col.items.filter((item) => item !== fallen).map((item) => item.y - item.gap), height);
+        col.items.splice(col.items.indexOf(fallen), 1);
+        fill(fallen, draw(), col);
+        fallen.y = Math.min(highest, -height * 0.05) - fallen.h;
+        col.items.unshift(fallen);
       }
       for (const item of col.items) item.wrap.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
       const grow = lerp(ZOOM_GROW.near, ZOOM_GROW.far, col.depth);
