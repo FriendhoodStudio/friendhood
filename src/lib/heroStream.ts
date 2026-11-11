@@ -231,17 +231,6 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   // The site's card corner radius, in px.
   const cardRadius = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--radius-card')) || 30;
 
-  // A rounded rectangle the size of the image within the soft copy's
-  // padding, blurred so its edge fades over most of that padding.
-  function softMask(w: number, h: number, radius: number) {
-    const pad = SOFT_PAD_PX;
-    const svg =
-      `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>` +
-      `<filter id='f' x='-50%' y='-50%' width='200%' height='200%'><feGaussianBlur stdDeviation='${pad / 3}'/></filter>` +
-      `<rect x='${pad}' y='${pad}' width='${w - pad * 2}' height='${h - pad * 2}' rx='${radius}' fill='#000' filter='url(#f)'/></svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  }
-
   function softUrl(image: HeroPopUpImage, blur: number) {
     const softH = Math.round(SOFT_WIDTH_PX / ratio(image));
     return (
@@ -305,17 +294,12 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       `left:${-SOFT_PAD_PX * scale}px;top:${-SOFT_PAD_PX * scale}px;` +
       `width:${(SOFT_WIDTH_PX + SOFT_PAD_PX * 2) * scale}px;height:${(softH + SOFT_PAD_PX * 2) * scale}px`;
     if (item.over) item.soft.style.display = 'none';
-    else {
-      // Sanity blurs the image as a square, so its blur is masked by a
-      // softened rounded rectangle with the site's card radius: the blurred
-      // image still feathers out past its edges, but around the same
-      // rounded corners as the sharp one.
-      const mask = softMask(SOFT_WIDTH_PX + SOFT_PAD_PX * 2, softH + SOFT_PAD_PX * 2, cardRadius / scale);
-      item.soft.style.setProperty('-webkit-mask-image', mask);
-      item.soft.style.setProperty('mask-image', mask);
-      item.soft.style.setProperty('-webkit-mask-size', '100% 100%');
-      item.soft.style.setProperty('mask-size', '100% 100%');
-    }
+    // Sanity blurs the image as a square, so the blurred copy's corners are
+    // rounded to match: its box is the image plus the padding the blur
+    // spreads into, so a radius of the card's plus that padding follows the
+    // same curve as the sharp image's corners. (An SVG mask did this more
+    // softly, but masks on moving images flickered on phones.)
+    else item.soft.style.borderRadius = `${cardRadius + SOFT_PAD_PX * scale}px`;
     item.sharp.src = image.url;
     // Links to the case study it came from (images added by hand in Studio
     // have none, and just sit in the stream).
