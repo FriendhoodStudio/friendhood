@@ -60,6 +60,8 @@ const PARALLAX_EASE_PER_S = 3;
 // NEAR and FAR.
 const SOFT_WIDTH_PX = 160;
 const SOFT_PAD_PX = 24;
+// How far the blurred copy may spill past the image's rounded edge.
+const SOFT_SPILL_PX = 10;
 // Hover: how much the image grows, how long it takes to come into focus
 // and go soft again, and how quickly its column slows and recovers.
 const HOVER_SCALE = 1.12;
@@ -280,13 +282,26 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     // With no room either side (phones), the share still comes up sharp,
     // just behind the headline.
     item.crisp = item.over || (pick && !roomLeft && !roomRight);
+    // An image in front starts with its inner edge over the end of the
+    // headline (but clear of the middle band), so it rises across the
+    // title's outer words.
+    if (item.over) {
+      const layerX =
+        centre < title.l
+          ? Math.min(words.l + w * WORDS_OVERLAP, title.l) - w
+          : Math.max(words.r - w * WORDS_OVERLAP, title.r);
+      item.x = layerX - (col.centre - col.w / 2);
+    }
+    // Images in front drift in towards the headline (and bounce off the
+    // middle band), so they pass over its outer words rather than hanging
+    // about at the screen's edge.
     if (!item.focused) {
       home(item, col).append(item.wrap);
       item.card.getAnimations().forEach((a) => a.cancel());
       item.card.style.opacity = String(restingOpacity(item, col));
     }
     item.rise = col.speed * (1 + (Math.random() * 2 - 1) * ITEM_SPEED_JITTER);
-    item.wander = between(WANDER_PX_S) * (Math.random() < 0.5 ? -1 : 1);
+    item.wander = between(WANDER_PX_S) * (item.over ? (centre < title.l ? 1 : -1) : Math.random() < 0.5 ? -1 : 1);
     item.vx = item.wander;
     item.vy = -item.rise;
     item.wrap.style.width = `${w}px`;
@@ -302,12 +317,15 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       `left:${-SOFT_PAD_PX * scale}px;top:${-SOFT_PAD_PX * scale}px;` +
       `width:${(SOFT_WIDTH_PX + SOFT_PAD_PX * 2) * scale}px;height:${(softH + SOFT_PAD_PX * 2) * scale}px`;
     if (item.crisp) item.soft.style.display = 'none';
-    // Sanity blurs the image as a square, so the blurred copy's corners are
-    // rounded to match: its box is the image plus the padding the blur
-    // spreads into, so a radius of the card's plus that padding follows the
-    // same curve as the sharp image's corners. (An SVG mask did this more
-    // softly, but masks on moving images flickered on phones.)
-    else item.soft.style.borderRadius = `${cardRadius + SOFT_PAD_PX * scale}px`;
+    // Sanity blurs the image as a square, so the blurred copy is clipped to
+    // the image's own rounded shape grown by SOFT_SPILL_PX all round: the
+    // corners follow the card radius, while the blur still spills softly
+    // past the edges. (An SVG mask did this more softly, but masks on
+    // moving images flickered on phones.)
+    else {
+      const inset = SOFT_PAD_PX * scale - SOFT_SPILL_PX;
+      item.soft.style.clipPath = `inset(${inset}px round ${cardRadius + SOFT_SPILL_PX}px)`;
+    }
     item.sharp.src = image.url;
     // Links to the case study it came from (images added by hand in Studio
     // have none, and just sit in the stream).
@@ -532,10 +550,16 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     minHeight = height + LABEL_CLEARANCE_PX * 2;
   }
 
-  // The headline's box in the layer's coordinates, with a little room
-  // around it, for the images in front of it to keep clear of.
-  const TITLE_CLEARANCE_PX = 16;
-  let title = { l: 0, r: 0, t: 0, b: 0 };
+  // The middle of the headline, in the layer's coordinates: the band the
+  // images in front of it keep out of, all the way up the screen, so they
+  // can pass over its outer words but never run straight up through the
+  // middle. As a share of the width of the headline's words.
+  const TITLE_BAND_SHARE = 0.45;
+  // How much of an image in front starts over the headline's end.
+  const WORDS_OVERLAP = 0.6;
+  let title = { l: 0, r: 0 };
+  // And the words' own left and right edges.
+  let words = { l: 0, r: 0 };
   function measureTitle() {
     const headline = layer.parentElement?.querySelector('h1');
     if (!headline) return;
@@ -545,12 +569,10 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     range.selectNodeContents(headline);
     const h = range.getBoundingClientRect();
     const box = layer.getBoundingClientRect();
-    title = {
-      l: h.left - box.left - TITLE_CLEARANCE_PX,
-      r: h.right - box.left + TITLE_CLEARANCE_PX,
-      t: h.top - box.top - TITLE_CLEARANCE_PX,
-      b: h.bottom - box.top + TITLE_CLEARANCE_PX,
-    };
+    const middle = (h.left + h.right) / 2 - box.left;
+    const half = (h.width * TITLE_BAND_SHARE) / 2;
+    title = { l: middle - half, r: middle + half };
+    words = { l: h.left - box.left, r: h.right - box.left };
   }
 
   function build() {
@@ -723,6 +745,9 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       for (let j = i + 1; j < all.length; j++) {
         const b = all[j];
         if (a.item.focused && b.item.focused) continue;
+        // Images in front of the headline pass over the ones behind it
+        // rather than knocking them (an image in focus still pushes all).
+        if (a.item.over !== b.item.over && !a.item.focused && !b.item.focused) continue;
         // An image in focus is drawn HOVER_SCALE bigger (around its centre),
         // so it takes up that much more room.
         const A = box(a.item, a.left);
