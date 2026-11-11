@@ -124,6 +124,9 @@ interface Item {
    * in front of the headline, and on screens with no room beside it, a few
    * behind it instead. */
   crisp: boolean;
+  /** In front of the headline but kept out of its middle (only where
+   * there's room beside it). */
+  keepClear: boolean;
 }
 
 interface Column {
@@ -259,14 +262,18 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     const roomRight = width - title.r >= w;
     const side = (centre < title.l && roomLeft) || (centre > title.r && roomRight);
     const pick = crispNow + 1 <= Math.max(1, Math.round(OVER_SHARE * (all.length + 1)));
-    item.over = side && pick;
-    // With no room either side (phones), the share still comes up sharp,
-    // just behind the headline.
-    item.crisp = item.over || (pick && !roomLeft && !roomRight);
+    // With no room either side (phones), the share still comes up sharp and
+    // in front, and simply passes over the headline: there are few enough
+    // that covering the words now and then is fine, and they skip the
+    // middle band (there's nowhere beside it to go).
+    const noRoom = !roomLeft && !roomRight;
+    item.over = pick && (side || noRoom);
+    item.keepClear = item.over && side;
+    item.crisp = item.over;
     // An image in front starts with its inner edge over the end of the
     // headline (but clear of the middle band), so it rises across the
     // title's outer words.
-    if (item.over) {
+    if (item.keepClear) {
       const layerX =
         centre < title.l
           ? Math.min(words.l + w * WORDS_OVERLAP, title.l) - w
@@ -282,7 +289,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       item.card.style.opacity = String(restingOpacity(item, col));
     }
     item.rise = col.speed * (1 + (Math.random() * 2 - 1) * ITEM_SPEED_JITTER);
-    item.wander = between(WANDER_PX_S) * (item.over ? (centre < title.l ? 1 : -1) : Math.random() < 0.5 ? -1 : 1);
+    item.wander = between(WANDER_PX_S) * (item.keepClear ? (centre < title.l ? 1 : -1) : Math.random() < 0.5 ? -1 : 1);
     item.vx = item.wander;
     item.vy = -item.rise;
     item.wrap.style.width = `${w}px`;
@@ -476,7 +483,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     stroke.style.cssText = 'opacity:0;transition:opacity 300ms ease-out';
     card.append(soft, sharp, stroke, label);
     wrap.append(card);
-    const item: Item = { wrap, card, soft, sharp, label, ticker, stroke, image: images[0], x: 0, y: 0, vx: 0, vy: 0, rise: 0, wander: 0, w: 0, h: 0, gap: 0, focused: false, over: false, crisp: false };
+    const item: Item = { wrap, card, soft, sharp, label, ticker, stroke, image: images[0], x: 0, y: 0, vx: 0, vy: 0, rise: 0, wander: 0, w: 0, h: 0, gap: 0, focused: false, over: false, crisp: false, keepClear: false };
     fill(item, draw(), col);
 
     wrap.addEventListener('pointerenter', (e) => {
@@ -690,7 +697,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
         // the screen's: an image drifting in bounces back out. (Running the
         // full height, they can only ever meet it side-on, slowly, so it
         // never jumps.)
-        if (item.over) {
+        if (item.keepClear) {
           const l = left + item.x;
           // If another image knocks one deep in, it's eased back out over a
           // few frames rather than snapped.
