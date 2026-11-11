@@ -59,7 +59,6 @@ const UNFOCUS_MS = 700;
 // loaded as soon as an image enters the stream (they're small, 600px
 // wide), so it's ready the moment it's hovered.
 const SWAP_MS = 90;
-const LONG_PRESS_MS = 400;
 // "See the project" comes up in the middle of a bubble in focus, after a
 // pause, so a passing mouse just sees the image and the label only appears
 // once you've settled on it.
@@ -247,6 +246,21 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     item.soft.getAnimations().forEach((a) => a.cancel());
   }
 
+  // The bubble a tap has brought into focus on a touch screen, if any.
+  let touchFocused: Item | null = null;
+  let touchCol: Column | null = null;
+  function releaseTouch() {
+    if (touchFocused && touchCol) unfocus(touchFocused, touchCol);
+    touchFocused = touchCol = null;
+  }
+  document.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.pointerType !== 'mouse' && touchFocused && !touchFocused.wrap.contains(e.target as Node)) releaseTouch();
+    },
+    { passive: true }
+  );
+
   function focus(item: Item, col: Column) {
     if (item.focused) return;
     item.focused = true;
@@ -350,26 +364,26 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     wrap.addEventListener('pointerleave', (e) => {
       if (e.pointerType === 'mouse') unfocus(item, col);
     });
-    // Touch: press to bring it up; let go (or scroll away) to send it back.
-    let pressedAt = 0;
+    // Touch has no hover, so a tap stands in for it: the first tap brings
+    // the bubble into focus (and, after the pause, its label) and holds it
+    // there; a second tap opens the case study. Tapping elsewhere, another
+    // bubble, or scrolling sends it back. Acting on the finished tap rather
+    // than the press means a swipe to scroll never sets it off.
+    let pointerType = '';
     wrap.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'mouse') {
-        pressedAt = performance.now();
-        focus(item, col);
-      }
+      pointerType = e.pointerType;
     });
-    // On touch, a quick tap follows the link, while pressing and holding is
-    // for looking at the image, so letting go after a hold doesn't navigate.
     wrap.addEventListener('click', (e) => {
-      if (pressedAt && performance.now() - pressedAt > LONG_PRESS_MS) e.preventDefault();
-      pressedAt = 0;
+      if (pointerType === 'mouse' || !pointerType) return;
+      if (touchFocused === item) return;
+      e.preventDefault();
+      releaseTouch();
+      touchFocused = item;
+      touchCol = col;
+      focus(item, col);
     });
-    for (const type of ['pointerup', 'pointercancel'] as const) {
-      wrap.addEventListener(type, (e) => {
-        if (e.pointerType !== 'mouse') unfocus(item, col);
-      });
-    }
     wrap.addEventListener('contextmenu', (e) => e.preventDefault());
+    wrap.style.setProperty('-webkit-tap-highlight-color', 'transparent');
     return item;
   }
 
@@ -388,6 +402,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   }
 
   function build() {
+    touchFocused = touchCol = null;
     layer.replaceChildren();
     measureLabel();
     frontLayer.replaceChildren();
@@ -507,6 +522,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     // The stream doesn't follow the headline's words.
     showWord(_index: number) {},
     zoomPast(progress: number) {
+      if (progress > 0) releaseTouch();
       zoom = progress;
       // Gone a little before the stage's end, and hands off while it flies
       // past, so a faded image can't swallow clicks on what's behind.
@@ -518,6 +534,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       place();
     },
     setPaused(value: boolean) {
+      if (value) releaseTouch();
       paused = value;
       if (paused && raf) {
         cancelAnimationFrame(raf);
