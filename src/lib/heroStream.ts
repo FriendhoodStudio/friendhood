@@ -77,14 +77,14 @@ const SWAP_MS = 90;
 const LABEL_DELAY_MS = 650;
 const LABEL_IN_MS = 900;
 const LABEL_CLASS =
-  'absolute bottom-[18px] left-[18px] w-3/4 block overflow-hidden rounded-full border border-front/15 bg-grey-600 py-2 font-body text-[0.9375rem] leading-[1.2] text-front backdrop-blur-[14px] whitespace-nowrap pointer-events-none';
+  'absolute bottom-[18px] inset-x-0 mx-auto w-3/4 block overflow-hidden rounded-full border border-front/15 bg-grey-600 py-2 font-body text-[0.9375rem] leading-[1.2] text-front backdrop-blur-[14px] whitespace-nowrap pointer-events-none';
 // The ticker's speed, how many copies of the name run round it (enough to
 // fill the pill however short the name), and how far in from each end of
 // the pill the name fades.
 const TICKER_PX_S = 28;
 const TICKER_COPIES = 8;
 const TICKER_FADE = 'linear-gradient(to right, transparent, #000 18%, #000 82%, transparent)';
-// The label is inset this far from the image's edges, and no image is
+// The label sits this far up from the image's bottom edge, centred, and no image is
 // narrower than LABEL_MIN_WIDTH_PX plus that either side.
 const LABEL_CLEARANCE_PX = 18;
 const LABEL_MIN_WIDTH_PX = 150;
