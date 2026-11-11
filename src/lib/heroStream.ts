@@ -21,18 +21,39 @@ const MAX_COLUMNS = 5;
 // read as a tidy grid.
 const IMAGE_WIDTH_SHARE = 0.68;
 const ITEM_WIDTH_RANGE = [0.95, 1.05];
-const ITEM_DRIFT_SHARE = 0.18;
-const IMAGE_GAP_RANGE = [0.35, 1.05];
+const ITEM_DRIFT_SHARE = 0.55;
+// Each image also sways gently side to side as it rises, by up to this
+// share of its column's width, over roughly this many seconds a swing, so
+// the stream reads as drifting rather than running on rails.
+const SWAY_SHARE = 0.12;
+const SWAY_PERIOD_S = [9, 15];
+const IMAGE_GAP_RANGE = [0.6, 1.6];
 // How much a column's speed may differ from its depth's speed.
 const SPEED_JITTER = 0.25;
 // How far a column may sit off the centre of its slot, as a share of pitch.
-const COLUMN_JITTER = 0.12;
+const COLUMN_JITTER = 0.2;
+// Images are pushed about rather than placed: each eases towards its
+// column's rising speed and (sideways) back towards its own line plus sway,
+// and when two touch they bounce apart. How quickly an image takes up its
+// column's speed, how strongly it's pulled back to its line, how fast
+// sideways movement dies away, the space kept between images, and how
+// bouncy a knock is (0 dead, 1 fully elastic).
+const RISE_EASE_PER_S = 1.2;
+const HOME_SPRING = 0.8;
+const SIDE_DAMPING_PER_S = 1.4;
+const BUMP_GAP_PX = 10;
+const BOUNCE = 0.55;
+// Only images at about the same depth knock into each other; a near one
+// passes in front of a far one, as it would. (Colliding across depths also
+// jammed narrow screens, where the near column got held to the far one's
+// pace.) As a share of the near-to-far range.
+const BUMP_DEPTH = 0.4;
 // Resting look and speed (px/s), from nearest column to furthest back.
 // The spread is wide so the stream reads as layers: near images are big,
 // clearer and quick, far ones small, hazy and slow, and nearer columns sit
 // in front where they overlap.
-const NEAR = { blur: 12, opacity: 0.8, speed: 42, scale: 1.2 };
-const FAR = { blur: 110, opacity: 0.25, speed: 9, scale: 0.6 };
+const NEAR = { blur: 32, opacity: 0.65, speed: 42, scale: 1.2 };
+const FAR = { blur: 48, opacity: 0.25, speed: 15, scale: 0.6 };
 // Moving the mouse shifts each column sideways by up to this much, more for
 // nearer columns, for a little parallax.
 const PARALLAX_PX = 28;
@@ -85,10 +106,19 @@ interface Item {
   sharp: HTMLImageElement;
   label: HTMLElement;
   image: HeroPopUpImage;
+  /** Position (x from the column's left edge) and velocity, in px and px/s. */
+  x: number;
   y: number;
+  vx: number;
+  vy: number;
+  /** Where it drifts back to sideways, from the column's left edge. */
+  home: number;
   w: number;
   h: number;
   gap: number;
+  sway: number;
+  swayRate: number;
+  swayPhase: number;
   focused: boolean;
 }
 
@@ -100,11 +130,13 @@ interface Column {
   depth: number;
   speed: number;
   speedNow: number;
-  offset: number;
   centre: number;
   w: number;
   hovered: number;
   shift: number;
+  /** Sway clock: runs with the column, so a stopped column stops swaying
+   * (an image in focus holds still rather than sliding from under you). */
+  time: number;
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -198,8 +230,15 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     item.image = image;
     item.w = w;
     item.h = h;
-    item.gap = col.w * between(IMAGE_GAP_RANGE);
-    item.wrap.style.left = `${x}px`;
+    // Gaps scale with the image itself, so small screens (where images sit
+    // at their minimum size in narrow columns) aren't packed tight.
+    item.gap = h * between(IMAGE_GAP_RANGE);
+    item.sway = col.w * SWAY_SHARE * between([0.4, 1]);
+    item.swayRate = (Math.PI * 2) / between(SWAY_PERIOD_S);
+    item.swayPhase = Math.random() * Math.PI * 2;
+    item.home = item.x = x;
+    item.vx = 0;
+    item.vy = -col.speedNow;
     item.wrap.style.width = `${w}px`;
     item.wrap.style.height = `${h}px`;
     // The soft copy's blur spreads past the image, so it's left out of
@@ -339,7 +378,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     soft.draggable = false;
     card.append(soft, sharp, label);
     wrap.append(card);
-    const item: Item = { wrap, card, soft, sharp, label, image: images[0], y: 0, w: 0, h: 0, gap: 0, focused: false };
+    const item: Item = { wrap, card, soft, sharp, label, image: images[0], x: 0, y: 0, vx: 0, vy: 0, home: 0, w: 0, h: 0, gap: 0, sway: 0, swayRate: 0, swayPhase: 0, focused: false };
     fill(item, draw(), col);
 
     wrap.addEventListener('pointerenter', (e) => {
@@ -417,7 +456,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       const front = document.createElement('div');
       front.style.cssText = el.style.cssText;
       frontLayer.append(front);
-      const col: Column = { el, front, items: [], depth, speed, speedNow: reduceMotion ? 0 : speed, offset: 0, centre, w, hovered: 0, shift: 0 };
+      const col: Column = { el, front, items: [], depth, speed, speedNow: reduceMotion ? 0 : speed, centre, w, hovered: 0, shift: 0, time: Math.random() * 100 };
       // Start part-way through, so the columns don't all begin level.
       let y = -Math.random() * height * 0.5;
       while (y < height * 1.4) {
@@ -442,15 +481,15 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     for (const col of columns) {
       // Recycle images that have risen out of the top to the bottom of the
       // column, with a fresh image from the deck.
-      const first = col.items[0];
-      if (first && !first.focused && first.y + first.h + col.offset < -height * 0.15) {
-        const lastItem = col.items[col.items.length - 1];
-        col.items.shift();
-        fill(first, draw(), col);
-        first.y = lastItem.y + lastItem.h + first.gap;
-        col.items.push(first);
+      const gone = col.items.find((item) => !item.focused && item.y + item.h < -height * 0.15);
+      if (gone) {
+        const lowest = Math.max(...col.items.filter((item) => item !== gone).map((item) => item.y + item.h + item.gap), 0);
+        col.items.splice(col.items.indexOf(gone), 1);
+        fill(gone, draw(), col);
+        gone.y = Math.max(lowest, height * 1.05);
+        col.items.push(gone);
       }
-      for (const item of col.items) item.wrap.style.transform = `translate3d(0, ${item.y + col.offset}px, 0)`;
+      for (const item of col.items) item.wrap.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
       const grow = lerp(ZOOM_GROW.near, ZOOM_GROW.far, col.depth);
       col.el.style.transformOrigin = `${width / 2 - (col.centre - col.w / 2)}px ${height / 2}px`;
       const rise = zoom * height * lerp(ZOOM_RISE.near, ZOOM_RISE.far, col.depth);
@@ -467,14 +506,79 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     for (const col of columns) {
       const target = reduceMotion || col.hovered ? 0 : col.speed;
       col.speedNow += (target - col.speedNow) * Math.min(1, dt * SPEED_EASE_PER_S);
-      col.offset -= col.speedNow * dt;
+      if (col.speed) col.time += dt * (col.speedNow / col.speed);
       if (!reduceMotion) {
         const shiftTarget = -pointerX * PARALLAX_PX * (1 - col.depth * 0.85);
         col.shift += (shiftTarget - col.shift) * Math.min(1, dt * PARALLAX_EASE_PER_S);
       }
     }
+    if (dt) move(dt);
     place();
     schedule();
+  }
+
+  // Moves every image on by its velocity, then knocks apart any that touch.
+  function move(dt: number) {
+    const all: { item: Item; col: Column; left: number }[] = [];
+    for (const col of columns) {
+      const left = col.centre - col.w / 2;
+      for (const item of col.items) {
+        all.push({ item, col, left });
+        if (item.focused) {
+          item.vx = item.vy = 0;
+          continue;
+        }
+        item.vy += (-col.speedNow - item.vy) * Math.min(1, dt * RISE_EASE_PER_S);
+        const lineX = item.home + Math.sin(col.time * item.swayRate + item.swayPhase) * item.sway;
+        item.vx += (lineX - item.x) * HOME_SPRING * dt;
+        item.vx *= Math.exp(-SIDE_DAMPING_PER_S * dt);
+        item.x += item.vx * dt;
+        item.y += item.vy * dt;
+      }
+    }
+    // Every pair, as boxes with BUMP_GAP_PX kept between them: pushed apart
+    // along whichever way they overlap least, and their speeds along that
+    // way exchanged with some bounce. An image in focus doesn't budge
+    // (the others bounce off it). Heavier (bigger) images push harder.
+    for (let i = 0; i < all.length; i++) {
+      const a = all[i];
+      const al = a.left + a.item.x;
+      for (let j = i + 1; j < all.length; j++) {
+        const b = all[j];
+        if (a.item.focused && b.item.focused) continue;
+        if (Math.abs(a.col.depth - b.col.depth) > BUMP_DEPTH) continue;
+        const bl = b.left + b.item.x;
+        const ox = Math.min(al + a.item.w, bl + b.item.w) - Math.max(al, bl) + BUMP_GAP_PX;
+        if (ox <= 0) continue;
+        const oy = Math.min(a.item.y + a.item.h, b.item.y + b.item.h) - Math.max(a.item.y, b.item.y) + BUMP_GAP_PX;
+        if (oy <= 0) continue;
+        const ia = a.item.focused ? 0 : 1 / (a.item.w * a.item.h);
+        const ib = b.item.focused ? 0 : 1 / (b.item.w * b.item.h);
+        const share = ia + ib;
+        if (!share) continue;
+        const horizontal = ox < oy;
+        // Which way b sits from a, along that axis.
+        const dir = horizontal
+          ? Math.sign(bl + b.item.w / 2 - (al + a.item.w / 2)) || 1
+          : Math.sign(b.item.y + b.item.h / 2 - (a.item.y + a.item.h / 2)) || 1;
+        const push = (horizontal ? ox : oy) * 0.5;
+        const va = horizontal ? a.item.vx : a.item.vy;
+        const vb = horizontal ? b.item.vx : b.item.vy;
+        const closing = (vb - va) * dir;
+        const impulse = closing < 0 ? (-(1 + BOUNCE) * closing) / share : 0;
+        if (horizontal) {
+          a.item.x -= dir * push * (ia / share);
+          b.item.x += dir * push * (ib / share);
+          a.item.vx -= dir * impulse * ia;
+          b.item.vx += dir * impulse * ib;
+        } else {
+          a.item.y -= dir * push * (ia / share);
+          b.item.y += dir * push * (ib / share);
+          a.item.vy -= dir * impulse * ia;
+          b.item.vy += dir * impulse * ib;
+        }
+      }
+    }
   }
 
   function schedule() {

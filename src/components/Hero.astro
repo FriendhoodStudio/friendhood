@@ -303,6 +303,17 @@ const afterParts = headlineAfter.split(/(\s+)/);
      why it's a separate family name rather than a font-weight on the
      existing one). Falls back to the Regular weight, then sans-serif, if
      the Heavy file fails to load. */
+  /* The headline is drawn white in difference mode, so it always reads
+     against what's behind it: near-black over the cream page (much as the
+     light-theme dark it used to be), light once the backdrop goes dark, and
+     the inverse colours where an image rises behind a word. White beats the
+     colour the stage script sets inline as you scroll, since difference
+     already does that job. */
+  .hero-headline-shadow {
+    mix-blend-mode: difference;
+    color: #fff !important;
+  }
+
   .hero-headline-heavy-font {
     font-family: "Greed Extended Heavy", "Greed Extended", sans-serif;
   }
