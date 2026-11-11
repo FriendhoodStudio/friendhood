@@ -535,12 +535,13 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
 // rather than with the canvas's own filter, which older Safari lacks.
 async function makeSoftBubble(url: string, blur: number): Promise<string> {
   const img = new Image();
-  img.crossOrigin = 'anonymous';
   img.decoding = 'async';
   // Fetched through the site's own /cdn-image path (a rewrite to Sanity's
   // image CDN, in vercel.json and the dev server's proxy): reading pixels
   // back from a canvas needs the image to be same-origin or CORS-allowed,
   // and Sanity only allows the origins listed in the project's settings.
+  // Not marked crossOrigin: it's same-origin now, and a CORS-mode request
+  // would pass the site's Origin header on to Sanity, which refuses it.
   const path = url.split('?')[0].replace(/^https:\/\/cdn\.sanity\.io\/images\//, '/cdn-image/');
   img.src = `${path}?w=${SOFT_DIAMETER * 2}&h=${SOFT_DIAMETER * 2}&fit=crop&fm=jpg&q=75`;
   await img.decode();
