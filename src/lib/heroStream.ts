@@ -92,6 +92,9 @@ const TICKER_FADE = 'linear-gradient(to right, transparent, #000 18%, #000 82%, 
 // narrower than LABEL_MIN_WIDTH_PX plus that either side.
 const LABEL_CLEARANCE_PX = 18;
 const LABEL_MIN_WIDTH_PX = 150;
+// On narrow screens, the most of the screen's width an image's minimum may
+// take up.
+const PHONE_MAX_SHARE = 0.36;
 const SPEED_EASE_PER_S = 4;
 // As the stage zooms past, each column grows around the screen's centre, so
 // it swells and spreads outward, and the stream carries on rising, faster
@@ -582,7 +585,10 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     layer.append(probe);
     const { height } = probe.getBoundingClientRect();
     probe.remove();
-    minWidth = LABEL_MIN_WIDTH_PX + LABEL_CLEARANCE_PX * 2;
+    // On a phone that minimum would make two images fill the screen edge
+    // to edge, so there it's a share of the screen instead, leaving room
+    // between them (the ticker label just runs narrower).
+    minWidth = Math.min(LABEL_MIN_WIDTH_PX + LABEL_CLEARANCE_PX * 2, (layer.clientWidth || window.innerWidth) * PHONE_MAX_SHARE);
     minHeight = height + LABEL_CLEARANCE_PX * 2;
   }
 
