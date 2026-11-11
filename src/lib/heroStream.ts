@@ -71,7 +71,7 @@ const SWAP_MS = 90;
 const LABEL_DELAY_MS = 650;
 const LABEL_IN_MS = 900;
 const LABEL_CLASS =
-  'absolute bottom-[18px] inset-x-0 mx-auto w-[90%] block overflow-hidden rounded-full border border-front/15 bg-grey-600 py-2 font-body text-[0.9375rem] leading-[1.2] text-front backdrop-blur-[14px] whitespace-nowrap pointer-events-none';
+  'absolute bottom-[18px] inset-x-0 mx-auto w-[87%] block overflow-hidden rounded-full border border-front/15 bg-grey-600 py-2 font-body text-[0.9375rem] leading-[1.2] text-front backdrop-blur-[14px] whitespace-nowrap pointer-events-none';
 // The ticker's speed, how many copies of the name run round it (enough to
 // fill the pill however short the name), and how far in from each end of
 // the pill the name fades.
