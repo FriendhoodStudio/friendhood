@@ -6,7 +6,7 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
 <header class="group pointer-events-none fixed inset-x-0 top-0 z-50" data-nav-bar data-open="false">
   <div class="relative z-50 flex items-center justify-center px-[var(--page-margin)] py-[var(--spacing-btn-y-nav)]">
     <div
-      class="nav-pill pointer-events-auto flex items-center overflow-hidden rounded-full border border-front/15 bg-grey-600 backdrop-blur-[14px]"
+      class="nav-pill pointer-events-auto flex items-center overflow-hidden rounded-full border border-front/15"
       data-nav-pill
     >
       <a
@@ -65,6 +65,13 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
    * physical flick rather than a fade.
    */
   .nav-pill {
+    /* Tinted glass: a lighter dark tint than the site's other pills, over a
+       blurred and strongly saturated copy of whatever is behind it, so it
+       takes on the colours passing underneath (the hero's images, a case
+       study's photos) while the white text keeps its contrast. */
+    background-color: rgb(41 40 45 / 0.62);
+    -webkit-backdrop-filter: blur(18px) saturate(2.2);
+    backdrop-filter: blur(18px) saturate(2.2);
     transform: scale(0.9);
     transform-origin: center;
     transition: transform 320ms cubic-bezier(0.22, 1.36, 0.36, 1);
