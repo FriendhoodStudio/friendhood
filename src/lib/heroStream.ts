@@ -78,6 +78,9 @@ const SPEED_EASE_PER_S = 4;
 // rushing past while the stream rises more slowly behind it, each layer at
 // its own pace, is what gives the depth and parallax.
 const ZOOM_GROW = { near: 1.6, far: 1.15 };
+// How far into the zoom the stream counts as scrolled away (bubbles let go
+// and stop taking taps).
+const ZOOM_AWAY = 0.03;
 const ZOOM_RISE = { near: 0.45, far: 0.12 };
 
 interface Item {
@@ -522,7 +525,12 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     // The stream doesn't follow the headline's words.
     showWord(_index: number) {},
     zoomPast(progress: number) {
-      if (progress > 0) releaseTouch();
+      // Only a real scroll counts: on phones the stage can sit a hair past
+      // zero at rest (the browser's toolbar, overscroll at the top), and
+      // treating that as "flying past" dropped tapped bubbles and switched
+      // off taps altogether.
+      const away = progress > ZOOM_AWAY;
+      if (away) releaseTouch();
       zoom = progress;
       // Gone a little before the stage's end, and hands off while it flies
       // past, so a faded image can't swallow clicks on what's behind.
@@ -530,11 +538,11 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       layer.style.visibility = progress >= 0.8 ? 'hidden' : '';
       frontLayer.style.opacity = layer.style.opacity;
       frontLayer.style.visibility = layer.style.visibility;
-      for (const col of columns) for (const item of col.items) item.wrap.style.pointerEvents = progress ? 'none' : 'auto';
+      for (const col of columns) for (const item of col.items) item.wrap.style.pointerEvents = away ? 'none' : 'auto';
       place();
     },
     setPaused(value: boolean) {
-      if (value) releaseTouch();
+      if (value && !paused) releaseTouch();
       paused = value;
       if (paused && raf) {
         cancelAnimationFrame(raf);
