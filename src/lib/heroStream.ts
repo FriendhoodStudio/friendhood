@@ -209,21 +209,31 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       // Forwards and back (held upright): measured from however the phone
       // is naturally being held, which the reading slowly settles towards.
       // Leaning the top away speeds the stream up; towards you slows it.
-      if ((screen.orientation?.angle ?? 0) % 180 === 0 && e.beta != null) {
-        const now = performance.now();
-        // Turned upside down (the top of the screen pointing down), the
-        // images fall instead, as if gravity had taken over; the resting
-        // angle holds still meanwhile, so turning back picks up as before.
-        if (Math.sin((e.beta * Math.PI) / 180) < UPSIDE_DOWN_SIN) {
-          pace = -FALL_PACE;
-          lastBetaAt = now;
-          return;
-        }
-        if (restBeta == null) restBeta = e.beta;
-        else restBeta += (e.beta - restBeta) * Math.min(1, ((now - lastBetaAt) / 1000) * REST_SETTLE_PER_S);
+      if (e.beta == null) return;
+      const now = performance.now();
+      // Turned upside down (the top of the phone pointing down), the images
+      // fall instead, as if gravity had taken over. Judged from the phone
+      // itself, whichever way the screen has turned: an iPhone won't show a
+      // page upside down, so turning one over leaves the page in landscape.
+      // The resting angle holds still meanwhile, so turning back picks up
+      // as before.
+      if (Math.sin((e.beta * Math.PI) / 180) < UPSIDE_DOWN_SIN) {
+        pace = -FALL_PACE;
         lastBetaAt = now;
-        pace = clamp(1 + (restBeta - e.beta) / PITCH_FULL_DEG, PITCH_PACE[0], PITCH_PACE[1]);
+        return;
       }
+      // Speed from tilting forwards or back only applies held upright; any
+      // other way round it's back to normal (rather than stuck at whatever
+      // it last was).
+      if ((screen.orientation?.angle ?? 0) % 180 !== 0) {
+        pace = 1;
+        lastBetaAt = now;
+        return;
+      }
+      if (restBeta == null) restBeta = e.beta;
+      else restBeta += (e.beta - restBeta) * Math.min(1, ((now - lastBetaAt) / 1000) * REST_SETTLE_PER_S);
+      lastBetaAt = now;
+      pace = clamp(1 + (restBeta - e.beta) / PITCH_FULL_DEG, PITCH_PACE[0], PITCH_PACE[1]);
     };
     const ask = (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission;
     if (typeof ask === 'function') {
