@@ -22,7 +22,17 @@ export default defineConfig({
   // production domain ends up different from the current live site.
   site: 'https://friendhood.co.uk',
   vite: {
-    plugins: [tailwindcss()]
+    plugins: [tailwindcss()],
+    // Same as the /cdn-image rewrite in vercel.json, for the dev server.
+    server: {
+      proxy: {
+        '/cdn-image': {
+          target: 'https://cdn.sanity.io',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/cdn-image/, '/images')
+        }
+      }
+    }
   },
   integrations: [
     react(),

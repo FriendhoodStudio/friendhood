@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/cdn-image/:path*",
+      "destination": "https://cdn.sanity.io/images/:path*"
+    }
+  ]
+}
