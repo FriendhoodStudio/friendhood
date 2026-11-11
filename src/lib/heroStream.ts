@@ -1,4 +1,5 @@
 import type { HeroPopUpImage } from '../types/hero';
+import { SOFT_H, SOFT_PAD, SOFT_W, softPath } from './heroSoft';
 
 /** An alternative to the floating field (heroPopups): project images rise
  * behind the hero headline in a few slow columns, like a stream, blurred and
@@ -53,16 +54,6 @@ const FAR = { blur: 48, opacity: 0.25, speed: 15, scale: 0.6 };
 // nearer columns, for a little parallax.
 const PARALLAX_PX = 28;
 const PARALLAX_EASE_PER_S = 3;
-// Soft copies are blurred by Sanity's image service, on a small copy
-// SOFT_WIDTH_PX wide inside SOFT_PAD_PX of clear padding the blur feathers
-// out into, rather than live with CSS (too heavy for Chrome on moving
-// images). Blur strength (in Sanity's units) comes from the depth: see
-// NEAR and FAR.
-const SOFT_WIDTH_PX = 160;
-const SOFT_PAD_PX = 24;
-// How far out into its padding the blurred copy is clipped (0 at the
-// image's edge, 1 at the padding's outer edge).
-const SOFT_SPILL_SHARE = 0.75;
 // Hover: how much the image grows, how long it takes to come into focus
 // and go soft again, and how quickly its column slows and recovers.
 const HOVER_SCALE = 1.12;
@@ -235,16 +226,6 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     return 4 / 5;
   }
 
-  // The site's card corner radius, in px.
-  const cardRadius = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--radius-card')) || 30;
-
-  function softUrl(image: HeroPopUpImage, blur: number) {
-    const softH = Math.round(SOFT_WIDTH_PX / ratio(image));
-    return (
-      `${image.url.split('?')[0]}?w=${SOFT_WIDTH_PX + SOFT_PAD_PX * 2}&h=${softH + SOFT_PAD_PX * 2}` +
-      `&fit=crop&pad=${SOFT_PAD_PX}&bg=00F9F7F2&blur=${blur}&fm=webp&q=70`
-    );
-  }
 
   // Sets (or swaps) the image an item shows, with its own size, sideways
   // drift and gap, all varied around the column's width.
@@ -253,8 +234,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     const w = Math.max(col.w, minWidth, minHeight * ratio(image));
     const h = w / ratio(image);
     const x = (col.w - w) / 2 + (Math.random() * 2 - 1) * col.w * ITEM_DRIFT_SHARE;
-    const scale = w / SOFT_WIDTH_PX;
-    const softH = Math.round(SOFT_WIDTH_PX / ratio(image));
+    const scale = w / SOFT_W;
     item.image = image;
     item.w = w;
     item.h = h;
@@ -307,27 +287,18 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     item.vy = -item.rise;
     item.wrap.style.width = `${w}px`;
     item.wrap.style.height = `${h}px`;
-    // The soft copy's blur spreads past the image, so it's left out of
-    // hit-testing: only the image itself reacts to the mouse.
-    // Images in front of the headline aren't blurred at all: they show the
-    // sharp image (set below) and skip loading a soft copy.
+    // The blurred copy is made at build time, already rounded to the card
+    // radius before it was blurred (see heroSoft.ts), so its corners match
+    // the sharp image's with no masking or clipping here. Its blur spreads
+    // into the padding around the image, so it's left out of hit-testing:
+    // only the image itself reacts to the mouse. Sharp images skip it.
     if (item.crisp) item.soft.removeAttribute('src');
-    else item.soft.src = softUrl(image, Math.round(look(col.depth).blur));
+    else item.soft.src = softPath(image.url, col.depth > 0 ? 'back' : 'near');
     item.soft.style.cssText =
       `position:absolute;display:block;max-width:none;pointer-events:none;` +
-      `left:${-SOFT_PAD_PX * scale}px;top:${-SOFT_PAD_PX * scale}px;` +
-      `width:${(SOFT_WIDTH_PX + SOFT_PAD_PX * 2) * scale}px;height:${(softH + SOFT_PAD_PX * 2) * scale}px`;
+      `left:${-SOFT_PAD * scale}px;top:${-SOFT_PAD * scale}px;` +
+      `width:${(SOFT_W + SOFT_PAD * 2) * scale}px;height:${(SOFT_H + SOFT_PAD * 2) * scale}px`;
     if (item.crisp) item.soft.style.display = 'none';
-    // Sanity blurs the image as a square, so the blurred copy is clipped to
-    // a rounded shape to soften its corners. The clip sits most of the way
-    // out into the padding, where the blur has already faded, so it never
-    // shows as a hard edge. (An SVG mask did this more softly, but masks on
-    // moving images flickered on phones.)
-    else {
-      const spill = SOFT_PAD_PX * scale * SOFT_SPILL_SHARE;
-      const inset = SOFT_PAD_PX * scale - spill;
-      item.soft.style.clipPath = `inset(${inset}px round ${cardRadius + spill}px)`;
-    }
     item.sharp.src = image.url;
     // Links to the case study it came from (images added by hand in Studio
     // have none, and just sit in the stream).
