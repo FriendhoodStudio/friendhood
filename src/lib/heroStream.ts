@@ -61,8 +61,10 @@ const TILT_PUSH_PX_S2 = 60;
 // Tilting forwards or back: how far (degrees) from the resting angle for
 // the full change, the slowest and fastest the stream goes, and how
 // quickly the resting angle catches up with how the phone is being held.
-const PITCH_FULL_DEG = 20;
-const PITCH_PACE = [0.25, 2.5];
+const PITCH_FULL_DEG = 15;
+const PITCH_PACE = [0.1, 4];
+// How quickly the stream takes up a new speed from tilting (per second).
+const PITCH_EASE_PER_S = 3;
 const REST_SETTLE_PER_S = 0.08;
 // Upside down: how far over the phone has to be (the sine of its forwards
 // tilt below this), and how fast the images then fall, as a multiple of
@@ -774,7 +776,8 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
         // the rest, under reduced motion).
         const colPace = col.speed ? col.speedNow / col.speed : 0;
         const ease = Math.min(1, dt * COURSE_EASE_PER_S);
-        item.vy += (-item.rise * colPace * pace - item.vy) * ease;
+        // Rising speed answers tilting quickly, so a change is felt at once.
+        item.vy += (-item.rise * colPace * pace - item.vy) * Math.min(1, dt * (pace === 1 ? COURSE_EASE_PER_S : PITCH_EASE_PER_S));
         item.vx += (item.wander * colPace - item.vx) * ease;
         // Leaning the phone sends the images drifting that way.
         item.vx += tilt * TILT_PUSH_PX_S2 * colPace * dt;
