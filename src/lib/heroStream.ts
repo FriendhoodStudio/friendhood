@@ -126,6 +126,10 @@ interface Item {
   focused: boolean;
   /** Sits in front of the headline (multiplied over it) rather than behind. */
   over: boolean;
+  /** Shown sharp and solid at rest, rather than soft and faded: every image
+   * in front of the headline, and on screens with no room beside it, a few
+   * behind it instead. */
+  crisp: boolean;
 }
 
 interface Column {
@@ -200,7 +204,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
   const home = (item: Item, col: Column) => (item.over ? col.over : col.el);
   // Images behind the headline are faded back by depth; those passing in
   // front of it are solid, so they properly cover the letters.
-  const restingOpacity = (item: Item, col: Column) => (item.over ? 1 : look(col.depth).opacity);
+  const restingOpacity = (item: Item, col: Column) => (item.crisp ? 1 : look(col.depth).opacity);
 
   function draw() {
     if (deck.length === 0) {
@@ -263,7 +267,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     // Kept to OVER_SHARE of all images by count rather than by chance, as
     // only some rise at the sides.
     const all = columns.flatMap((c) => c.items).filter((other) => other !== item);
-    const overNow = all.filter((other) => other.over).length;
+    const crispNow = all.filter((other) => other.crisp).length;
     // And only where there's room for the whole image beside the headline:
     // on a phone the words span nearly the full width, and an image
     // squeezed between them and the screen's edge was pushed back and forth
@@ -271,7 +275,11 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     const roomLeft = title.l >= w;
     const roomRight = width - title.r >= w;
     const side = (centre < title.l && roomLeft) || (centre > title.r && roomRight);
-    item.over = side && overNow + 1 <= Math.max(1, Math.round(OVER_SHARE * (all.length + 1)));
+    const pick = crispNow + 1 <= Math.max(1, Math.round(OVER_SHARE * (all.length + 1)));
+    item.over = side && pick;
+    // With no room either side (phones), the share still comes up sharp,
+    // just behind the headline.
+    item.crisp = item.over || (pick && !roomLeft && !roomRight);
     if (!item.focused) {
       home(item, col).append(item.wrap);
       item.card.getAnimations().forEach((a) => a.cancel());
@@ -287,13 +295,13 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     // hit-testing: only the image itself reacts to the mouse.
     // Images in front of the headline aren't blurred at all: they show the
     // sharp image (set below) and skip loading a soft copy.
-    if (item.over) item.soft.removeAttribute('src');
+    if (item.crisp) item.soft.removeAttribute('src');
     else item.soft.src = softUrl(image, Math.round(look(col.depth).blur));
     item.soft.style.cssText =
       `position:absolute;display:block;max-width:none;pointer-events:none;` +
       `left:${-SOFT_PAD_PX * scale}px;top:${-SOFT_PAD_PX * scale}px;` +
       `width:${(SOFT_WIDTH_PX + SOFT_PAD_PX * 2) * scale}px;height:${(softH + SOFT_PAD_PX * 2) * scale}px`;
-    if (item.over) item.soft.style.display = 'none';
+    if (item.crisp) item.soft.style.display = 'none';
     // Sanity blurs the image as a square, so the blurred copy's corners are
     // rounded to match: its box is the image plus the padding the blur
     // spreads into, so a radius of the card's plus that padding follows the
@@ -331,7 +339,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
       item.label.hidden = true;
     }
     item.sharp.alt = '';
-    item.sharp.style.opacity = item.over ? '1' : '0';
+    item.sharp.style.opacity = item.crisp ? '1' : '0';
     item.sharp.getAnimations().forEach((a) => a.cancel());
     item.label.getAnimations().forEach((a) => a.cancel());
     item.ticker.getAnimations().forEach((a) => a.cancel());
@@ -417,7 +425,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     item.ticker.getAnimations().forEach((a) => a.cancel());
     item.stroke.style.opacity = '0';
     // Images in front of the headline stay sharp; the rest go soft again.
-    if (!item.over) {
+    if (!item.crisp) {
       item.soft.animate([{ opacity: getComputedStyle(item.soft).opacity }, { opacity: 1 }], {
         duration: SWAP_MS,
         easing: 'linear',
@@ -477,7 +485,7 @@ export function initHeroStream(layer: HTMLElement, images: HeroPopUpImage[]) {
     stroke.style.cssText = 'opacity:0;transition:opacity 300ms ease-out';
     card.append(soft, sharp, stroke, label);
     wrap.append(card);
-    const item: Item = { wrap, card, soft, sharp, label, ticker, stroke, image: images[0], x: 0, y: 0, vx: 0, vy: 0, rise: 0, wander: 0, w: 0, h: 0, gap: 0, focused: false, over: false };
+    const item: Item = { wrap, card, soft, sharp, label, ticker, stroke, image: images[0], x: 0, y: 0, vx: 0, vy: 0, rise: 0, wander: 0, w: 0, h: 0, gap: 0, focused: false, over: false, crisp: false };
     fill(item, draw(), col);
 
     wrap.addEventListener('pointerenter', (e) => {
