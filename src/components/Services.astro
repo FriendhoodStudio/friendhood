@@ -67,7 +67,10 @@ const serviceList: ServiceItem[] =
           data-index={i}
         >
           <div class="flex min-w-0 flex-1 items-center gap-[15px]">
-            <div class="size-[63px] shrink-0 overflow-hidden rounded-m">
+            {/* Corners concentric with the tile's: its radius less the
+                ~16px gap around the photo leaves next to none, so the
+                site's small 4px. */}
+            <div class="size-[63px] shrink-0 overflow-hidden rounded-small">
               <img src={service.imageUrl} alt="" class="h-full w-full object-cover" />
             </div>
             {/* Wraps onto a second line rather than truncating — with the grid's
