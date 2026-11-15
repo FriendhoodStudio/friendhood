@@ -112,7 +112,7 @@
 
   /* Colors (Figma: Core/Front, Core/Back, Core/Accent-Yello, Services) */
   --color-front: #f9f7f2;
-  --color-back: #0d0d0d;
+  --color-back: #121319; /* was #0d0d0d — updated in Figma (Core/Back) */
   --color-accent-yellow: #e7fe54;
   --color-services: #848484;
   --color-grey-200: #d8d8d8;
