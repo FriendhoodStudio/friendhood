@@ -93,10 +93,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
             <source src={loop.url} />
           </video>
         ))}
-        {/* A subtle scrim over the videos, so the headline, nav and the
-            lines at the bottom hold up over bright footage: a light tint
-            throughout, a touch deeper at the top and bottom. Inside the
-            video layer, so it zooms and fades with them on scroll. */}
+        {/* A scrim over the videos (an even 30% tint), so the headline,
+            nav and the lines at the bottom hold up over bright footage.
+            Inside the video layer, so it zooms and fades with them on
+            scroll. */}
         <div class="hero-loops-scrim pointer-events-none absolute inset-0" aria-hidden="true"></div>
       </div>
     )}
@@ -516,13 +516,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
      backgrounds, so it's hidden: the videos start on the first touch or
      scroll instead (see heroLoops.ts). */
   .hero-loops-scrim {
-    background: linear-gradient(
-      to bottom,
-      rgb(13 13 13 / 0.42) 0%,
-      rgb(13 13 13 / 0.22) 22%,
-      rgb(13 13 13 / 0.22) 72%,
-      rgb(13 13 13 / 0.45) 100%
-    );
+    background: rgb(13 13 13 / 0.3);
   }
 
   /* The case study link over the videos: off (and see-through to clicks)
