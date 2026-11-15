@@ -88,7 +88,7 @@ const { services } = Astro.props;
         data-index={i}
         data-name={service.name}
       >
-        <div class="flex w-full flex-col items-start gap-[20px]">
+        <div class="flex w-full flex-1 flex-col items-start gap-[20px]">
           <div class="services-card-image relative w-full overflow-hidden">
             {/* Only the middle copy (the real, initially-centred set) is
                 eager — lazy-loading buys nothing for THOSE since the
@@ -167,7 +167,7 @@ const { services } = Astro.props;
               continuous block with title→overview at 12px and
               overview→modules at 20px (tightened from 20px and 36px to
               shorten the cards), rather than ruled-off sections. */}
-          <div class="services-card-text flex w-full flex-col items-start gap-[12px]">
+          <div class="services-card-text flex w-full flex-1 flex-col items-start gap-[12px]">
             {/* Service name as a small label above the title — the card
                 titles are descriptive ("Made properly") rather than the
                 service name, so this keeps it clear which service a card
@@ -177,9 +177,13 @@ const { services } = Astro.props;
               <p class="font-tag text-categories text-services">{service.name}</p>
               <h3 class="font-heading text-h3 text-[#29282d]">{service.cardTitle}</h3>
             </div>
-            <div class="flex w-full flex-col items-start gap-[20px]">
+            {/* Example Modules sit at the foot of every card (Figma
+                7382:2286): the cards in a row share one height, and any
+                spare space opens up above the modules, so they line up
+                from card to card. */}
+            <div class="flex w-full flex-1 flex-col items-start gap-[20px]">
               <p class="font-body text-body-3 text-services">{service.overview}</p>
-              <div class="flex w-full flex-col items-start gap-[10px]">
+              <div class="mt-auto flex w-full flex-col items-start gap-[10px]">
                 <p class="font-tag text-categories text-services">Example Modules</p>
                 <div class="flex flex-wrap gap-1">
                   {service.modules.map((moduleName) => <ModuleTag label={moduleName} />)}
