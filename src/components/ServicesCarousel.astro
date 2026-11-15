@@ -463,7 +463,7 @@ const { services } = Astro.props;
   // Scale/fade cards by distance from centre — the closer to centre, the
   // larger and more opaque, per the Figma annotation calling for "the rest
   // smaller and faded". One full step away (a peeking neighbour) is where
-  // this bottoms out at its floor; 0.55 opacity / 0.85 scale keeps that
+  // this bottoms out at its floor; 0.4 opacity / 0.85 scale keeps that
   // peeking card reading as "the next card" rather than washing out into
   // background blur.
   //
@@ -475,6 +475,9 @@ const { services } = Astro.props;
   // stays there), which keeps the movement continuous as cards pass
   // through the centre. Tablet keeps the plain shrink around the middle.
   const CARD_SHRINK = 0.15;
+  // How far a neighbour fades (to 0.4 opacity; was 0.55), so the cards
+  // either side of the centre one sit darker against the backdrop.
+  const SIDE_FADE = 0.6;
   const pulledCards = window.matchMedia('(max-width: 767px), (min-width: 1200px)');
   function cardVisualState(delta: number) {
     const t = Math.min(Math.abs(delta), 1);
@@ -485,7 +488,7 @@ const { services } = Astro.props;
       const closed = d <= 1 ? (CARD_SHRINK / 2) * d * d : CARD_SHRINK / 2 + CARD_SHRINK * (d - 1);
       pull = -Math.sign(delta) * closed * (cards[0]?.offsetWidth ?? 0);
     }
-    return { scale, opacity: 1 - t * 0.45, base: `translateX(${pull}px) scale(${scale})` };
+    return { scale, opacity: 1 - t * SIDE_FADE, base: `translateX(${pull}px) scale(${scale})` };
   }
 
   // Two passes, not one combined loop — all the layout reads (cardDelta,
