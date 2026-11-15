@@ -6,12 +6,12 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
 <header class="group pointer-events-none fixed inset-x-0 top-0 z-50" data-nav-bar data-open="false">
   <div class="relative z-50 flex items-center justify-center px-[var(--page-margin)] py-[var(--spacing-btn-y-nav)]">
     <div
-      class="nav-pill pointer-events-auto flex items-center overflow-hidden rounded-full border border-front/15"
+      class="nav-pill pointer-events-auto flex items-center overflow-hidden rounded-small"
       data-nav-pill
     >
       <a
         href="/"
-        class="flex items-center py-[15px] pl-[27px] pr-5"
+        class="flex items-center py-[15px] pl-[25px] pr-[30px]"
         style="height:var(--nav-menu-height)"
         data-nav-logo
       >
@@ -21,9 +21,12 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
         <img src={logo.src} alt="Friendhood — Home" class="nav-logo-img h-[80%] w-auto" />
       </a>
 
+      {/* A short divider, inset top and bottom (Figma 7893:3750). */}
+      <span class="nav-divider w-px shrink-0 bg-front/15" aria-hidden="true"></span>
+
       <button
         type="button"
-        class="nav-toggle font-tag pointer-events-auto flex cursor-pointer items-center justify-center border-l border-front/15 px-[var(--spacing-btn-x)] py-[var(--spacing-btn-y)] text-detail text-[length:calc(var(--text-detail)*1.12)] text-front transition-[background-color] duration-300 ease-out hover:bg-[#29282d]"
+        class="nav-toggle font-tag pointer-events-auto flex cursor-pointer items-center justify-center pl-[30px] pr-[25px] py-[var(--spacing-btn-y)] text-detail text-[length:calc(var(--text-detail)*1.12)] text-front transition-[background-color] duration-300 ease-out hover:bg-[#29282d]"
         style="height:var(--nav-menu-height)"
         data-nav-toggle
         aria-expanded="false"
@@ -65,11 +68,10 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
    * physical flick rather than a fade.
    */
   .nav-pill {
-    /* Tinted glass: a lighter dark tint than the site's other pills, over a
-       blurred and strongly saturated copy of whatever is behind it, so it
-       takes on the colours passing underneath (the hero's images, a case
-       study's photos) while the white text keeps its contrast. */
-    background-color: rgb(41 40 45 / 0.62);
+    /* A rounded bar (Figma 7893:3750): the site's 70% grey over a blurred,
+       saturated copy of whatever is behind it, so it takes on the colours
+       passing underneath while the white text keeps its contrast. */
+    background-color: rgb(41 40 45 / 0.7);
     -webkit-backdrop-filter: blur(18px) saturate(2.2);
     backdrop-filter: blur(18px) saturate(2.2);
     transform: scale(0.9);
@@ -88,6 +90,10 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
      CSS transition above is only what plays while held down. */
   .nav-pill.is-settling {
     transition: none;
+  }
+
+  .nav-divider {
+    height: calc(var(--nav-menu-height) * 0.57);
   }
 
   /* 5% bigger than the shared mobile/tablet default (80% → 84%) — mobile
