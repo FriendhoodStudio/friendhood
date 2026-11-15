@@ -62,21 +62,21 @@ const serviceList: ServiceItem[] =
         />
         <button
           type="button"
-          class="flex h-[96px] w-full cursor-pointer items-center justify-between gap-[15px] rounded-card border border-front/15 bg-[#29282d] px-[20px] py-[15px] text-left shadow-[0px_0px_4px_0px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
+          class="flex h-[80px] w-full cursor-pointer items-center justify-between gap-[15px] rounded-card border border-front/15 bg-[#29282d] px-[16px] py-[12px] text-left shadow-[0px_0px_4px_0px_rgba(0,0,0,0.3)] backdrop-blur-[25px]"
           data-service-trigger
           data-index={i}
         >
           <div class="flex min-w-0 flex-1 items-center gap-[15px]">
             {/* A circle: a deliberate contrast with the tile's square-ish
                 corners. */}
-            <div class="size-[63px] shrink-0 overflow-hidden rounded-full">
+            <div class="size-[52px] shrink-0 overflow-hidden rounded-full">
               <img src={service.imageUrl} alt="" class="h-full w-full object-cover" />
             </div>
             {/* Wraps onto a second line rather than truncating — with the grid's
                 columns now allowed to shrink to fit (see .col-grid), longer
                 names like "Creative engagement" no longer have the room to
                 sit on one line in three columns, and "Creative enga…" read
-                badly. The 96px tile fits two lines comfortably. */}
+                badly. The 80px tile fits two lines. */}
             <p class="line-clamp-2 pb-[2px] font-body text-body-2 leading-tight text-front">{service.name}</p>
           </div>
           <div class="flex size-[22px] shrink-0 items-center justify-center transition-transform duration-300 ease-out group-hover:scale-125 group-active:scale-90">
