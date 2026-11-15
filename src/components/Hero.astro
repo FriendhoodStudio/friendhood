@@ -1824,8 +1824,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
 
     reelTrigger.addEventListener('click', openReel);
 
-    // With a mouse the play box is the cursor over the showreel, and a
-    // click anywhere on the reel plays it.
+    // With a mouse the play box is the cursor over the showreel.
     const reelCard = document.querySelector<HTMLElement>('[data-hero-media]');
     if (reelCard && window.matchMedia('(hover: hover)').matches) {
       let px = 0;
@@ -1849,10 +1848,12 @@ const afterParts = headlineAfter.split(/(\s+)/);
         } else if (!raf) raf = requestAnimationFrame(place);
       });
       reelCard.addEventListener('pointerleave', () => reelCard.classList.remove('is-hovered'));
-      reelCard.addEventListener('click', (e) => {
-        if (!(e.target as Element).closest('[data-reel-trigger]')) openReel();
-      });
     }
+    // A click or tap anywhere on the landed showreel plays it, on every
+    // device (the play box is just the cue).
+    reelCard?.addEventListener('click', (e) => {
+      if (!(e.target as Element).closest('[data-reel-trigger]')) openReel();
+    });
     reelClose.addEventListener('click', closeReel);
     reelOverlay.addEventListener('click', (e) => {
       // Only the backdrop itself, not the video or close button, both of
