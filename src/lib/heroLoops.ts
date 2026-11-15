@@ -5,8 +5,9 @@
  * to the first.
  *
  * The <video> elements are rendered by Hero.astro, stacked in `root`; only
- * the first one loads up front, and each one after it starts loading while
- * the one before is playing, so it's ready by the time it's needed. */
+ * the first one loads up front, and each one after it is loaded while the
+ * one before is playing (see warm), so it's ready by the time it's needed.
+ * Nothing moves on until it is: the video showing just carries on looping. */
 
 // How many times each video plays before moving on.
 const PLAYS = 2;
@@ -16,8 +17,6 @@ const PUSH_EASE = 'cubic-bezier(0.65, 0, 0.35, 1)';
 // The push sets off this long before the video's second play ends, so it
 // is still moving as it slides away rather than stopped on its last frame.
 const PUSH_LEAD_S = 0.6;
-// How long to wait for the next video to be ready before pushing anyway.
-const READY_WAIT_MS = 4000;
 
 export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
   const videos = Array.from(root.querySelectorAll<HTMLVideoElement>('video'));
@@ -37,6 +36,9 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     GESTURES.forEach((type) => window.removeEventListener(type, onGesture));
     waitingForGesture = false;
     if (!paused) showing().forEach(play);
+    // A phone that wanted a tap before playing wants one before loading the
+    // next video too (see warm), and this is it.
+    if (videos.length > 1) warm(nextVideo());
   }
   function play(video: HTMLVideoElement) {
     video.muted = true;
@@ -51,31 +53,40 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     if (document.visibilityState === 'visible' && !paused) showing().forEach(play);
   });
 
-  const preload = (video: HTMLVideoElement) => {
-    if (video.readyState > 0 || video.preload === 'auto') return;
+  // Gets a video loaded and sitting on its first frame, ready to push in.
+  // Phones (an iPhone especially) ignore a request to preload and only load
+  // a video once it's played, so it's played for a moment and paused.
+  const warming = new WeakSet<HTMLVideoElement>();
+  function warm(video: HTMLVideoElement) {
+    if (video.readyState >= 3 || warming.has(video)) return;
+    warming.add(video);
     video.preload = 'auto';
-    video.load();
-  };
-
-  const whenReady = (video: HTMLVideoElement) =>
-    new Promise<void>((resolve) => {
-      if (video.readyState >= 3) return resolve();
-      const done = () => {
-        video.removeEventListener('canplay', done);
-        window.clearTimeout(timer);
-        resolve();
-      };
-      const timer = window.setTimeout(done, READY_WAIT_MS);
-      video.addEventListener('canplay', done);
-    });
+    if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) video.load();
+    video.muted = true;
+    video
+      .play()
+      .then(() => {
+        if (video !== videos[index] && !pushing) {
+          video.pause();
+          video.currentTime = 0;
+        }
+      })
+      .catch(() => {})
+      .finally(() => warming.delete(video));
+  }
 
   function start(video: HTMLVideoElement) {
     plays = 0;
-    lastTime = 0;
-    // Loops by itself until its last play, so the restart is seamless.
-    video.loop = videos.length === 1 || PLAYS > 1;
-    if (videos.length > 1) preload(videos[(index + 1) % videos.length]);
+    lastTime = video.currentTime;
+    // Loops by itself, so each restart is seamless; the push takes it from
+    // there once it has played enough.
+    video.loop = true;
+    if (videos.length > 1) warm(videos[(index + 1) % videos.length]);
   }
+
+  const nextVideo = () => videos[(index + 1) % videos.length];
+  // Ready enough to play straight through the push without stalling.
+  const isReady = (video: HTMLVideoElement) => video.readyState >= 3;
 
   async function push() {
     if (pushing || videos.length < 2) return;
@@ -83,9 +94,10 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     const current = videos[index];
     const nextIndex = (index + 1) % videos.length;
     const next = videos[nextIndex];
-    preload(next);
-    await whenReady(next);
-    next.currentTime = 0;
+    // The outgoing video plays out its last moments as it slides away and
+    // holds its last frame, rather than jumping back to its start.
+    current.loop = false;
+    if (next.currentTime > 0.05) next.currentTime = 0;
     next.loop = true;
     next.style.visibility = 'visible';
     if (!paused) play(next);
@@ -101,31 +113,40 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     incoming.cancel();
     current.pause();
     current.style.visibility = 'hidden';
+    if (current.currentTime > 0.05) current.currentTime = 0;
     index = nextIndex;
-    start(next);
     pushing = false;
+    start(next);
   }
 
-  // Counts the plays (a loop shows up as the time jumping back), lets the
-  // last one run out rather than loop, and sets the push off just before
-  // it ends. Driven by the video's own time updates (a few a second), which
-  // carry on even where animation frames are held back.
+  // Counts the plays (each loop shows up as the time jumping back) and sets
+  // the push off just before the last one ends, once the next video is
+  // ready. If it isn't ready yet, this one carries on looping and goes as
+  // soon as it is, at the start of a loop; and if the moment near the end
+  // was missed (time updates come only a few times a second, fewer on a
+  // busy phone), it goes as the next loop starts. Driven by the video's own
+  // time updates, which carry on even where animation frames are held back.
   function onTime(this: HTMLVideoElement) {
     const video = this;
-    if (video !== videos[index] || pushing || !video.duration) return;
-    if (video.currentTime < lastTime - 0.25) {
-      plays++;
-      if (plays >= PLAYS - 1 && videos.length > 1) video.loop = false;
-    }
+    if (video !== videos[index] || pushing || !video.duration || videos.length < 2) return;
+    const wrapped = video.currentTime < lastTime - 0.25;
+    if (wrapped) plays++;
     lastTime = video.currentTime;
-    if (videos.length > 1 && plays >= PLAYS - 1 && video.duration - video.currentTime <= PUSH_LEAD_S) push();
+    const next = nextVideo();
+    if (!isReady(next)) {
+      if (plays >= PLAYS - 1) warm(next);
+      return;
+    }
+    const nearEnd = plays >= PLAYS - 1 && video.duration - video.currentTime <= PUSH_LEAD_S;
+    const overdue = plays >= PLAYS && video.currentTime < 1;
+    if (nearEnd || overdue) push();
   }
 
   for (const video of videos) {
     video.addEventListener('timeupdate', onTime);
     // In case the end comes between time updates.
     video.addEventListener('ended', () => {
-      if (video === videos[index]) push();
+      if (video === videos[index] && !pushing) push();
     });
   }
 
