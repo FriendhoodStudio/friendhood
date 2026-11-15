@@ -16,6 +16,9 @@ export interface HeroData {
    * separate file from `media`'s short muted loop. Undefined until one is
    * uploaded in Studio, which is also what gates the trigger button. */
   reelVideoUrl?: string;
+  /** Video loops filling the first screen behind the headline, in order:
+   * each plays twice, then pushes sideways to the next. */
+  loopVideos: HeroLoopVideo[];
   /** Project images that roll up around the headline as the hover word
    * cycles. Empty when the effect is switched off in Studio. */
   popUpImages: HeroPopUpImage[];
@@ -30,4 +33,10 @@ export interface HeroPopUpImage {
   project?: string;
   /** The project's short card copy. */
   detail?: string;
+}
+
+export interface HeroLoopVideo {
+  url: string;
+  /** Optional portrait cut for phones. */
+  mobileUrl?: string;
 }

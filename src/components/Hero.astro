@@ -18,7 +18,11 @@ const heroVideoMobileUrl = hero?.heroVideoMobileUrl;
 // render once this is actually set, rather than falling back to replaying
 // the tiny background loop unmuted.
 const reelVideoUrl = hero?.reelVideoUrl;
-const popUpImages = hero?.popUpImages ?? [];
+const loopVideos = hero?.loopVideos ?? [];
+// Background videos, when there are any, take the first screen instead of
+// the floating project images and the light backdrop.
+const hasLoops = loopVideos.length > 0;
+const popUpImages = hasLoops ? [] : hero?.popUpImages ?? [];
 
 // Splits the headline around the one literal word that rolls on hover, so
 // the rest of the sentence stays put — e.g. "For people thinking about
@@ -49,7 +53,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     first lets the card's edge sit inside a section, not ON the seam.
     Services' own top padding is reduced by the same amount (see there) so
     the total visible gap before "How we help" doesn't grow. */}
-<section class="hero-stage relative" data-hero-section>
+<section class:list={['hero-stage relative', { 'has-loops': hasLoops }]} data-hero-section>
   {/* The hero is a pinned scroll "stage": this sticky screen holds still
       for the extra scroll height the section adds (see .hero-stage), while
       the scroll drives the headline and floating images zooming apart past
@@ -70,7 +74,27 @@ const afterParts = headlineAfter.split(/(\s+)/);
         over the normal dark gradient) and fades out as you scroll, see
         the invert script below; sits above the gradient so it hides it
         completely at scroll position 0. */}
-    <div class="absolute inset-0 bg-front" data-hero-invert-overlay></div>
+    {!hasLoops && <div class="absolute inset-0 bg-front" data-hero-invert-overlay></div>}
+    {/* The background videos (see heroLoops.ts), stacked: one showing at a
+        time, the next pushing it off sideways. Only the first loads up
+        front. Muted and decorative. */}
+    {hasLoops && (
+      <div class="absolute inset-0 overflow-hidden bg-back" data-hero-loops>
+        {loopVideos.map((loop, i) => (
+          <video
+            class="absolute inset-0 h-full w-full object-cover"
+            muted
+            playsinline
+            disablepictureinpicture
+            preload={i === 0 ? 'auto' : 'none'}
+            autoplay={i === 0}
+          >
+            {loop.mobileUrl && <source src={loop.mobileUrl} media="(max-width: 767px)" />}
+            <source src={loop.url} />
+          </video>
+        ))}
+      </div>
+    )}
   </div>
 
   {/* Keeps the headline vertically centred in the space below the nav —
@@ -98,7 +122,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       </Fragment>
     )}
     <h1
-      class="hero-fade-in hero-headline-shadow hero-headline-heavy-font relative z-20 max-w-[var(--col-8)] text-balance text-center font-display text-h1 text-front pointer-events-none"
+      class="hero-fade-in hero-headline-shadow hero-headline-heavy-font relative z-20 text-center font-display text-h2 text-front pointer-events-none max-md:text-balance md:whitespace-nowrap"
     >
       {loopWords.length > 0 ? (
         <Fragment>
@@ -453,6 +477,26 @@ const afterParts = headlineAfter.split(/(\s+)/);
        to try. */
     mix-blend-mode: difference;
   }
+  /* Over the background videos, the headline and the line at the bottom
+     are the light foreground colour set to difference, so they show as the
+     inverse of whatever's playing behind them. Set on the elements
+     themselves (they're each their own layer), so they blend with the
+     videos rather than only with their own empty box. */
+  .has-loops h1,
+  .has-loops [data-hero-tagline] {
+    mix-blend-mode: difference;
+  }
+
+  /* One line from tablet up (two on phones, at the break after the cycling
+     word). At H2 size the line is about 21 of its own font size wide with
+     the longest cycling word in it, more than a narrow tablet has room for,
+     so there it comes down just enough to fit. */
+  @media (min-width: 768px) {
+    .hero-headline-heavy-font {
+      font-size: min(var(--text-h2), calc((100vw - 2 * var(--page-margin)) / 21.5));
+    }
+  }
+
   /*
    * Different hover/auto-advance words have different natural widths
    * ("people" vs "orgs"), which on mobile is enough to shift where the
@@ -658,6 +702,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
   import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock';
   import { initHeroPopups } from '../lib/heroPopups';
   import { initHeroStream } from '../lib/heroStream';
+  import { initHeroLoops } from '../lib/heroLoops';
   import type { HeroPopUpImage } from '../types/hero';
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -698,6 +743,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const statement = document.querySelector<HTMLElement>('[data-hero-statement]');
     const glow = document.querySelector<HTMLElement>('.hero-gradient');
     const overlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
+    const loopsLayer = document.querySelector<HTMLElement>('[data-hero-loops]');
+    const loops = loopsLayer ? initHeroLoops(loopsLayer, reduceMotion) : null;
 
     // Headline/tagline text goes from the light-theme dark to the normal
     // light as the backdrop darkens — read from the live colour tokens.
@@ -780,7 +827,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // for, and with too much to draw Chrome holds the stage's frames back
       // during a trackpad scroll. The tagline swaps in one go, while it's
       // faded out between the headline and the statement.
-      if (headline) headline.style.color = mix(Math.round(darken * COLOUR_STEPS) / COLOUR_STEPS);
+      // Over the background videos the text stays light throughout.
+      if (headline && !loops) headline.style.color = mix(Math.round(darken * COLOUR_STEPS) / COLOUR_STEPS);
       if (tagline) {
         // Fades at the start, comes back under the statement, and fades
         // again early in the hand-over as it scrolls away.
@@ -788,7 +836,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
         // The colour only changes while it's showing: Safari on iPhone
         // doesn't redraw text whose colour changed while it was faded right
         // out, so it came back under the statement still dark.
-        if (taglineOpacity > 0) tagline.style.color = mix(darken > 0.5 ? 1 : 0);
+        if (taglineOpacity > 0 && !loops) tagline.style.color = mix(darken > 0.5 ? 1 : 0);
         tagline.style.opacity = String(taglineOpacity);
         tagline.style.translate = after ? `0 ${-after * fadePx}px` : '';
       }
@@ -796,6 +844,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
       stageUnderway = p > 0.002;
       if (wasUnderway && !stageUnderway) window.dispatchEvent(new Event('hero-stage-rest'));
       popups?.setPaused(p > 0.02);
+      // The videos stop once they've faded out of sight behind the reel.
+      loops?.setPaused(out >= 1);
 
       if (reel) {
         // It doesn't vanish as it zooms past: it settles back as a dimmed,
@@ -814,11 +864,15 @@ const afterParts = headlineAfter.split(/(\s+)/);
         statement.style.translate = after ? `0 ${-after * fadePx}px` : '';
       }
 
+      if (loopsLayer) loopsLayer.style.opacity = String(1 - out);
       if (reduceMotion) {
         if (headline) headline.style.opacity = String(1 - out);
         if (popupLayer) popupLayer.style.opacity = String(1 - out);
         return;
       }
+      // The videos zoom on past the viewer as they fade, along with the
+      // headline, giving way to the dark backdrop the reel zooms up out of.
+      if (loopsLayer) loopsLayer.style.scale = out ? String(1 + out * 0.35) : '';
 
       // The headline's lines part like a curtain: lines above its middle
       // slide up and off the top, lines below slide down and off the

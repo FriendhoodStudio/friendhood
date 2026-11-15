@@ -260,6 +260,7 @@ export interface RawHero extends RawMedia {
   statement?: string;
   heroVideoMobileUrl?: string;
   reelVideoUrl?: string;
+  loopVideos?: { url: string; mobileUrl?: string | null }[] | null;
   popUpImagesEnabled?: boolean;
   popUpImages?: RawPopUpImage[] | null;
   projectPopUpImages?: { title: string; detail?: string; slug?: string; images: RawPopUpImage[] | null }[];
@@ -304,6 +305,7 @@ export function toHeroData(raw: RawHero): HeroData {
     media: toMedia(raw, raw.headline),
     heroVideoMobileUrl: raw.heroVideoMobileUrl,
     reelVideoUrl: raw.reelVideoUrl,
+    loopVideos: (raw.loopVideos ?? []).filter((v) => v?.url).map((v) => ({ url: v.url, ...(v.mobileUrl ? { mobileUrl: v.mobileUrl } : {}) })),
     popUpImages: toPopUpImages(raw),
   };
 }

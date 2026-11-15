@@ -44,6 +44,48 @@ export default defineType({
       rows: 2,
     }),
     defineField({
+      name: 'loopVideos',
+      title: 'Background videos',
+      description:
+        'Fill the first screen behind the headline, one at a time: each plays twice, then pushes sideways to the next, in this order (drag to reorder). Short, muted, 16:9 clips work best — around 5–10MB each. Leave empty to show the floating project images instead.',
+      type: 'array',
+      of: [
+        {
+          type: 'object',
+          name: 'loopVideo',
+          title: 'Background video',
+          fields: [
+            defineField({
+              name: 'video',
+              title: 'Video',
+              type: 'file',
+              options: { accept: 'video/*' },
+              validation: (rule) => rule.required(),
+            }),
+            defineField({
+              name: 'mobileVideo',
+              title: 'Mobile video (portrait)',
+              description:
+                'Optional. A portrait cut for phones. Without one, phones show the middle of the video above.',
+              type: 'file',
+              options: { accept: 'video/*' },
+            }),
+            defineField({
+              name: 'project',
+              title: 'Case study',
+              description: 'Optional. Which case study the clip is from, to keep track of them here.',
+              type: 'reference',
+              to: [{ type: 'project' }],
+            }),
+          ],
+          preview: {
+            select: { project: 'project.title', file: 'video.asset.originalFilename' },
+            prepare: ({ project, file }) => ({ title: project || file || 'Video', subtitle: project ? file : undefined }),
+          },
+        },
+      ],
+    }),
+    defineField({
       name: 'mediaType',
       title: 'Hero media type',
       type: 'string',
