@@ -124,43 +124,44 @@ const { services } = Astro.props;
                 a white bar across the top that closed the cards. */}
             <div class="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end px-[15px] pt-[12px]">
               <div class="services-card-controls pointer-events-auto flex items-center rounded-full border border-front/15 bg-[#29282d]/70 text-grey-200 backdrop-blur-[14px]">
-              <div class="group relative">
-                <button
-                  type="button"
-                  class="copy-email-btn flex h-[40px] w-[46px] cursor-pointer items-center justify-center transition-colors duration-300 ease-out hover:text-front"
-                  data-copy-email
-                  data-email="hello@friendhood.co.uk"
-                  aria-label="Copy email address"
-                >
-                  <svg width="20" height="19" viewBox="13 17 26 24" fill="none" aria-hidden="true">
-                    <path d="M35.0088 18.0822C37.301 18.0823 38.7262 20.5799 37.5801 22.5887L28.5211 38.4654C27.0951 40.9646 23.3493 40.234 22.9739 37.3837L22.1093 30.8181C21.9372 29.5112 21.2616 28.3271 20.2291 27.5229L15.0432 23.4841C12.7913 21.7301 14.039 18.0823 16.8909 18.0822L35.0088 18.0822Z" stroke="currentColor" stroke-width="2" />
-                    <path d="M34.154 22.7865C34.6309 22.5079 34.7956 21.8932 34.5219 21.4135C34.2482 20.9338 33.6397 20.7708 33.1628 21.0494L33.6584 21.918L34.154 22.7865ZM20.7313 29.4701L21.2268 30.3386L34.154 22.7865L33.6584 21.918L33.1628 21.0494L20.2357 28.6015L20.7313 29.4701Z" fill="currentColor" />
-                  </svg>
-                </button>
-                <span
-                  data-copy-email-status
-                  class="pointer-events-none absolute right-0 top-full mt-2 whitespace-nowrap rounded-small border border-front/15 bg-[#29282d]/85 px-3 py-1 opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100"
-                >
-                  <span class="relative block h-[18px] overflow-hidden">
-                    {/* leading-[18px] (not leading-none) — same fix as the
-                        nav Menu/Close toggle's own h-[21px] window: height
-                        alone doesn't vertically centre a single line of
-                        text in a taller box, it just leaves the extra
-                        space at the bottom. */}
-                    <span
-                      data-copy-email-status-track
-                      class="flex flex-col font-tag text-detail leading-[18px] text-front transition-transform duration-400 ease-in-out"
-                    >
-                      <span class="block h-[18px]">Enquire now</span>
-                      <span data-copy-email-status-result class="block h-[18px]"></span>
+              {/* Copy the email address. Hovering it opens the pill out:
+                  "Enquire now" grows out from the middle as the button
+                  widens, pushing the plane and cross off to either side
+                  (and after a click it shows "Email copied" the same way).
+                  The words are inside the button, so the pointer stays on
+                  it as it grows. Springs back shut on leaving. */}
+              <button
+                type="button"
+                class="copy-email-btn flex h-[40px] cursor-pointer items-center px-[13px] transition-colors duration-300 ease-out hover:text-accent-yellow"
+                data-copy-email
+                data-email="hello@friendhood.co.uk"
+                aria-label="Copy email address"
+              >
+                <svg class="shrink-0" width="20" height="19" viewBox="13 17 26 24" fill="none" aria-hidden="true">
+                  <path d="M35.0088 18.0822C37.301 18.0823 38.7262 20.5799 37.5801 22.5887L28.5211 38.4654C27.0951 40.9646 23.3493 40.234 22.9739 37.3837L22.1093 30.8181C21.9372 29.5112 21.2616 28.3271 20.2291 27.5229L15.0432 23.4841C12.7913 21.7301 14.039 18.0823 16.8909 18.0822L35.0088 18.0822Z" stroke="currentColor" stroke-width="2" />
+                  <path d="M34.154 22.7865C34.6309 22.5079 34.7956 21.8932 34.5219 21.4135C34.2482 20.9338 33.6397 20.7708 33.1628 21.0494L33.6584 21.918L34.154 22.7865ZM20.7313 29.4701L21.2268 30.3386L34.154 22.7865L33.6584 21.918L33.1628 21.0494L20.2357 28.6015L20.7313 29.4701Z" fill="currentColor" />
+                </svg>
+                <span class="copy-label block overflow-hidden" data-copy-email-status aria-hidden="true">
+                  <span class="copy-label-text block whitespace-nowrap px-[10px]">
+                    {/* Two rows in a one-row window, rolled up to swap from
+                        "Enquire now" to the click's result (same roll as
+                        the nav's Menu/Close). */}
+                    <span class="relative block h-[18px] overflow-hidden">
+                      <span
+                        data-copy-email-status-track
+                        class="flex w-max flex-col font-tag text-detail uppercase leading-[18px] transition-transform duration-400 ease-in-out"
+                      >
+                        <span class="block h-[18px]">Enquire now</span>
+                        <span data-copy-email-status-result class="block h-[18px]"></span>
+                      </span>
                     </span>
                   </span>
                 </span>
-              </div>
-              <span class="h-[18px] w-px bg-front/15" aria-hidden="true"></span>
+              </button>
+              <span class="copy-divider h-[18px] w-px bg-front/15" aria-hidden="true"></span>
               <button
                 type="button"
-                class="flex h-[40px] w-[46px] cursor-pointer items-center justify-center transition-colors duration-300 ease-out hover:text-front"
+                class="flex h-[40px] w-[46px] cursor-pointer items-center justify-center transition-colors duration-300 ease-out hover:text-accent-yellow"
                 data-services-close
                 aria-label="Close"
               >
@@ -334,8 +335,50 @@ const { services } = Astro.props;
      a wide shape a see-saw motion would read on. Release is driven by
      WAAPI (see script) so it can overshoot past 1 before settling; this
      transition is only what plays while actually held down. */
+  /* The copy button's words: no width and clipped to a sliver at their
+     centre at rest; open (hover, or .is-open while a click's result shows)
+     the width springs out to fit them (--copy-w, measured by the script)
+     and they open out from the middle. The same spring closes it, so it
+     snaps back with a little settle. */
+  .copy-label {
+    width: 0;
+    transition: width 520ms cubic-bezier(0.34, 1.45, 0.5, 1);
+  }
+  .copy-label-text {
+    opacity: 0;
+    clip-path: inset(0 50% 0 50%);
+    transition:
+      clip-path 360ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 200ms ease-out;
+  }
+  .copy-divider {
+    transition: opacity 200ms ease-out;
+  }
+  @media (hover: hover) {
+    .copy-email-btn:hover .copy-label {
+      width: var(--copy-w, 0px);
+    }
+    .copy-email-btn:hover .copy-label-text {
+      opacity: 1;
+      clip-path: inset(0 0 0 0);
+    }
+    .services-card-controls:has(.copy-email-btn:hover) .copy-divider {
+      opacity: 0;
+    }
+  }
+  .copy-email-btn.is-open .copy-label {
+    width: var(--copy-w, 0px);
+  }
+  .copy-email-btn.is-open .copy-label-text {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+  .services-card-controls:has(.copy-email-btn.is-open) .copy-divider {
+    opacity: 0;
+  }
+
   .copy-email-btn.is-pressed {
-    transform: scale(0.82);
+    transform: scale(0.94);
     transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   .copy-email-btn.is-settling {
@@ -965,21 +1008,29 @@ const { services } = Astro.props;
     const result = status?.querySelector<HTMLElement>('[data-copy-email-status-result]');
     let hideTimeout = 0;
 
-    // Same two-row roll used for the nav's Menu/Close toggle: a fixed-height
-    // window with both labels stacked in a flex column, translated up by
-    // half its own height to swap which row shows. The tooltip element also
-    // doubles as the hover label ("Enquire now", shown via CSS group-hover)
-    // — the inline opacity set here temporarily overrides that, then clears
-    // afterward so it falls back to plain CSS hover behavior once the
-    // click-feedback window ends, rather than getting stuck.
+    // How wide the words open to: the wider of the two rows, plus the
+    // label's padding either side. Measured when it's about to open, since
+    // the result row's words change.
+    const LABEL_PAD = 20;
+    const measure = () => {
+      if (status && track) status.style.setProperty('--copy-w', `${track.offsetWidth + LABEL_PAD}px`);
+    };
+    measure();
+    document.fonts.ready.then(measure);
+    copyButton.addEventListener('pointerenter', measure);
+
+    // The click's result rolls up in place of "Enquire now" (same two-row
+    // roll as the nav's Menu/Close), with the button held open while it
+    // shows, then everything springs back.
     function showStatus(text: string) {
       if (!status || !track || !result) return;
       window.clearTimeout(hideTimeout);
       result.textContent = text;
-      status.style.opacity = '1';
+      measure();
+      copyButton.classList.add('is-open');
       track.classList.add('-translate-y-1/2');
       hideTimeout = window.setTimeout(() => {
-        status.style.opacity = '';
+        copyButton.classList.remove('is-open');
         track.classList.remove('-translate-y-1/2');
       }, 1500);
     }
@@ -998,9 +1049,9 @@ const { services } = Astro.props;
       if (!copyButton.classList.contains('is-pressed')) return;
       settleAnim = copyButton.animate(
         [
-          { transform: 'scale(0.82)' },
-          { transform: 'scale(1.12)', offset: 0.55 },
-          { transform: 'scale(0.97)', offset: 0.8 },
+          { transform: 'scale(0.94)' },
+          { transform: 'scale(1.04)', offset: 0.55 },
+          { transform: 'scale(0.99)', offset: 0.8 },
           { transform: 'scale(1)' },
         ],
         { duration: 380, easing: 'ease-out', fill: 'forwards' }
