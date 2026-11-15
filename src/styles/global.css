@@ -190,8 +190,10 @@
   --spacing-vertical-xs: 0.25rem; /* 4px, constant across breakpoints */
   --spacing-vertical-s: 0.8125rem; /* 13px */
   --spacing-vertical-m: 1.25rem; /* 20px */
-  --spacing-vertical-l: 2.5rem; /* 40px */
-  --spacing-vertical-xl: 6.25rem; /* 100px */
+  /* The two largest vertical spacings trimmed ~15% at every size, to
+     suit the more compact layout. */
+  --spacing-vertical-l: 2.125rem; /* 34px (was 40px) */
+  --spacing-vertical-xl: 5.3125rem; /* 85px (was 100px) */
   --spacing-horizontal-xs: 0.25rem; /* 4px, constant across breakpoints */
   --spacing-horizontal-m: 0.5rem; /* 8px — half of --spacing-gutter at this tier */
   --spacing-gutter: 0.9375rem; /* 15px */
@@ -365,8 +367,8 @@
 
     --spacing-vertical-s: 0.9375rem; /* 15px */
     --spacing-vertical-m: 1.875rem; /* 30px */
-    --spacing-vertical-l: 3.125rem; /* 50px */
-    --spacing-vertical-xl: 7.5rem; /* 120px */
+    --spacing-vertical-l: 2.625rem; /* 42px (was 50px) */
+    --spacing-vertical-xl: 6.25rem; /* 100px (was 120px) */
     --spacing-horizontal-m: 0.625rem; /* 10px — half of --spacing-gutter at this tier */
     --spacing-gutter: 1.25rem; /* 20px */
     --spacing-btn-x: 1.25rem; /* 20px */
@@ -411,8 +413,8 @@
     --text-categories: 0.84375rem; /* 13.5px */
 
     --spacing-vertical-s: 1.25rem; /* 20px */
-    --spacing-vertical-l: 4.375rem; /* 70px */
-    --spacing-vertical-xl: 11.875rem; /* 190px */
+    --spacing-vertical-l: 3.75rem; /* 60px (was 70px) */
+    --spacing-vertical-xl: 10rem; /* 160px (was 190px) */
     --spacing-horizontal-m: 1.25rem; /* 20px — half of --spacing-gutter at this tier */
     --spacing-gutter: 2.5rem; /* 40px */
     --spacing-btn-x: 1.5625rem; /* 25px */
@@ -440,8 +442,8 @@
     --text-body-3: 1.0125rem; /* 16.2px */
 
     --spacing-vertical-m: 2.25rem; /* 36px */
-    --spacing-vertical-l: 4.6875rem; /* 75px */
-    --spacing-vertical-xl: 12.5rem; /* 200px */
+    --spacing-vertical-l: 4rem; /* 64px (was 75px) */
+    --spacing-vertical-xl: 10.625rem; /* 170px (was 200px) */
     --spacing-horizontal-m: 1.5625rem; /* 25px — half of --spacing-gutter at this tier */
     --spacing-gutter: 3.125rem; /* 50px */
     --spacing-btn-y-nav: 1.5rem; /* 24px (was 30px) */
