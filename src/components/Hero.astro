@@ -1717,12 +1717,18 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // fill it, plenty for even a short name to run end to end.
       const TICKER_PX_S = 28;
       const COPIES = 8;
+      const EYE_SVG =
+        '<svg width="14" height="9" viewBox="0 0 14 9" fill="none" aria-hidden="true" style="flex-shrink:0">' +
+        '<path d="M1 4.5C2.6 1.9 4.7 0.75 7 0.75S11.4 1.9 13 4.5C11.4 7.1 9.3 8.25 7 8.25S2.6 7.1 1 4.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
+        '<circle cx="7" cy="4.5" r="1.7" fill="currentColor"/></svg>';
       const setTicker = (name: string) => {
         track.replaceChildren(
           ...Array.from({ length: COPIES }, () => {
+            // The name, then a small eye between repeats (in place of a dot).
             const copy = document.createElement('span');
-            copy.className = 'pr-[0.6em]';
-            copy.textContent = `${name} \u2022`;
+            copy.className = 'inline-flex items-center gap-[0.5em] pr-[0.6em]';
+            copy.append(name);
+            copy.insertAdjacentHTML('beforeend', EYE_SVG);
             return copy;
           })
         );
