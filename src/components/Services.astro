@@ -111,6 +111,13 @@ const serviceList: ServiceItem[] =
       max-width: var(--col-6);
     }
   }
+  /* Tablet: half the page's width (8 columns ran nearly the full width
+     there). */
+  @media (min-width: 768px) and (max-width: 1199px) {
+    .paragraph-span {
+      max-width: 50%;
+    }
+  }
 
   /* Tile grid: 1/2/3 columns per row across the breakpoints, per Figma —
      see .col-grid in global.css for why this is explicit breakpoint-gated
