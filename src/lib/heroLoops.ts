@@ -35,17 +35,47 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     // next video too (see warm), and this is it.
     if (videos.length > 1) warm(nextVideo());
   }
+  // A play can also fail for no lasting reason: Safari especially, on a
+  // fresh load, can drop one while the video's still fetching. Those are
+  // tried again (when it can play, and again shortly after) rather than
+  // left waiting for a tap; only a real "not allowed" waits for one, and
+  // even then it keeps trying, in case it was only Safari being early.
+  const MAX_RETRIES = 6;
+  const retries = new WeakMap<HTMLVideoElement, number>();
+  const shouldPlay = (video: HTMLVideoElement) =>
+    !paused && video.paused && video.style.visibility !== 'hidden' && document.visibilityState === 'visible';
+  function retry(video: HTMLVideoElement) {
+    const n = retries.get(video) ?? 0;
+    if (n >= MAX_RETRIES) return;
+    retries.set(video, n + 1);
+    const again = () => {
+      if (shouldPlay(video)) play(video);
+    };
+    video.addEventListener('canplay', again, { once: true });
+    window.setTimeout(again, 400 + n * 400);
+  }
   function play(video: HTMLVideoElement) {
     video.muted = true;
-    video.play().catch(() => {
-      if (waitingForGesture) return;
-      waitingForGesture = true;
-      GESTURES.forEach((type) => window.addEventListener(type, onGesture, { passive: true }));
+    video.play().catch((err: unknown) => {
+      if ((err as { name?: string })?.name === 'NotAllowedError' && !waitingForGesture) {
+        waitingForGesture = true;
+        GESTURES.forEach((type) => window.addEventListener(type, onGesture, { passive: true }));
+      }
+      retry(video);
     });
   }
-  // Coming back to the tab (or the app) after the browser paused it.
+  for (const video of videos) {
+    // Playing at last: clear its retries (they start again if it's stopped
+    // later and won't restart).
+    video.addEventListener('playing', () => retries.delete(video));
+  }
+  // Coming back to the tab (or the app), or to the page from the back
+  // button, after the browser paused it.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && !paused) showing().forEach(play);
+  });
+  window.addEventListener('pageshow', () => {
+    if (!paused) showing().forEach(play);
   });
 
   // Gets a video loaded and sitting on its first frame, ready to push in.
@@ -73,7 +103,11 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
   function start(video: HTMLVideoElement) {
     // Loops by itself, so each restart is seamless, until it's pushed on.
     video.loop = true;
-    if (videos.length > 1) warm(nextVideo());
+    if (videos.length < 2) return;
+    // The next one loads once this one is playing, so on a fresh load the
+    // two aren't fetching at once and this one starts as soon as it can.
+    if (!video.paused) warm(nextVideo());
+    else video.addEventListener('playing', () => warm(nextVideo()), { once: true });
   }
 
   const nextVideo = () => videos[(index + 1) % videos.length];
