@@ -98,12 +98,12 @@ import NavMenuOverlay from './NavMenuOverlay.astro';
     }
   }
 
-  /* Smaller on desktop specifically — at 80% of --nav-menu-height (68px
-     there) the wordmark read as oversized next to the Menu button once the
-     pill itself is that much bigger than on mobile/tablet. */
+  /* Desktop keeps the wordmark at the size it had in the taller pill (it
+     was 62% of the old 68px pill's padded height), now that the pill is
+     shorter (see --nav-menu-height). */
   @media (min-width: 1200px) {
     .nav-logo-img {
-      height: 62%;
+      height: 84%;
     }
   }
 </style>

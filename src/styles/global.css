@@ -338,7 +338,9 @@
     --col-6: 354px;
     --col-8: 728px;
     --label-width: 167px;
-    --nav-menu-height: 68px;
+    /* Was 68px: the pill read as too tall on tablet and desktop. 58px
+       gives the same room above and below the logo as on phones. */
+    --nav-menu-height: 58px;
 
     --text-h1: 3.375rem; /* 54px */
     --text-h2: 2.625rem; /* 42px */
@@ -361,7 +363,7 @@
     --spacing-gutter: 1.25rem; /* 20px */
     --spacing-btn-x: 1.25rem; /* 20px */
     --spacing-btn-y: 1.25rem; /* 20px — matches btn-x, per Button-L spec */
-    --spacing-btn-y-nav: 1.25rem; /* 20px */
+    --spacing-btn-y-nav: 1rem; /* 16px (was 20px) */
   }
 }
 
@@ -407,7 +409,7 @@
     --spacing-gutter: 2.5rem; /* 40px */
     --spacing-btn-x: 1.5625rem; /* 25px */
     --spacing-btn-y: 1.5625rem; /* 25px — matches btn-x, per Button-L spec */
-    --spacing-btn-y-nav: 1.5625rem; /* 25px */
+    --spacing-btn-y-nav: 1.25rem; /* 20px (was 25px) */
   }
 }
 
@@ -434,6 +436,6 @@
     --spacing-vertical-xl: 12.5rem; /* 200px */
     --spacing-horizontal-m: 1.5625rem; /* 25px — half of --spacing-gutter at this tier */
     --spacing-gutter: 3.125rem; /* 50px */
-    --spacing-btn-y-nav: 1.875rem; /* 30px */
+    --spacing-btn-y-nav: 1.5rem; /* 24px (was 30px) */
   }
 }
