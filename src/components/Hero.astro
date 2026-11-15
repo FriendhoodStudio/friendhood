@@ -93,11 +93,6 @@ const afterParts = headlineAfter.split(/(\s+)/);
             <source src={loop.url} />
           </video>
         ))}
-        {/* A scrim over the videos (an even 20% tint), so the headline,
-            nav and the lines at the bottom hold up over bright footage.
-            Inside the video layer, so it zooms and fades with them on
-            scroll. */}
-        <div class="hero-loops-scrim pointer-events-none absolute inset-0" aria-hidden="true"></div>
       </div>
     )}
   </div>
@@ -515,10 +510,6 @@ const afterParts = headlineAfter.split(/(\s+)/);
      iPhone in Low Power Mode, or a Mac set not to auto-play). These are
      backgrounds, so it's hidden: the videos start on the first touch or
      scroll instead (see heroLoops.ts). */
-  .hero-loops-scrim {
-    background: rgb(13 13 13 / 0.2);
-  }
-
   /* The case study link over the videos: off (and see-through to clicks)
      until the video showing has one. */
   .hero-loop-link {
@@ -598,24 +589,6 @@ const afterParts = headlineAfter.split(/(\s+)/);
   }
   [data-hero-loops] video::-webkit-media-controls-overlay-play-button {
     display: none !important;
-  }
-
-  /* Over each of those, a faint solid copy (the script makes and drives
-     it) gives the difference a floor: over mid-tone footage, where
-     difference alone goes grey, the words still read. The copy sits in the
-     same grid cell as the headline, so it lays out exactly on top. */
-  .has-loops .hero-headline-area {
-    display: grid;
-    place-items: center;
-  }
-  .has-loops .hero-headline-area > :global(*) {
-    grid-area: 1 / 1;
-  }
-  :global(.hero-text-floor) {
-    mix-blend-mode: normal !important;
-    pointer-events: none;
-    /* Its strength until the script first syncs it. */
-    opacity: 0.3;
   }
 
   .has-loops h1,
@@ -1810,62 +1783,6 @@ const afterParts = headlineAfter.split(/(\s+)/);
       });
       link.addEventListener('pointerleave', () => link.classList.remove('is-hovered'));
     }
-  }
-
-  // The solid floor for the difference-blended headline and footer line
-  // (see .hero-text-floor): a copy of each at FLOOR opacity, blended
-  // normally, just above it (above, so it adds to the difference result;
-  // beneath, it would only lighten what the difference inverts against,
-  // which weakens it). The original is what the page's scripts
-  // drive (the word roll, the scroll stage); each frame the copy takes on
-  // its state, so the two always move as one.
-  if (loopsLayer && !reduceMotion) {
-    const FLOOR = 0.3;
-    type Pair = { orig: HTMLElement; copy: HTMLElement; o: HTMLElement[]; c: HTMLElement[] };
-    const pairs: Pair[] = [];
-    const makeFloor = (orig: HTMLElement | null, asTag: string) => {
-      if (!orig) return;
-      const copy = document.createElement(asTag);
-      for (const attr of Array.from(orig.attributes)) copy.setAttribute(attr.name, attr.value);
-      copy.innerHTML = orig.innerHTML;
-      copy.classList.add('hero-text-floor');
-      // Fades in alongside the original rather than on its own animation,
-      // which would otherwise hold it at full strength.
-      copy.classList.remove('hero-fade-in');
-      copy.setAttribute('aria-hidden', 'true');
-      orig.after(copy);
-      pairs.push({
-        orig,
-        copy,
-        o: Array.from(orig.querySelectorAll<HTMLElement>('*')),
-        c: Array.from(copy.querySelectorAll<HTMLElement>('*')),
-      });
-    };
-    makeFloor(document.querySelector<HTMLElement>('h1.hero-headline-shadow'), 'div');
-    makeFloor(document.querySelector<HTMLElement>('p[data-hero-tagline]'), 'p');
-    const sync = () => {
-      for (const { orig, copy, o, c } of pairs) {
-        copy.style.cssText = orig.style.cssText;
-        const cs = getComputedStyle(orig);
-        copy.style.opacity = String(parseFloat(cs.opacity) * FLOOR);
-        copy.style.zIndex = String((parseInt(cs.zIndex, 10) || 20) + 1);
-        o.forEach((el, i) => {
-          const twin = c[i];
-          if (!twin) return;
-          twin.style.cssText = el.style.cssText;
-          // Animated parts (the word roll and its width spring) are moved
-          // by animations rather than their style, so their live values
-          // are copied across.
-          if (el.getAnimations().length) {
-            const ecs = getComputedStyle(el);
-            twin.style.transform = ecs.transform;
-            twin.style.width = ecs.width;
-          }
-        });
-      }
-      requestAnimationFrame(sync);
-    };
-    requestAnimationFrame(sync);
   }
 
   // Reel modal — the background hero video is already the showreel (muted,
