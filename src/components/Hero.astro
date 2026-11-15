@@ -494,6 +494,11 @@ const afterParts = headlineAfter.split(/(\s+)/);
   .has-loops h1,
   .has-loops [data-hero-tagline] {
     mix-blend-mode: difference;
+    /* Kept on a layer of their own the whole time. Otherwise Safari gives
+       the headline one only while something in it animates (the word roll
+       every two seconds, the fade in), and stops blending it then, so it
+       flicked between difference and solid white. */
+    will-change: transform;
   }
 
   /* One line from tablet up (two on phones, at the break after the cycling
