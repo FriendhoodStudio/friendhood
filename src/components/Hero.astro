@@ -97,6 +97,31 @@ const afterParts = headlineAfter.split(/(\s+)/);
     )}
   </div>
 
+  {/* Links the first screen to the case study the video showing is from
+      (set per video in Studio), with a tooltip naming it: it follows the
+      pointer with a mouse, and sits above "Find your possibility" on touch
+      screens. Above the videos, below the headline (which lets pointers
+      through to it), so the headline still blends with the video. Only
+      live while the video showing has a case study. Filled in by the
+      script. */}
+  {hasLoops && (
+    <Fragment>
+      <a class="hero-loop-link absolute inset-0 z-[15]" data-hero-loop-link aria-label="" tabindex="-1">
+        {/* Figma node 7887:4081: a small box with the project's name running
+            through it like a ticker tape, fading out at either end. */}
+        <span
+          class="hero-loop-tip pointer-events-none absolute left-0 top-0 block w-[132px] overflow-hidden h-[28px] rounded-[4px] bg-grey-600 p-[5px] font-tag text-detail uppercase leading-[18px] text-front backdrop-blur-[14px]"
+          data-hero-loop-tip
+        ><span class="hero-loop-tip-fade block overflow-hidden"><span class="hero-loop-tip-track flex w-max whitespace-nowrap" data-hero-loop-tip-track></span></span></span>
+      </a>
+      <script
+        type="application/json"
+        data-hero-loop-projects
+        set:html={JSON.stringify(loopVideos.map((loop) => (loop.href ? { href: loop.href, project: loop.project } : null)))}
+      />
+    </Fragment>
+  )}
+
   {/* Keeps the headline vertically centred in the space below the nav —
       sized from the viewport (see .hero-headline-area), not tied to the
       actual height of the tagline/media below, plus flex centring.
@@ -478,6 +503,64 @@ const afterParts = headlineAfter.split(/(\s+)/);
      iPhone in Low Power Mode, or a Mac set not to auto-play). These are
      backgrounds, so it's hidden: the videos start on the first touch or
      scroll instead (see heroLoops.ts). */
+  /* The case study link over the videos: off (and see-through to clicks)
+     until the video showing has one. */
+  .hero-loop-link {
+    pointer-events: none;
+    cursor: pointer;
+  }
+  .hero-loop-link.is-live {
+    pointer-events: auto;
+  }
+  /* With a mouse the tooltip follows the pointer (placed by the script),
+     showing while it's over the hero. */
+  .hero-loop-tip {
+    opacity: 0;
+    transition: opacity 250ms ease-out;
+    will-change: transform;
+  }
+  .hero-loop-link.is-live.is-hovered .hero-loop-tip {
+    opacity: 1;
+  }
+  /* The ticker: the name repeated along a track that slides left by one
+     copy's width (--tip-copy, set by the script) and starts again, which
+     looks continuous. Faded out at both ends. */
+  .hero-loop-tip-fade {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+  }
+  .hero-loop-tip-track {
+    animation: hero-loop-tip-ticker var(--tip-duration, 6s) linear infinite;
+  }
+  @keyframes hero-loop-tip-ticker {
+    to {
+      translate: calc(-1 * var(--tip-copy, 0px)) 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-loop-tip-track {
+      animation: none;
+    }
+  }
+
+  /* On touch screens there's no pointer to follow: it sits centred above
+     "Find your possibility", showing whenever there's a case study. */
+  @media (hover: none) {
+    .hero-loop-link.is-live {
+      pointer-events: none;
+    }
+    .hero-loop-tip {
+      left: 50%;
+      top: auto;
+      bottom: 64px;
+      translate: -50% 0;
+    }
+    .hero-loop-link.is-live .hero-loop-tip {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
   /* Separate rules on purpose: a browser that doesn't know one of these
      would otherwise drop all of them. */
   [data-hero-loops] video::-webkit-media-controls {
@@ -728,6 +811,16 @@ const afterParts = headlineAfter.split(/(\s+)/);
   // Set once the floating images are running (see the word cycle below), so
   // the stage can send them flying past too.
   let popups: { showWord(index: number): void; zoomPast(progress: number): void; setPaused(value: boolean): void } | null = null;
+  // The background videos, when there are any (see heroLoops.ts): each
+  // change of the headline's word pushes on to the next one.
+  const loopsLayer = document.querySelector<HTMLElement>('[data-hero-loops]');
+  const loops = loopsLayer ? initHeroLoops(loopsLayer, reduceMotion) : null;
+  // How long the headline holds each word: longer over the videos, since
+  // each word change brings in a new one.
+  const WORD_MS = loops ? 7000 : 2000;
+  // With reduced motion the word doesn't cycle, so the videos move on by
+  // themselves (crossfading rather than pushing).
+  if (loops && reduceMotion) window.setInterval(() => loops.next(), WORD_MS);
   // True while the scroll stage's transition is under way: the headline's
   // word cycle holds still, since a new word's width can re-wrap the lines
   // and send a word to the other line (and the other direction) mid-split.
@@ -757,8 +850,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const statement = document.querySelector<HTMLElement>('[data-hero-statement]');
     const glow = document.querySelector<HTMLElement>('.hero-gradient');
     const overlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
-    const loopsLayer = document.querySelector<HTMLElement>('[data-hero-loops]');
-    const loops = loopsLayer ? initHeroLoops(loopsLayer, reduceMotion) : null;
+    const loopLink = document.querySelector<HTMLAnchorElement>('[data-hero-loop-link]');
 
     // Headline/tagline text goes from the light-theme dark to the normal
     // light as the backdrop darkens — read from the live colour tokens.
@@ -860,6 +952,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
       popups?.setPaused(p > 0.02);
       // The videos stop once they've faded out of sight behind the reel.
       loops?.setPaused(out >= 1);
+      // The case study link is only there on the first screen.
+      if (loopLink) loopLink.style.visibility = p > 0.02 ? 'hidden' : '';
 
       if (reel) {
         // It doesn't vanish as it zooms past: it settles back as a dimmed,
@@ -1513,13 +1607,14 @@ const afterParts = headlineAfter.split(/(\s+)/);
       playWordRoll(-index * frameStep);
       // index lands on the looping duplicate of word 0 once per cycle.
       popups?.showWord(index % (frameCount - 1));
+      loops?.next();
       const width = frameWidths[index];
       if (width) animateWordWidth(width);
     }
 
     // Auto-advances on a timer on every screen, not just touch/no-hover
     // devices — desktop visitors who never hover the word still see it cycle.
-    window.setInterval(advance, 2000);
+    window.setInterval(advance, WORD_MS);
 
     let resizeRafId = 0;
     const remeasureWord = () => {
@@ -1555,6 +1650,92 @@ const afterParts = headlineAfter.split(/(\s+)/);
     // a belt-and-braces correction for anything measured mid-transition.
     window.addEventListener('hero-stage-rest', remeasureWord);
 
+  }
+
+  // The case study link over the background videos: points at the project
+  // of whichever video is showing, with a tooltip naming it. With a mouse
+  // the tooltip trails the pointer; on touch screens it sits still (CSS).
+  {
+    const link = document.querySelector<HTMLAnchorElement>('[data-hero-loop-link]');
+    const tip = document.querySelector<HTMLElement>('[data-hero-loop-tip]');
+    const track = document.querySelector<HTMLElement>('[data-hero-loop-tip-track]');
+    const data = document.querySelector<HTMLScriptElement>('[data-hero-loop-projects]');
+    const projects = data ? (JSON.parse(data.textContent || '[]') as ({ href: string; project?: string } | null)[]) : [];
+    if (link && tip && track && loops) {
+      // The ticker's speed (px a second) and how many copies of the name
+      // fill it, plenty for even a short name to run end to end.
+      const TICKER_PX_S = 28;
+      const COPIES = 8;
+      const setTicker = (name: string) => {
+        track.replaceChildren(
+          ...Array.from({ length: COPIES }, () => {
+            const copy = document.createElement('span');
+            copy.className = 'pr-[0.6em]';
+            copy.textContent = `${name} \u2022`;
+            return copy;
+          })
+        );
+        const copyWidth = (track.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0;
+        track.style.setProperty('--tip-copy', `${copyWidth}px`);
+        track.style.setProperty('--tip-duration', `${Math.max(1, copyWidth / TICKER_PX_S)}s`);
+      };
+      const show = (i: number) => {
+        const p = projects[i];
+        link.classList.toggle('is-live', !!p);
+        if (!p) {
+          link.removeAttribute('href');
+          return;
+        }
+        link.href = p.href;
+        const name = p.project || 'View project';
+        link.setAttribute('aria-label', p.project ? `View the ${p.project} case study` : 'View the case study');
+        // The name swaps while it's faded down for a moment.
+        if (track.dataset.name && track.dataset.name !== name) {
+          tip.animate([{ opacity: 1 }, { opacity: 0, offset: 0.4 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 500, easing: 'ease-in-out' });
+          window.setTimeout(() => setTicker(name), 200);
+        } else setTicker(name);
+        track.dataset.name = name;
+      };
+      show(loops.index);
+      loops.onChange(show);
+      // Measured again once the real font is in, in case it wasn't yet.
+      document.fonts.ready.then(() => {
+        if (track.dataset.name) setTicker(track.dataset.name);
+      });
+
+      // Trails the pointer a little, offset down and right of it.
+      const OFFSET = 18;
+      let x = 0;
+      let y = 0;
+      let tx = 0;
+      let ty = 0;
+      let raf = 0;
+      const follow = () => {
+        tx += (x - tx) * 0.25;
+        ty += (y - ty) * 0.25;
+        // Kept on screen at the right and bottom edges.
+        const box = link.getBoundingClientRect();
+        const left = Math.min(tx + OFFSET, box.width - tip.offsetWidth - 12);
+        const top = Math.min(ty + OFFSET, box.height - tip.offsetHeight - 12);
+        tip.style.transform = `translate(${left}px, ${top}px)`;
+        raf = Math.abs(x - tx) + Math.abs(y - ty) > 0.5 ? requestAnimationFrame(follow) : 0;
+      };
+      link.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'mouse') return;
+        const box = link.getBoundingClientRect();
+        x = e.clientX - box.left;
+        y = e.clientY - box.top;
+        if (!link.classList.contains('is-hovered')) {
+          // Appears where the pointer is, rather than sliding in from the
+          // corner.
+          tx = x;
+          ty = y;
+          link.classList.add('is-hovered');
+        }
+        if (!raf) raf = requestAnimationFrame(follow);
+      });
+      link.addEventListener('pointerleave', () => link.classList.remove('is-hovered'));
+    }
   }
 
   // Reel modal — the background hero video is already the showreel (muted,

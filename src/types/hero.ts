@@ -39,4 +39,7 @@ export interface HeroLoopVideo {
   url: string;
   /** Optional portrait cut for phones. */
   mobileUrl?: string;
+  /** The case study the clip links to, shown in a tooltip over the hero. */
+  href?: string;
+  project?: string;
 }

@@ -47,7 +47,7 @@ export default defineType({
       name: 'loopVideos',
       title: 'Background videos',
       description:
-        'Fill the first screen behind the headline, one at a time: each plays twice, then pushes sideways to the next, in this order (drag to reorder). Short, muted, 16:9 clips work best — around 5–10MB each. Leave empty to show the floating project images instead.',
+        'Fill the first screen behind the headline, one at a time, in this order (drag to reorder): each loops until the headline changes word, then the next pushes it sideways. Muted 16:9 clips work best — around 5–10MB each. Leave empty to show the floating project images instead.',
       type: 'array',
       of: [
         {
@@ -73,7 +73,8 @@ export default defineType({
             defineField({
               name: 'project',
               title: 'Case study',
-              description: 'Optional. Which case study the clip is from, to keep track of them here.',
+              description:
+                'The case study this clip is from. A tooltip over the hero links to it while the clip is showing. Leave empty for no link.',
               type: 'reference',
               to: [{ type: 'project' }],
             }),
