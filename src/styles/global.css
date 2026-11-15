@@ -347,13 +347,15 @@
     --text-h1: 3.375rem; /* 54px */
     --text-h2: 2.625rem; /* 42px */
     --text-h3: 2.25rem; /* 36px */
-    --text-body-1: 1.4375rem; /* 23px (was 25px) */
+    /* Tablet body sizes sit just under desktop's (they were above it, and
+       read as too big). */
+    --text-body-1: 1.25rem; /* 20px (was 25px, then 23px) */
     /* Back to Figma's own 115% from here up — the looser 1.3 in the base
        tier is a mobile-only deviation (see the comment there). */
     --text-body-1--line-height: 1.15;
-    --text-body-2: 1.375rem; /* 22px */
+    --text-body-2: 1.25rem; /* 20px (was 22px) */
     --text-body-2--line-height: 1.15;
-    --text-body-3: 1.125rem; /* 18px */
+    --text-body-3: 1rem; /* 16px (was 18px) */
     --text-body-3--line-height: 1.15;
     --text-detail: 0.9375rem; /* 15px (was 16px) */
 
