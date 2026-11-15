@@ -74,10 +74,8 @@ const { services } = Astro.props;
          noticeably smoother) as the actual cost behind the jerkiness this
          whole thread of fixes was chasing — every other change this
          session touched the scroll/position mechanics, never this, which
-         is exactly why none of them moved the needle. bg-accent-yellow/90
-         is already 90% opaque, so the blur was also doing very little
-         visible work to begin with — there's barely any of the photo
-         underneath left to blur through.
+         is exactly why none of them moved the needle. The card's background
+         is solid, so there's nothing underneath for a blur to show anyway.
 
          The swipe snaps to the plain outer slot, not the card inside it:
          the card is scaled as it moves off-centre, and snapping works from
@@ -85,7 +83,7 @@ const { services } = Astro.props;
          centre one (on phones) would drag its own snap point with it. */
       <div class="flex shrink-0 snap-center">
       <div
-        class="services-card flex flex-col items-center gap-[10px] overflow-hidden rounded-card bg-accent-yellow/90 pb-[36px] shadow-[0_0_4px_rgba(0,0,0,0.3)]"
+        class="services-card flex flex-col items-center gap-[10px] overflow-hidden rounded-card bg-[#29282d] pb-[36px] shadow-[0_0_4px_rgba(0,0,0,0.3)]"
         data-service-card
         data-index={i}
         data-name={service.name}
@@ -184,13 +182,13 @@ const { services } = Astro.props;
                 is once you've swiped away from the one you opened. Same
                 style as the "Example Modules" label below. */}
             <div class="flex w-full flex-col items-start gap-[8px]">
-              <p class="font-tag text-categories text-back/70">{service.name}</p>
-              <h3 class="font-heading text-h3 text-back">{service.cardTitle}</h3>
+              <p class="font-tag text-categories text-front">{service.name}</p>
+              <h3 class="font-heading text-h3 text-accent-yellow">{service.cardTitle}</h3>
             </div>
             <div class="flex w-full flex-col items-start gap-[20px]">
-              <p class="font-body text-body-3 text-back">{service.overview}</p>
+              <p class="font-body text-body-3 text-front">{service.overview}</p>
               <div class="flex w-full flex-col items-start gap-[10px]">
-                <p class="font-tag text-categories text-back/70">Example Modules</p>
+                <p class="font-tag text-categories text-front">Example Modules</p>
                 <div class="flex flex-wrap gap-1">
                   {service.modules.map((moduleName) => <ModuleTag label={moduleName} />)}
                 </div>
