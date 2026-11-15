@@ -122,7 +122,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       </Fragment>
     )}
     <h1
-      class="hero-fade-in hero-headline-shadow hero-headline-heavy-font relative z-20 text-center font-display text-h2 text-front pointer-events-none max-md:text-balance md:whitespace-nowrap"
+      class="hero-fade-in hero-headline-shadow hero-headline-fit relative z-20 text-center font-display text-h2 text-front pointer-events-none max-md:text-balance md:whitespace-nowrap"
     >
       {loopWords.length > 0 ? (
         <Fragment>
@@ -322,14 +322,6 @@ const afterParts = headlineAfter.split(/(\s+)/);
 )}
 
 <style>
-  /* Greed Extended's licensed Heavy weight, used for just this headline,
-     not the rest of the site (see the @font-face comment in global.css for
-     why it's a separate family name rather than a font-weight on the
-     existing one). Falls back to the Regular weight, then sans-serif, if
-     the Heavy file fails to load. */
-  .hero-headline-heavy-font {
-    font-family: "Greed Extended Heavy", "Greed Extended", sans-serif;
-  }
 
   /* See the markup comment by data-hero-word-window for why this exists —
      expands the window's paint region a few px past its right edge so the
@@ -488,12 +480,12 @@ const afterParts = headlineAfter.split(/(\s+)/);
   }
 
   /* One line from tablet up (two on phones, at the break after the cycling
-     word). At H2 size the line is about 21 of its own font size wide with
+     word). At H2 size the line is about 19.5 of its own font size wide with
      the longest cycling word in it, more than a narrow tablet has room for,
      so there it comes down just enough to fit. */
   @media (min-width: 768px) {
-    .hero-headline-heavy-font {
-      font-size: min(var(--text-h2), calc((100vw - 2 * var(--page-margin)) / 21.5));
+    .hero-headline-fit {
+      font-size: min(var(--text-h2), calc((100vw - 2 * var(--page-margin)) / 20));
     }
   }
 
