@@ -474,6 +474,23 @@ const afterParts = headlineAfter.split(/(\s+)/);
      inverse of whatever's playing behind them. Set on the elements
      themselves (they're each their own layer), so they blend with the
      videos rather than only with their own empty box. */
+  /* Safari puts its own play button over a video it won't autoplay (an
+     iPhone in Low Power Mode, or a Mac set not to auto-play). These are
+     backgrounds, so it's hidden: the videos start on the first touch or
+     scroll instead (see heroLoops.ts). */
+  /* Separate rules on purpose: a browser that doesn't know one of these
+     would otherwise drop all of them. */
+  [data-hero-loops] video::-webkit-media-controls {
+    display: none !important;
+  }
+  [data-hero-loops] video::-webkit-media-controls-start-playback-button {
+    display: none !important;
+    -webkit-appearance: none;
+  }
+  [data-hero-loops] video::-webkit-media-controls-overlay-play-button {
+    display: none !important;
+  }
+
   .has-loops h1,
   .has-loops [data-hero-tagline] {
     mix-blend-mode: difference;
