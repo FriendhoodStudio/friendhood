@@ -43,4 +43,12 @@ const description =
   [data-hero-section] ~ [data-reveal-group='services'] {
     padding-top: calc(var(--spacing-vertical-xl) - var(--spacing-vertical-m));
   }
+  /* On phones the page comes to rest with this section's top at the top of
+     the screen, where that left its label just under the nav bar: a little
+     more room there. */
+  @media (max-width: 767px) {
+    [data-hero-section] ~ [data-reveal-group='services'] {
+      padding-top: calc(var(--spacing-vertical-xl) - var(--spacing-vertical-m) + 40px);
+    }
+  }
 </style>
