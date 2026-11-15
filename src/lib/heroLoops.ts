@@ -1,6 +1,7 @@
 /** The hero's background videos (set in Studio under Hero → Background
  * videos): they fill the first screen one at a time, in order. Each plays
- * through twice, then the next pushes it off sideways, the two sliding
+ * through twice (or for 12 seconds, if that's sooner), then the next pushes
+ * it off sideways, the two sliding
  * together with an ease in and out, and after the last it comes back round
  * to the first.
  *
@@ -9,8 +10,11 @@
  * one before is playing (see warm), so it's ready by the time it's needed.
  * Nothing moves on until it is: the video showing just carries on looping. */
 
-// How many times each video plays before moving on.
+// How many times each video plays before moving on, and the most time
+// (seconds) one stays on screen: a long clip moves on partway through
+// rather than holding the screen for two full plays.
 const PLAYS = 2;
+const MAX_SHOWN_S = 12;
 // The push between videos.
 const PUSH_MS = 1400;
 const PUSH_EASE = 'cubic-bezier(0.65, 0, 0.35, 1)';
@@ -139,7 +143,8 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     }
     const nearEnd = plays >= PLAYS - 1 && video.duration - video.currentTime <= PUSH_LEAD_S;
     const overdue = plays >= PLAYS && video.currentTime < 1;
-    if (nearEnd || overdue) push();
+    const capped = plays * video.duration + video.currentTime >= MAX_SHOWN_S;
+    if (nearEnd || overdue || capped) push();
   }
 
   for (const video of videos) {
