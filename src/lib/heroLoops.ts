@@ -27,7 +27,29 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
   let pushing = false;
   let paused = false;
 
-  const play = (video: HTMLVideoElement) => video.play().catch(() => {});
+  // Phones can refuse to autoplay even muted video (an iPhone in Low Power
+  // Mode always does). When a play is refused, the videos start instead on
+  // the first touch, click, key or scroll, which counts as permission.
+  let waitingForGesture = false;
+  const showing = () => videos.filter((v) => v.style.visibility !== 'hidden');
+  const GESTURES = ['touchstart', 'pointerdown', 'keydown', 'scroll'] as const;
+  function onGesture() {
+    GESTURES.forEach((type) => window.removeEventListener(type, onGesture));
+    waitingForGesture = false;
+    if (!paused) showing().forEach(play);
+  }
+  function play(video: HTMLVideoElement) {
+    video.muted = true;
+    video.play().catch(() => {
+      if (waitingForGesture) return;
+      waitingForGesture = true;
+      GESTURES.forEach((type) => window.addEventListener(type, onGesture, { passive: true }));
+    });
+  }
+  // Coming back to the tab (or the app) after the browser paused it.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !paused) showing().forEach(play);
+  });
 
   const preload = (video: HTMLVideoElement) => {
     if (video.readyState > 0 || video.preload === 'auto') return;
@@ -121,9 +143,8 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     setPaused(value: boolean) {
       if (value === paused || !videos.length) return;
       paused = value;
-      const showing = videos.filter((v) => v.style.visibility !== 'hidden');
-      if (paused) showing.forEach((v) => v.pause());
-      else showing.forEach(play);
+      if (paused) showing().forEach((v) => v.pause());
+      else showing().forEach(play);
     },
   };
 }
