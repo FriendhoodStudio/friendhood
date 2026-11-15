@@ -54,9 +54,21 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     video.addEventListener('canplay', again, { once: true });
     window.setTimeout(again, 400 + n * 400);
   }
+  // Temporary diagnostics (?videodebug): a log of every play attempt and
+  // video event, shown in a panel on the page.
+  const debug = new URLSearchParams(location.search).has('videodebug');
+  const log: string[] = [];
+  const t0 = performance.now();
+  const note = (msg: string) => {
+    if (!debug) return;
+    log.push(`${((performance.now() - t0) / 1000).toFixed(2)}s ${msg}`);
+    if (log.length > 40) log.shift();
+  };
   function play(video: HTMLVideoElement) {
     video.muted = true;
-    video.play().catch((err: unknown) => {
+    note(`play() v${videos.indexOf(video)} rs=${video.readyState}`);
+    video.play().then(() => note(`  ok v${videos.indexOf(video)}`)).catch((err: unknown) => {
+      note(`  REFUSED v${videos.indexOf(video)}: ${(err as { name?: string })?.name} ${(err as { message?: string })?.message ?? ''}`);
       if ((err as { name?: string })?.name === 'NotAllowedError' && !waitingForGesture) {
         waitingForGesture = true;
         GESTURES.forEach((type) => window.addEventListener(type, onGesture, { passive: true }));
@@ -64,6 +76,26 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
       retry(video);
     });
   }
+  if (debug) {
+    const panel = document.createElement('pre');
+    panel.style.cssText =
+      'position:fixed;left:8px;bottom:8px;z-index:9999;max-width:min(560px,calc(100vw - 16px));max-height:60vh;overflow:auto;margin:0;padding:8px;font:11px/1.35 ui-monospace,monospace;color:#fff;background:rgba(0,0,0,.82);border-radius:6px;white-space:pre-wrap;pointer-events:auto';
+    document.body.appendChild(panel);
+    for (const [i, v] of videos.entries()) {
+      for (const ev of ['loadstart', 'loadedmetadata', 'canplay', 'playing', 'pause', 'waiting', 'stalled', 'suspend', 'error']) {
+        v.addEventListener(ev, () => note(`v${i} ${ev}${ev === 'error' ? ' ' + (v.error?.code ?? '') : ''}`));
+      }
+    }
+    const render = () => {
+      const state = videos
+        .map((v, i) => `v${i} ${v.paused ? 'PAUSED' : 'playing'} t=${v.currentTime.toFixed(1)} rs=${v.readyState} ns=${v.networkState} muted=${v.muted} autoplay=${v.autoplay} vis=${v.style.visibility || '-'} src=${(v.currentSrc || '').split('/').pop()?.slice(0, 14)}`)
+        .join('\n');
+      panel.textContent = `${navigator.userAgent}\nvisible=${document.visibilityState} paused(stage)=${paused}\n\n${state}\n\n${log.join('\n')}`;
+    };
+    render();
+    window.setInterval(render, 500);
+  }
+
   for (const video of videos) {
     // Playing at last: clear its retries (they start again if it's stopped
     // later and won't restart).
