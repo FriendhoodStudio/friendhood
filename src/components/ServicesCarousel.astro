@@ -108,14 +108,6 @@ const { services } = Astro.props;
               class="h-full w-full object-cover"
               loading={copyIndex === 1 ? 'eager' : 'lazy'}
             />
-            {/* Gradiating darkness + blur behind the two controls below —
-                a plain flat scrim would read as a hard-edged box sitting on
-                the photo; fading both the tint and the blur strength itself
-                (via mask-image, not just the tint) reads as a soft vignette
-                instead, regardless of what the image underneath is doing.
-                pointer-events-none: purely visual, must not sit in front of
-                the controls it's there to support. */}
-            <div class="services-card-top-fade pointer-events-none absolute inset-x-0 top-0 h-[110px]" aria-hidden="true"></div>
             {/* The card's controls, in one small see-through pill at the top
                 right: copy the email address (the paper plane) and close
                 (the cross), split by a hairline like the nav pill. Replaced
@@ -321,12 +313,6 @@ const { services } = Astro.props;
      The gradient tint alone (mask-image still softens ITS edge, which is
      cheap — just alpha compositing, not a filter) still reads as a
      legible scrim on its own. */
-  .services-card-top-fade {
-    background: linear-gradient(to bottom, rgba(13, 13, 13, 0.45), rgba(13, 13, 13, 0) 100%);
-    mask-image: linear-gradient(to bottom, black, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, black, transparent 100%);
-  }
-
   /* Press/release feel for the copy-email button, matching the nav pill's
      quick-firm-press + springy-overshoot-release — scale-based here rather
      than the pill's 3D tilt, since this is a small round icon button, not
