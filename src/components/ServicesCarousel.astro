@@ -185,8 +185,9 @@ const { services } = Astro.props;
               latest Figma pass (node 7382:2286), this now reads as one
               continuous block with title→overview at 12px and
               overview→modules at 20px (tightened from 20px and 36px to
-              shorten the cards), rather than ruled-off sections. */}
-          <div class="services-card-text flex w-full flex-col items-start gap-[12px]">
+              shorten the cards; phones only slightly, to 16px and 28px),
+              rather than ruled-off sections. */}
+          <div class="services-card-text flex w-full flex-col items-start gap-[16px] md:gap-[12px]">
             {/* Service name as a small label above the title — the card
                 titles are descriptive ("Made properly") rather than the
                 service name, so this keeps it clear which service a card
@@ -196,7 +197,7 @@ const { services } = Astro.props;
               <p class="font-tag text-categories text-back/70">{service.name}</p>
               <h3 class="font-heading text-h3 text-back">{service.cardTitle}</h3>
             </div>
-            <div class="flex w-full flex-col items-start gap-[20px]">
+            <div class="flex w-full flex-col items-start gap-[28px] md:gap-[20px]">
               <p class="font-body text-body-3 text-back">{service.overview}</p>
               <div class="flex w-full flex-col items-start gap-[10px]">
                 <p class="font-tag text-categories text-back/70">Example Modules</p>
