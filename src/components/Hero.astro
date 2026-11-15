@@ -548,17 +548,22 @@ const afterParts = headlineAfter.split(/(\s+)/);
     }
   }
 
-  /* On touch screens there's no pointer to follow: it sits centred above
-     "Find your possibility", showing whenever there's a case study. */
+  /* On touch screens there's no pointer to follow: it sits at the bottom
+     left, on one line with "Find your possibility", which moves over to
+     the right while it's there (.has-loop-tip, set by the script; centred
+     again otherwise). Both line up on the same centre line. */
   @media (hover: none) {
     .hero-loop-link.is-live {
       pointer-events: none;
     }
     .hero-loop-tip {
-      left: 50%;
+      left: var(--page-margin);
       top: auto;
-      bottom: 64px;
-      translate: -50% 0;
+      bottom: calc(28px + 0.48em - 14px);
+    }
+    .has-loop-tip [data-hero-tagline] {
+      text-align: right;
+      padding-right: var(--page-margin);
     }
     .hero-loop-link.is-live .hero-loop-tip {
       opacity: 1;
@@ -823,6 +828,13 @@ const afterParts = headlineAfter.split(/(\s+)/);
   // How long the headline holds each word: longer over the videos, since
   // each word change brings in a new one.
   const WORD_MS = loops ? 7000 : 2000;
+  // On touch screens the case study ticker shares the bottom line with
+  // "Find your possibility" while it's showing (see .has-loop-tip).
+  function syncTipRow() {
+    const link = document.querySelector<HTMLElement>('[data-hero-loop-link]');
+    const stage = document.querySelector<HTMLElement>('[data-hero-section]');
+    stage?.classList.toggle('has-loop-tip', !!link && link.classList.contains('is-live') && link.style.visibility !== 'hidden');
+  }
   // With reduced motion the word doesn't cycle, so the videos move on by
   // themselves (crossfading rather than pushing).
   if (loops && reduceMotion) window.setInterval(() => loops.next(), WORD_MS);
@@ -958,7 +970,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // The videos stop once they've faded out of sight behind the reel.
       loops?.setPaused(out >= 1);
       // The case study link is only there on the first screen.
-      if (loopLink) loopLink.style.visibility = p > 0.02 ? 'hidden' : '';
+      if (loopLink) {
+        loopLink.style.visibility = p > 0.02 ? 'hidden' : '';
+        syncTipRow();
+      }
 
       if (reel) {
         // It doesn't vanish as it zooms past: it settles back as a dimmed,
@@ -1687,6 +1702,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       const show = (i: number) => {
         const p = projects[i];
         link.classList.toggle('is-live', !!p);
+        syncTipRow();
         if (!p) {
           link.removeAttribute('href');
           return;
