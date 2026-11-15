@@ -93,6 +93,11 @@ const afterParts = headlineAfter.split(/(\s+)/);
             <source src={loop.url} />
           </video>
         ))}
+        {/* A subtle scrim over the videos, so the headline, nav and the
+            lines at the bottom hold up over bright footage: a light tint
+            throughout, a touch deeper at the top and bottom. Inside the
+            video layer, so it zooms and fades with them on scroll. */}
+        <div class="hero-loops-scrim pointer-events-none absolute inset-0" aria-hidden="true"></div>
       </div>
     )}
   </div>
@@ -510,6 +515,16 @@ const afterParts = headlineAfter.split(/(\s+)/);
      iPhone in Low Power Mode, or a Mac set not to auto-play). These are
      backgrounds, so it's hidden: the videos start on the first touch or
      scroll instead (see heroLoops.ts). */
+  .hero-loops-scrim {
+    background: linear-gradient(
+      to bottom,
+      rgb(13 13 13 / 0.3) 0%,
+      rgb(13 13 13 / 0.12) 22%,
+      rgb(13 13 13 / 0.12) 72%,
+      rgb(13 13 13 / 0.32) 100%
+    );
+  }
+
   /* The case study link over the videos: off (and see-through to clicks)
      until the video showing has one. */
   .hero-loop-link {
