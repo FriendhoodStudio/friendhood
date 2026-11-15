@@ -1,7 +1,6 @@
 ---
 import type { ServiceItem } from '../types/services';
 import ModuleTag from './ModuleTag.astro';
-import emailIcon from '../assets/services/email-icon.svg';
 
 interface Props {
   services: ServiceItem[];
@@ -119,45 +118,24 @@ const { services } = Astro.props;
                 pointer-events-none: purely visual, must not sit in front of
                 the controls it's there to support. */}
             <div class="services-card-top-fade pointer-events-none absolute inset-x-0 top-0 h-[110px]" aria-hidden="true"></div>
-            {/* Was a plain bar sitting in its own yellow strip above the
-                image; now the image runs flush to the card's own top edge
-                (no more strip), so this moved onto the photo itself as a
-                floating pill — same border/dark-chip
-                treatment as the copy-email button just below it, so it
-                stays legible over whatever the image happens to be. */}
-            {/* No background chip — just the bar itself, wide enough to be
-                an easy target on its own without needing one. Hover/press
-                feedback lives on the bar's own opacity instead of a
-                background, since there's no longer a background to react. */}
-            <button
-              type="button"
-              class="services-drag-handle group absolute left-1/2 top-[14px] flex h-[26px] w-[100px] -translate-x-1/2 cursor-pointer items-center justify-center transition-transform duration-300 ease-in-out hover:scale-110 active:scale-90"
-              data-services-close
-              aria-label="Close"
-            >
-              <span class="h-1 w-[56px] rounded-full bg-front/70 transition-colors duration-300 ease-out group-hover:bg-front"></span>
-            </button>
-            {/* pointer-events-none: this wrapper is inset-x-0 (full card
-                width) so its empty left side doesn't have anything painted
-                in it — but as a plain positioned div it was still capturing
-                pointer events across that whole invisible area, sitting in
-                front of (later in DOM order than) the close button above
-                and silently eating its clicks/hover. Only the actual
-                button inside needs to opt back in with pointer-events-auto. */}
-            <div class="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end px-[15px] pt-[10px]">
+            {/* The card's controls, in one small see-through pill at the top
+                right: copy the email address (the paper plane) and close
+                (the cross), split by a hairline like the nav pill. Replaced
+                a white bar across the top that closed the cards. */}
+            <div class="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end px-[15px] pt-[12px]">
+              <div class="services-card-controls pointer-events-auto flex items-center rounded-full border border-front/15 bg-[#29282d]/70 text-grey-200 backdrop-blur-[14px]">
               <div class="group relative">
                 <button
                   type="button"
-                  class="copy-email-btn pointer-events-auto flex h-[52px] w-[52px] cursor-pointer items-center justify-center rounded-full border border-front/15 bg-[#29282d]/85 transition-[scale] duration-300 ease-out hover:scale-110"
+                  class="copy-email-btn flex h-[40px] w-[46px] cursor-pointer items-center justify-center transition-colors duration-300 ease-out hover:text-front"
                   data-copy-email
                   data-email="hello@friendhood.co.uk"
                   aria-label="Copy email address"
                 >
-                  <img
-                    src={emailIcon.src}
-                    alt=""
-                    class="h-full w-full transition-opacity duration-300 ease-out group-hover:opacity-90 group-active:opacity-70"
-                  />
+                  <svg width="20" height="19" viewBox="13 17 26 24" fill="none" aria-hidden="true">
+                    <path d="M35.0088 18.0822C37.301 18.0823 38.7262 20.5799 37.5801 22.5887L28.5211 38.4654C27.0951 40.9646 23.3493 40.234 22.9739 37.3837L22.1093 30.8181C21.9372 29.5112 21.2616 28.3271 20.2291 27.5229L15.0432 23.4841C12.7913 21.7301 14.039 18.0823 16.8909 18.0822L35.0088 18.0822Z" stroke="currentColor" stroke-width="2" />
+                    <path d="M34.154 22.7865C34.6309 22.5079 34.7956 21.8932 34.5219 21.4135C34.2482 20.9338 33.6397 20.7708 33.1628 21.0494L33.6584 21.918L34.154 22.7865ZM20.7313 29.4701L21.2268 30.3386L34.154 22.7865L33.6584 21.918L33.1628 21.0494L20.2357 28.6015L20.7313 29.4701Z" fill="currentColor" />
+                  </svg>
                 </button>
                 <span
                   data-copy-email-status
@@ -178,6 +156,18 @@ const { services } = Astro.props;
                     </span>
                   </span>
                 </span>
+              </div>
+              <span class="h-[18px] w-px bg-front/15" aria-hidden="true"></span>
+              <button
+                type="button"
+                class="flex h-[40px] w-[46px] cursor-pointer items-center justify-center transition-colors duration-300 ease-out hover:text-front"
+                data-services-close
+                aria-label="Close"
+              >
+                <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M1 1L17 17M17 1L1 17" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+                </svg>
+              </button>
               </div>
             </div>
           </div>
