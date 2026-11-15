@@ -201,7 +201,7 @@
      "small" spelled out, not `--radius-s` — Tailwind reserves the bare `s`
      suffix on `rounded-*` for its own logical "start side" corner utility,
      which silently collided with this and only rounded 2 of 4 corners. */
-  --radius-card: 30px;
+  --radius-card: 20px; /* was 30px */
   --radius-m: 20px;
   /* Labels, tags and tooltips (was 10px): matches the hero's case study
      ticker (Figma 7887:4081). */
