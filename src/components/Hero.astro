@@ -98,15 +98,15 @@ const afterParts = headlineAfter.split(/(\s+)/);
   </div>
 
   {/* Links the first screen to the case study the video showing is from
-      (set per video in Studio), with a tooltip naming it: it shows where
-      the pointer rests with a mouse, and sits above "Find your possibility"
-      on touch screens. Above the videos, below the headline (which lets pointers
-      through to it), so the headline still blends with the video. Only
-      live while the video showing has a case study. Filled in by the
-      script. */}
+      (set per video in Studio), with a ticker naming it: with a mouse it
+      takes the cursor's place over the videos, and on touch screens it
+      sits above "Find your possibility". In front of the headline, so the
+      ticker passes over it; the layer itself is see-through, so the
+      headline still blends with the video. Only live while the video
+      showing has a case study. Filled in by the script. */}
   {hasLoops && (
     <Fragment>
-      <a class="hero-loop-link absolute inset-0 z-[15]" data-hero-loop-link aria-label="" tabindex="-1">
+      <a class="hero-loop-link absolute inset-0 z-[45]" data-hero-loop-link aria-label="" tabindex="-1">
         {/* Figma node 7887:4081: a small box with the project's name running
             through it like a ticker tape, fading out at either end. */}
         <span
@@ -512,11 +512,16 @@ const afterParts = headlineAfter.split(/(\s+)/);
   .hero-loop-link.is-live {
     pointer-events: auto;
   }
-  /* With a mouse it shows like a standard tooltip, where the pointer comes
-     to rest (placed by the script). */
+  /* With a mouse the ticker takes the cursor's place over the videos
+     (placed by the script), so the normal cursor is hidden there. */
+  @media (hover: hover) {
+    .hero-loop-link.is-live {
+      cursor: none;
+    }
+  }
   .hero-loop-tip {
     opacity: 0;
-    transition: opacity 250ms ease-out;
+    transition: opacity 150ms ease-out;
     will-change: transform;
   }
   .hero-loop-link.is-live.is-hovered .hero-loop-tip {
@@ -1653,8 +1658,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
   }
 
   // The case study link over the background videos: points at the project
-  // of whichever video is showing, with a tooltip naming it. With a mouse
-  // it shows where the pointer rests; on touch screens it sits still (CSS).
+  // of whichever video is showing, with a ticker naming it. With a mouse it
+  // is the cursor over the videos; on touch screens it sits still (CSS).
   {
     const link = document.querySelector<HTMLAnchorElement>('[data-hero-loop-link]');
     const tip = document.querySelector<HTMLElement>('[data-hero-loop-tip]');
@@ -1703,37 +1708,27 @@ const afterParts = headlineAfter.split(/(\s+)/);
         if (track.dataset.name) setTicker(track.dataset.name);
       });
 
-      // A standard tooltip: once the pointer comes to rest over the hero it
-      // appears just below and right of it and stays put there; moving on
-      // hides it, until the pointer rests again.
-      const OFFSET = 16;
-      const REST_MS = 450;
-      let restTimer = 0;
+      // With a mouse the ticker is the pointer: the normal cursor is hidden
+      // over the videos (CSS) and the box sits centred on where it would be,
+      // moving with it exactly.
       let x = 0;
       let y = 0;
+      let raf = 0;
       const place = () => {
-        // Kept on screen at the right and bottom edges.
-        const box = link.getBoundingClientRect();
-        const left = Math.min(x + OFFSET, box.width - tip.offsetWidth - 12);
-        const top = Math.min(y + OFFSET, box.height - tip.offsetHeight - 12);
-        tip.style.transform = `translate(${left}px, ${top}px)`;
-        link.classList.add('is-hovered');
+        raf = 0;
+        tip.style.transform = `translate(${x - tip.offsetWidth / 2}px, ${y - tip.offsetHeight / 2}px)`;
       };
       link.addEventListener('pointermove', (e) => {
         if (e.pointerType !== 'mouse') return;
         const box = link.getBoundingClientRect();
-        // Small jitters don't count as moving on.
-        if (link.classList.contains('is-hovered') && Math.hypot(e.clientX - box.left - x, e.clientY - box.top - y) < 6) return;
         x = e.clientX - box.left;
         y = e.clientY - box.top;
-        link.classList.remove('is-hovered');
-        window.clearTimeout(restTimer);
-        restTimer = window.setTimeout(place, REST_MS);
+        if (!link.classList.contains('is-hovered')) {
+          place();
+          link.classList.add('is-hovered');
+        } else if (!raf) raf = requestAnimationFrame(place);
       });
-      link.addEventListener('pointerleave', () => {
-        window.clearTimeout(restTimer);
-        link.classList.remove('is-hovered');
-      });
+      link.addEventListener('pointerleave', () => link.classList.remove('is-hovered'));
     }
   }
 
