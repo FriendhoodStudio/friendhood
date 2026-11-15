@@ -1,6 +1,6 @@
 /** The hero's background videos (set in Studio under Hero → Background
  * videos): they fill the first screen one at a time, in order. Each plays
- * through twice (or for 12 seconds, if that's sooner), then the next pushes
+ * through once (or for 30 seconds, if it's longer), then the next pushes
  * it off sideways, the two sliding
  * together with an ease in and out, and after the last it comes back round
  * to the first.
@@ -11,10 +11,10 @@
  * Nothing moves on until it is: the video showing just carries on looping. */
 
 // How many times each video plays before moving on, and the most time
-// (seconds) one stays on screen: a long clip moves on partway through
-// rather than holding the screen for two full plays.
-const PLAYS = 2;
-const MAX_SHOWN_S = 12;
+// (seconds) one stays on screen: a very long clip moves on partway through
+// rather than holding the screen for its whole length.
+const PLAYS = 1;
+const MAX_SHOWN_S = 30;
 // The push between videos.
 const PUSH_MS = 1400;
 const PUSH_EASE = 'cubic-bezier(0.65, 0, 0.35, 1)';
