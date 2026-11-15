@@ -401,7 +401,7 @@
     --text-body-1: 1.35rem; /* 21.6px (was 23.4px) */
     --text-body-2: 1.40625rem; /* 22.5px */
     --text-body-3: 1.0125rem; /* 16.2px */
-    --text-detail: 0.9375rem; /* 15px (was 16.2px) */
+    --text-detail: 0.875rem; /* 14px (was 16.2px, then 15px) */
     --text-categories: 0.84375rem; /* 13.5px */
 
     --spacing-vertical-s: 1.25rem; /* 20px */
