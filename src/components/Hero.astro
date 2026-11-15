@@ -285,12 +285,19 @@ const afterParts = headlineAfter.split(/(\s+)/);
             two different Mux playback IDs. Only rendered once that second
             file is actually set. */}
         {reelVideoUrl && (
+          /* Same box as the hero's case study ticker: with a mouse it's the
+             cursor over the showreel (placed by the script), and on touch
+             screens it sits at the reel's bottom left. */
           <button
             type="button"
             data-reel-trigger
-            class="reel-trigger-btn absolute bottom-4 left-4 cursor-pointer rounded-full border border-front/15 bg-grey-600 px-[16px] py-[12px] font-tag text-detail leading-none text-front backdrop-blur-[14px] transition-[color,opacity,visibility] duration-300 ease-out hover:text-accent-yellow data-[past=true]:invisible data-[past=true]:opacity-0"
+            aria-label="Watch our showreel"
+            class="reel-trigger-btn absolute flex h-[28px] cursor-pointer items-center gap-[7px] rounded-small bg-grey-600 px-[9px] font-tag text-detail uppercase leading-[18px] text-front backdrop-blur-[14px] transition-[opacity,visibility] duration-150 ease-out data-[past=true]:invisible data-[past=true]:opacity-0"
           >
-            Watch our showreel
+            <svg width="9" height="10" viewBox="0 0 9 10" fill="currentColor" aria-hidden="true">
+              <path d="M8.5 5 0.5 9.6V0.4z" />
+            </svg>
+            Play
           </button>
         )}
       </div>
@@ -717,6 +724,30 @@ const afterParts = headlineAfter.split(/(\s+)/);
      trigger is a wide text pill (shallower scale, matching the footer
      buttons); the close button is a small round icon button (deeper scale,
      matching the copy-email button's treatment). */
+  /* The showreel's play box: at the bottom left on touch screens; with a
+     mouse it replaces the cursor over the landed reel (placed by the
+     script, via `translate` so the press spring's `transform` is free),
+     showing while the pointer's over it. */
+  .reel-trigger-btn {
+    left: 16px;
+    bottom: 16px;
+  }
+  @media (hover: hover) {
+    [data-hero-media] {
+      cursor: none;
+    }
+    .reel-trigger-btn {
+      left: 0;
+      top: 0;
+      bottom: auto;
+      opacity: 0;
+      pointer-events: none;
+    }
+    [data-hero-media].is-hovered .reel-trigger-btn {
+      opacity: 1;
+    }
+  }
+
   .reel-trigger-btn.is-pressed {
     transform: scale(0.95);
     transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -1786,6 +1817,36 @@ const afterParts = headlineAfter.split(/(\s+)/);
     }
 
     reelTrigger.addEventListener('click', openReel);
+
+    // With a mouse the play box is the cursor over the showreel, and a
+    // click anywhere on the reel plays it.
+    const reelCard = document.querySelector<HTMLElement>('[data-hero-media]');
+    if (reelCard && window.matchMedia('(hover: hover)').matches) {
+      let px = 0;
+      let py = 0;
+      let raf = 0;
+      const place = () => {
+        raf = 0;
+        reelTrigger.style.translate = `${px - reelTrigger.offsetWidth / 2}px ${py - reelTrigger.offsetHeight / 2}px`;
+      };
+      reelCard.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'mouse') return;
+        // The reel is scaled while it zooms in and out; positions are in
+        // its own (unscaled) space.
+        const box = reelCard.getBoundingClientRect();
+        const scale = box.width / reelCard.offsetWidth || 1;
+        px = (e.clientX - box.left) / scale;
+        py = (e.clientY - box.top) / scale;
+        if (!reelCard.classList.contains('is-hovered')) {
+          place();
+          reelCard.classList.add('is-hovered');
+        } else if (!raf) raf = requestAnimationFrame(place);
+      });
+      reelCard.addEventListener('pointerleave', () => reelCard.classList.remove('is-hovered'));
+      reelCard.addEventListener('click', (e) => {
+        if (!(e.target as Element).closest('[data-reel-trigger]')) openReel();
+      });
+    }
     reelClose.addEventListener('click', closeReel);
     reelOverlay.addEventListener('click', (e) => {
       // Only the backdrop itself, not the video or close button, both of
