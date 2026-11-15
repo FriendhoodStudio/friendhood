@@ -98,9 +98,9 @@ const afterParts = headlineAfter.split(/(\s+)/);
   </div>
 
   {/* Links the first screen to the case study the video showing is from
-      (set per video in Studio), with a tooltip naming it: it follows the
-      pointer with a mouse, and sits above "Find your possibility" on touch
-      screens. Above the videos, below the headline (which lets pointers
+      (set per video in Studio), with a tooltip naming it: it shows where
+      the pointer rests with a mouse, and sits above "Find your possibility"
+      on touch screens. Above the videos, below the headline (which lets pointers
       through to it), so the headline still blends with the video. Only
       live while the video showing has a case study. Filled in by the
       script. */}
@@ -512,8 +512,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
   .hero-loop-link.is-live {
     pointer-events: auto;
   }
-  /* With a mouse the tooltip follows the pointer (placed by the script),
-     showing while it's over the hero. */
+  /* With a mouse it shows like a standard tooltip, where the pointer comes
+     to rest (placed by the script). */
   .hero-loop-tip {
     opacity: 0;
     transition: opacity 250ms ease-out;
@@ -1654,7 +1654,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
 
   // The case study link over the background videos: points at the project
   // of whichever video is showing, with a tooltip naming it. With a mouse
-  // the tooltip trails the pointer; on touch screens it sits still (CSS).
+  // it shows where the pointer rests; on touch screens it sits still (CSS).
   {
     const link = document.querySelector<HTMLAnchorElement>('[data-hero-loop-link]');
     const tip = document.querySelector<HTMLElement>('[data-hero-loop-tip]');
@@ -1703,38 +1703,37 @@ const afterParts = headlineAfter.split(/(\s+)/);
         if (track.dataset.name) setTicker(track.dataset.name);
       });
 
-      // Trails the pointer a little, offset down and right of it.
-      const OFFSET = 18;
+      // A standard tooltip: once the pointer comes to rest over the hero it
+      // appears just below and right of it and stays put there; moving on
+      // hides it, until the pointer rests again.
+      const OFFSET = 16;
+      const REST_MS = 450;
+      let restTimer = 0;
       let x = 0;
       let y = 0;
-      let tx = 0;
-      let ty = 0;
-      let raf = 0;
-      const follow = () => {
-        tx += (x - tx) * 0.25;
-        ty += (y - ty) * 0.25;
+      const place = () => {
         // Kept on screen at the right and bottom edges.
         const box = link.getBoundingClientRect();
-        const left = Math.min(tx + OFFSET, box.width - tip.offsetWidth - 12);
-        const top = Math.min(ty + OFFSET, box.height - tip.offsetHeight - 12);
+        const left = Math.min(x + OFFSET, box.width - tip.offsetWidth - 12);
+        const top = Math.min(y + OFFSET, box.height - tip.offsetHeight - 12);
         tip.style.transform = `translate(${left}px, ${top}px)`;
-        raf = Math.abs(x - tx) + Math.abs(y - ty) > 0.5 ? requestAnimationFrame(follow) : 0;
+        link.classList.add('is-hovered');
       };
       link.addEventListener('pointermove', (e) => {
         if (e.pointerType !== 'mouse') return;
         const box = link.getBoundingClientRect();
+        // Small jitters don't count as moving on.
+        if (link.classList.contains('is-hovered') && Math.hypot(e.clientX - box.left - x, e.clientY - box.top - y) < 6) return;
         x = e.clientX - box.left;
         y = e.clientY - box.top;
-        if (!link.classList.contains('is-hovered')) {
-          // Appears where the pointer is, rather than sliding in from the
-          // corner.
-          tx = x;
-          ty = y;
-          link.classList.add('is-hovered');
-        }
-        if (!raf) raf = requestAnimationFrame(follow);
+        link.classList.remove('is-hovered');
+        window.clearTimeout(restTimer);
+        restTimer = window.setTimeout(place, REST_MS);
       });
-      link.addEventListener('pointerleave', () => link.classList.remove('is-hovered'));
+      link.addEventListener('pointerleave', () => {
+        window.clearTimeout(restTimer);
+        link.classList.remove('is-hovered');
+      });
     }
   }
 
