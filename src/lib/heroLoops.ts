@@ -26,11 +26,23 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
   // the first touch, click, key or scroll, which counts as permission.
   let waitingForGesture = false;
   const showing = () => videos.filter((v) => v.style.visibility !== 'hidden');
-  const GESTURES = ['touchstart', 'pointerdown', 'keydown', 'scroll'] as const;
+  // Safari only counts the end of a tap (touchend / pointerup / click) or a
+  // key as permission, not touchstart or a scroll, so those are listened
+  // for too.
+  const GESTURES = ['touchstart', 'touchend', 'pointerdown', 'pointerup', 'click', 'keydown', 'scroll'] as const;
+  // When a tap or click has just started a stalled video: that tap was for
+  // the video, so the case study link under it doesn't follow it (see
+  // Hero.astro).
+  let kickedAt = -Infinity;
+  const stalled = () => !paused && document.visibilityState === 'visible' && showing().some((v) => v.paused && !v.ended);
+  function kick() {
+    if (stalled()) kickedAt = performance.now();
+    if (!paused) showing().forEach(play);
+  }
   function onGesture() {
     GESTURES.forEach((type) => window.removeEventListener(type, onGesture));
     waitingForGesture = false;
-    if (!paused) showing().forEach(play);
+    kick();
     // A phone that wanted a tap before playing wants one before loading the
     // next video too (see warm), and this is it.
     if (videos.length > 1) warm(nextVideo());
@@ -69,7 +81,8 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     note(`play() v${videos.indexOf(video)} rs=${video.readyState}`);
     video.play().then(() => note(`  ok v${videos.indexOf(video)}`)).catch((err: unknown) => {
       note(`  REFUSED v${videos.indexOf(video)}: ${(err as { name?: string })?.name} ${(err as { message?: string })?.message ?? ''}`);
-      if ((err as { name?: string })?.name === 'NotAllowedError' && !waitingForGesture) {
+      // Any refusal: the next touch or click starts it, whatever the reason.
+      if (!waitingForGesture) {
         waitingForGesture = true;
         GESTURES.forEach((type) => window.addEventListener(type, onGesture, { passive: true }));
       }
@@ -101,6 +114,13 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
     // later and won't restart).
     video.addEventListener('playing', () => retries.delete(video));
   }
+  // A watchdog: Safari can leave a video sitting on its first frame
+  // without ever saying why (no refusal, no error), once its retries are
+  // spent. Every couple of seconds, a video that should be playing and
+  // isn't is asked again.
+  window.setInterval(() => {
+    for (const v of showing()) if (shouldPlay(v) && !v.ended) play(v);
+  }, 2000);
   // Coming back to the tab (or the app), or to the page from the back
   // button, after the browser paused it.
   document.addEventListener('visibilitychange', () => {
@@ -193,6 +213,14 @@ export function initHeroLoops(root: HTMLElement, reduceMotion: boolean) {
   }
 
   return {
+    /** True when a tap or click should start the videos rather than follow
+     * the link over them: the one showing is stuck, or that tap has only
+     * just started it. */
+    get wantsTap() {
+      return stalled() || performance.now() - kickedAt < 1500;
+    },
+    /** Starts the videos (from a tap or click). */
+    kick,
     /** Pushes on to the next video. */
     next: push,
     /** Which video is showing (or on its way in). */

@@ -1766,6 +1766,15 @@ const afterParts = headlineAfter.split(/(\s+)/);
       };
       show(loops.index);
       loops.onChange(show);
+      // Safari sometimes won't start the videos until it's tapped or
+      // clicked. That tap (or click) lands on this link, so while the video
+      // is stuck, or has only just been started by it, it plays the video
+      // instead of opening the case study.
+      link.addEventListener('click', (e) => {
+        if (!loops.wantsTap) return;
+        e.preventDefault();
+        loops.kick();
+      });
       // Measured again once the real font is in, in case it wasn't yet.
       document.fonts.ready.then(() => {
         if (track.dataset.name) setTicker(track.dataset.name);
