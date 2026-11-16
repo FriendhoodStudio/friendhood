@@ -161,7 +161,7 @@ const HERO_QUERY = `*[_type == "hero"][0]{
   videoPoster,
   "heroVideoMobileUrl": heroVideoMobile.asset->url,
   "reelVideoUrl": reelVideo.asset->url,
-  "loopVideos": loopVideos[defined(video.asset)]{ "url": video.asset->url, "mobileUrl": mobileVideo.asset->url, "project": project->{ title, "slug": slug.current } },
+  "loopVideos": loopVideos[defined(video.asset)]{ "url": video.asset->url, "mobileUrl": mobileVideo.asset->url, "webmUrl": webm.asset->url, "mobileWebmUrl": mobileWebm.asset->url, "project": project->{ title, "slug": slug.current } },
   popUpImagesEnabled,
   "popUpImages": popUpImages[]{ asset, alt, "aspectRatio": asset->metadata.dimensions.aspectRatio },
   "projectPopUpImages": *[_type == "project" && comingSoon != true && defined(slug.current)]{

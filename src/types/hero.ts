@@ -39,6 +39,9 @@ export interface HeroLoopVideo {
   url: string;
   /** Optional portrait cut for phones. */
   mobileUrl?: string;
+  /** Optional smaller AV1 WebM copies, for browsers that can play them. */
+  webmUrl?: string;
+  mobileWebmUrl?: string;
   /** The case study the clip links to, shown in a tooltip over the hero. */
   href?: string;
   project?: string;

@@ -19,6 +19,9 @@ const heroVideoMobileUrl = hero?.heroVideoMobileUrl;
 // the tiny background loop unmuted.
 const reelVideoUrl = hero?.reelVideoUrl;
 const loopVideos = hero?.loopVideos ?? [];
+// The MIME type of the hero's AV1 WebM copies (main profile, level 4.0,
+// 8-bit), so browsers that can't decode them skip straight to the MP4.
+const AV1_WEBM = 'video/webm; codecs="av01.0.08M.08"';
 // Background videos, when there are any, take the first screen instead of
 // the floating project images and the light backdrop.
 const hasLoops = loopVideos.length > 0;
@@ -89,8 +92,15 @@ const afterParts = headlineAfter.split(/(\s+)/);
             preload={i === 0 ? 'auto' : 'none'}
             autoplay={i === 0}
           >
-            {loop.mobileUrl && <source src={loop.mobileUrl} media="(max-width: 767px)" />}
-            <source src={loop.url} />
+            {/* Lightest first: each browser plays the first it can. The
+                WebMs are AV1, which a browser only claims to play where it
+                really can (Safari only on Apple chips that decode it), so
+                everywhere else falls through to the MP4s. Phones get a
+                portrait crop where there is one. */}
+            {loop.mobileWebmUrl && <source src={loop.mobileWebmUrl} media="(max-width: 767px)" type={AV1_WEBM} />}
+            {loop.mobileUrl && <source src={loop.mobileUrl} media="(max-width: 767px)" type="video/mp4" />}
+            {loop.webmUrl && <source src={loop.webmUrl} type={AV1_WEBM} />}
+            <source src={loop.url} type="video/mp4" />
           </video>
         ))}
       </div>

@@ -71,6 +71,21 @@ export default defineType({
               options: { accept: 'video/*' },
             }),
             defineField({
+              name: 'webm',
+              title: 'Video (WebM)',
+              description:
+                'Optional. A smaller AV1 WebM copy of the video above, played by browsers that support it; the others (Safari, mostly) play the MP4.',
+              type: 'file',
+              options: { accept: 'video/webm' },
+            }),
+            defineField({
+              name: 'mobileWebm',
+              title: 'Mobile video (WebM)',
+              description: 'Optional. The same for the mobile video.',
+              type: 'file',
+              options: { accept: 'video/webm' },
+            }),
+            defineField({
               name: 'project',
               title: 'Case study',
               description:
