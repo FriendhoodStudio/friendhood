@@ -1,0 +1,20 @@
+# Dependabot: opens a pull request when a package the site uses has an
+# update. Security fixes arrive as soon as they're published; everything
+# else is gathered into one pull request a week (minor and patch versions
+# together, majors on their own since they can break things). Each pull
+# request gets its own Vercel preview to check before merging.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
