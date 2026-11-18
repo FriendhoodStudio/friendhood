@@ -1,0 +1,53 @@
+# Weekly backup of everything in Sanity: all documents (drafts included)
+# and every uploaded image and video, as one .tar.gz.
+#
+# The repository is public, so the file is encrypted before it's stored:
+# it's kept for 90 days as a download on the run's page (Actions → Sanity
+# backup), and only opens with the passphrase. To restore:
+#   gpg --decrypt sanity-backup.tar.gz.gpg > backup.tar.gz
+#   npx sanity dataset import backup.tar.gz production --replace
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   SANITY_BACKUP_TOKEN       a Sanity API token with Viewer access
+#   BACKUP_PASSPHRASE         any long passphrase; keep a copy somewhere safe
+name: Sanity backup
+
+on:
+  schedule:
+    - cron: '0 3 * * 1' # Mondays, 3am UTC
+  workflow_dispatch: # or run it by hand from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Export the dataset
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_BACKUP_TOKEN }}
+          PUBLIC_SANITY_PROJECT_ID: 49bds5g1
+          PUBLIC_SANITY_DATASET: production
+        run: npx sanity dataset export production backup.tar.gz --overwrite
+      - name: Encrypt it
+        env:
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          test -n "$PASSPHRASE" || { echo "BACKUP_PASSPHRASE secret is not set"; exit 1; }
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" \
+            --symmetric --cipher-algo AES256 -o sanity-backup.tar.gz.gpg backup.tar.gz
+          rm backup.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sanity-backup-${{ github.run_number }}
+          path: sanity-backup.tar.gz.gpg
+          retention-days: 90
+          compression-level: 0
