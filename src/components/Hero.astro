@@ -1015,9 +1015,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // Over the background videos the text stays light throughout.
       if (headline && !loops) headline.style.color = mix(Math.round(darken * COLOUR_STEPS) / COLOUR_STEPS);
       if (tagline) {
-        // Fades at the start, comes back under the statement, and fades
-        // again early in the hand-over as it scrolls away.
-        const taglineOpacity = Math.max(1 - clamp(p / 0.07, 0, 1), statementIn) * (1 - clamp(after / 0.3, 0, 1));
+        // Stays put the whole way through the stage, as a steady cue to
+        // keep scrolling, and only fades early in the hand-over as it
+        // scrolls away.
+        const taglineOpacity = 1 - clamp(after / 0.3, 0, 1);
         // The colour only changes while it's showing: Safari on iPhone
         // doesn't redraw text whose colour changed while it was faded right
         // out, so it came back under the statement still dark.
@@ -1044,12 +1045,11 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // statement. Hidden, not just faded, so its backdrop blur isn't drawn.
       if (reelHit) reelHit.style.pointerEvents = reelLive ? 'auto' : 'none';
       if (reelButton) reelButton.dataset.past = String(!reelLive);
-      // On touch screens "Find your possibility" sits to the right while a
+      // On touch screens "Find your possibility" sits to the right when a
       // box shares its row (the case study ticker on the first screen, the
-      // play box on the statement). It holds there through the scroll in
-      // between, so it doesn't jump to the middle as the ticker goes; it
-      // only moves while it's faded right out (from p 0.07).
-      stage.classList.toggle('has-reel-tip', !!reelButton && (p >= 0.07 || !!loopLink?.classList.contains('is-live')));
+      // play box on the statement), and with the play box there it stays
+      // right the whole way, so it never moves.
+      stage.classList.toggle('has-reel-tip', !!reelButton);
       if (statement) {
         statement.style.opacity = String(statementIn * handoverFade);
         // Scrolls away at the page's own speed during the hand-over.
