@@ -288,28 +288,6 @@ const afterParts = headlineAfter.split(/(\s+)/);
           <img src={media.url} alt={media.alt} class="h-full w-full object-cover" loading="eager" />
         )}
 
-        {/* Deliberately a separate file from the muted loop above (see the
-            reelVideo schema field) — wearecollins.com's own reel section
-            does the same: a lightweight preview loop plus a distinct
-            full-quality asset for the modal, confirmed by inspecting their
-            two different Mux playback IDs. Only rendered once that second
-            file is actually set. */}
-        {reelVideoUrl && (
-          /* Same box as the hero's case study ticker: with a mouse it's the
-             cursor over the showreel (placed by the script), and on touch
-             screens it sits at the reel's bottom left. */
-          <button
-            type="button"
-            data-reel-trigger
-            aria-label="Watch our showreel"
-            class="reel-trigger-btn absolute flex h-[28px] cursor-pointer items-center gap-[7px] rounded-small bg-grey-600 px-[9px] font-tag text-detail uppercase leading-[18px] text-front backdrop-blur-[14px] transition-[opacity,visibility] duration-150 ease-out data-[past=true]:invisible data-[past=true]:opacity-0"
-          >
-            <svg width="9" height="10" viewBox="0 0 9 10" fill="currentColor" aria-hidden="true">
-              <path d="M8.5 5 0.5 9.6V0.4z" />
-            </svg>
-            Play showreel
-          </button>
-        )}
       </div>
     )}
 
@@ -319,6 +297,30 @@ const afterParts = headlineAfter.split(/(\s+)/);
     <div class="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-[var(--page-margin)]" data-hero-statement>
       <h3 class="max-w-[var(--col-8)] text-balance text-center font-display text-h3 text-front">{statement}</h3>
     </div>
+
+    {/* The showreel's play box, on the statement screen: the reel plays
+        softly behind the statement, and a click or tap anywhere on that
+        screen plays it in full. With a mouse the box is the cursor; on
+        touch screens it sits at the bottom left, beside "Find your
+        possibility". Only live while the statement is resting (the stage
+        script). The full reel is a separate file from the muted loop (see
+        the reelVideo schema field). */}
+    {media && reelVideoUrl && (
+      <div class="reel-hit absolute inset-0 z-[35]" data-reel-hit>
+        <button
+          type="button"
+          data-reel-trigger
+          data-past="true"
+          aria-label="Watch our showreel"
+          class="reel-trigger-btn absolute flex h-[28px] cursor-pointer items-center gap-[7px] rounded-small bg-grey-600 px-[9px] font-tag text-detail uppercase leading-[18px] text-front backdrop-blur-[14px] transition-[opacity,visibility] duration-150 ease-out data-[past=true]:invisible data-[past=true]:opacity-0"
+        >
+          <svg width="9" height="10" viewBox="0 0 9 10" fill="currentColor" aria-hidden="true">
+            <path d="M8.5 5 0.5 9.6V0.4z" />
+          </svg>
+          Play showreel
+        </button>
+      </div>
+    )}
   </div>
 </section>
 
@@ -668,7 +670,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
      that stretch): headline out, showreel in, a beat on the reel, then the
      reel out and the statement in, and the hand-over to the next section. */
   .hero-stage {
-    --hero-stage-scroll: 420vh;
+    --hero-stage-scroll: 300vh;
     height: calc(100dvh + var(--hero-stage-scroll));
     /* The hand-over: the next section is pulled up a screen to scroll in
        over the stage's last, still-pinned stretch, while the reel backdrop
@@ -738,12 +740,21 @@ const afterParts = headlineAfter.split(/(\s+)/);
      mouse it replaces the cursor over the landed reel (placed by the
      script, via `translate` so the press spring's `transform` is free),
      showing while the pointer's over it. */
+  .reel-hit {
+    pointer-events: none;
+  }
   .reel-trigger-btn {
-    left: 16px;
-    bottom: 16px;
+    left: var(--page-margin);
+    bottom: calc(28px + 0.48em - 14px);
+  }
+  @media (hover: none) {
+    .has-reel-tip [data-hero-tagline] {
+      text-align: right;
+      padding-right: var(--page-margin);
+    }
   }
   @media (hover: hover) {
-    [data-hero-media] {
+    [data-reel-hit] {
       cursor: none;
     }
     .reel-trigger-btn {
@@ -753,7 +764,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       opacity: 0;
       pointer-events: none;
     }
-    [data-hero-media].is-hovered .reel-trigger-btn {
+    [data-reel-hit].is-hovered .reel-trigger-btn {
       opacity: 1;
     }
   }
@@ -905,6 +916,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const tagline = document.querySelector<HTMLElement>('[data-hero-tagline]');
     const reel = document.querySelector<HTMLElement>('[data-hero-media]');
     const reelButton = document.querySelector<HTMLElement>('[data-reel-trigger]');
+    const reelHit = document.querySelector<HTMLElement>('[data-reel-hit]');
     const statement = document.querySelector<HTMLElement>('[data-hero-statement]');
     const glow = document.querySelector<HTMLElement>('.hero-gradient');
     const overlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
@@ -928,14 +940,23 @@ const afterParts = headlineAfter.split(/(\s+)/);
     // How far the headline's lines travel up/down over the transition, as a
     // share of the screen's height — enough to carry them off screen.
     const LINE_TRAVEL = 0.75;
-    // Stage timeline (shares of its scroll): the reel has fully landed by
-    // REEL_LANDED_AT, holds for a beat, starts zooming on past at
-    // REEL_LEAVES_AT, and the statement comes up from STATEMENT_ARRIVES_AT.
-    const REEL_LANDED_AT = 0.56;
-    const REEL_LEAVES_AT = 0.66;
-    const STATEMENT_ARRIVES_AT = 0.72;
-    // How strongly the reel stays on behind the statement.
+    // Stage timeline (shares of its scroll): the headline has parted and
+    // gone by HEADLINE_GONE_AT; the reel zooms up out of the dark into a
+    // soft backdrop from REEL_FROM to REEL_TO, and the statement comes up
+    // over it from STATEMENT_ARRIVES_AT, in focus by STATEMENT_LANDED_AT.
+    // (There used to be a stop on the landed reel in between; people got
+    // stuck there, so the statement now comes straight after the headline
+    // and the reel is played from it.)
+    const HEADLINE_GONE_AT = 0.45;
+    const REEL_FROM = 0.2;
+    const REEL_TO = 0.9;
+    const STATEMENT_ARRIVES_AT = 0.42;
+    const STATEMENT_LANDED_AT = 0.92;
+    // The reel behind the statement: how strongly it shows, how far it's
+    // zoomed and how soft it is.
     const REEL_BACKDROP_OPACITY = 0.45;
+    const REEL_BACKDROP_SCALE = 1.4;
+    const REEL_BACKDROP_BLUR = 18;
     // How far through the hand-over (as a share of it) the statement and
     // video have fully faded.
     const HANDOVER_FADE_BY = 0.6;
@@ -970,16 +991,16 @@ const afterParts = headlineAfter.split(/(\s+)/);
       const phases = Math.max(1, travel - fadePx);
       const p = travel > 0 ? clamp(scrolled / phases, 0, 1) : 0;
       const after = travel > 0 ? clamp((scrolled - phases) / fadePx, 0, 1) : 0;
-      // Phases, as shares of the stage: headline out and reel in over the
-      // first part (q), a beat on the landed reel, then the reel zooming on
-      // past while the statement zooms up into focus.
-      const q = clamp(p / REEL_LANDED_AT, 0, 1);
-      const out = easeIn(clamp(q / 0.5, 0, 1));
-      const into = easeOut(clamp((q - 0.4) / 0.6, 0, 1));
-      const darken = clamp((q - 0.15) / 0.3, 0, 1);
-      const reelOut = easeIn(clamp((p - REEL_LEAVES_AT) / (1 - REEL_LEAVES_AT - 0.04), 0, 1));
+      // Phases, as shares of the stage: the headline parts and goes while
+      // the reel zooms up out of the dark behind, and the statement zooms
+      // up into focus over it.
+      const out = easeIn(clamp(p / HEADLINE_GONE_AT, 0, 1));
+      const into = easeOut(clamp((p - REEL_FROM) / (REEL_TO - REEL_FROM), 0, 1));
+      const darken = clamp((p - 0.08) / 0.17, 0, 1);
       // Fully in a little before the stage ends, so it rests there in focus.
-      const statementIn = easeOut(clamp((p - STATEMENT_ARRIVES_AT) / (0.95 - STATEMENT_ARRIVES_AT), 0, 1));
+      const statementIn = easeOut(clamp((p - STATEMENT_ARRIVES_AT) / (STATEMENT_LANDED_AT - STATEMENT_ARRIVES_AT), 0, 1));
+      // Resting on the statement: the showreel can be played from here.
+      const reelLive = statementIn > 0.97 && after < 0.02;
 
       if (overlay) overlay.style.opacity = String(1 - darken);
       // The statement and the video behind it are gone a little over halfway
@@ -996,7 +1017,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       if (tagline) {
         // Fades at the start, comes back under the statement, and fades
         // again early in the hand-over as it scrolls away.
-        const taglineOpacity = Math.max(1 - clamp(q / 0.12, 0, 1), statementIn) * (1 - clamp(after / 0.3, 0, 1));
+        const taglineOpacity = Math.max(1 - clamp(p / 0.07, 0, 1), statementIn) * (1 - clamp(after / 0.3, 0, 1));
         // The colour only changes while it's showing: Safari on iPhone
         // doesn't redraw text whose colour changed while it was faded right
         // out, so it came back under the statement still dark.
@@ -1016,17 +1037,14 @@ const afterParts = headlineAfter.split(/(\s+)/);
         syncTipRow();
       }
 
-      if (reel) {
-        // It doesn't vanish as it zooms past: it settles back as a dimmed,
-        // blurred, still-playing backdrop behind the statement.
-        reel.style.opacity = String(clamp(into * 1.6, 0, 1) * (1 - reelOut * (1 - REEL_BACKDROP_OPACITY)) * handoverFade);
-        // Only clickable (the "Watch our showreel" button) while it's landed.
-        reel.style.pointerEvents = into > 0.95 && reelOut < 0.05 ? 'auto' : 'none';
-      }
-      // The button fades out as the reel starts zooming past (rather than
-      // riding along into the blurred backdrop) and back when you scroll up.
-      // Hidden, not just faded, so its backdrop blur isn't drawn.
-      if (reelButton) reelButton.dataset.past = String(reelOut > 0.02);
+      // The reel comes up as a dimmed, blurred, still-playing backdrop
+      // behind the statement.
+      if (reel) reel.style.opacity = String(into * REEL_BACKDROP_OPACITY * handoverFade);
+      // The play box and the click-anywhere layer, only while resting on the
+      // statement. Hidden, not just faded, so its backdrop blur isn't drawn.
+      if (reelHit) reelHit.style.pointerEvents = reelLive ? 'auto' : 'none';
+      if (reelButton) reelButton.dataset.past = String(!reelLive);
+      stage.classList.toggle('has-reel-tip', !!reelButton && reelLive);
       if (statement) {
         statement.style.opacity = String(statementIn * handoverFade);
         // Scrolls away at the page's own speed during the hand-over.
@@ -1104,13 +1122,12 @@ const afterParts = headlineAfter.split(/(\s+)/);
       }
       popups?.zoomPast(out);
 
-      // The reel zooms up from small and blurred to fill the screen, then
-      // carries on growing past the viewer — blurring and fading — as the
-      // statement zooms up out of a blur into focus behind it.
+      // The reel zooms up from small and blurred in the middle into the
+      // soft backdrop, as the statement zooms up out of a blur into focus
+      // over it.
       if (reel) {
-        reel.style.scale = String((0.25 + 0.75 * into) * (1 + reelOut * 0.6));
-        const blur = (1 - into) * 30 + reelOut * 24;
-        reel.style.filter = blur > 0.1 ? `blur(${blur}px)` : '';
+        reel.style.scale = String(0.25 + (REEL_BACKDROP_SCALE - 0.25) * into);
+        reel.style.filter = `blur(${30 + (REEL_BACKDROP_BLUR - 30) * into}px)`;
       }
       if (statement) {
         statement.style.scale = String(0.7 + 0.3 * statementIn);
@@ -1131,8 +1148,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
       window.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('resize', onScroll);
 
-      // Resting points: the headline, the reel landed (the middle of its
-      // beat), the statement in focus, and the services section arrived at
+      // Resting points: the headline, the statement in focus, and the
+      // services section arrived at
       // the top of the screen. Scrolling stays yours — the page moves 1:1
       // with the wheel or finger, nothing holds it — the points only help
       // the last bit of the way: as a swipe runs out (a trackpad's momentum
@@ -1145,7 +1162,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // Off with reduced motion. (CSS scroll snapping was tried first:
       // "proximity" only catches stops near a point, and "mandatory" would
       // hold the whole page.)
-      const REST_POINTS = [0, (REEL_LANDED_AT + REEL_LEAVES_AT) / 2, 0.975];
+      const REST_POINTS = [0, 0.975];
       const SETTLE_NUDGE_PX = 80;
       // How far a fling would carry on, per px/ms of speed — about what
       // the browsers' own momentum does.
@@ -1230,7 +1247,7 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // or the services section, however hard — it eases to a stop on the
       // first one ahead of where it began, and the next swipe moves on.
       // (Indexes into the points.)
-      const STICKY_DOWN = [2, 3];
+      const STICKY_DOWN = [1, 2];
       const stickyAhead = (m: ReturnType<typeof measure>, fromScrolled: number) => {
         const pt = STICKY_DOWN.map((i) => m.points[i]).find((p) => p > fromScrolled + 2);
         return pt === undefined ? null : m.top + pt;
@@ -1843,8 +1860,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
 
     reelTrigger.addEventListener('click', openReel);
 
-    // With a mouse the play box is the cursor over the showreel.
-    const reelCard = document.querySelector<HTMLElement>('[data-hero-media]');
+    // With a mouse the play box is the cursor over the statement screen.
+    const reelCard = document.querySelector<HTMLElement>('[data-reel-hit]');
     if (reelCard && window.matchMedia('(hover: hover)').matches) {
       let px = 0;
       let py = 0;
@@ -1855,12 +1872,9 @@ const afterParts = headlineAfter.split(/(\s+)/);
       };
       reelCard.addEventListener('pointermove', (e) => {
         if (e.pointerType !== 'mouse') return;
-        // The reel is scaled while it zooms in and out; positions are in
-        // its own (unscaled) space.
         const box = reelCard.getBoundingClientRect();
-        const scale = box.width / reelCard.offsetWidth || 1;
-        px = (e.clientX - box.left) / scale;
-        py = (e.clientY - box.top) / scale;
+        px = e.clientX - box.left;
+        py = e.clientY - box.top;
         if (!reelCard.classList.contains('is-hovered')) {
           place();
           reelCard.classList.add('is-hovered');
@@ -1868,8 +1882,8 @@ const afterParts = headlineAfter.split(/(\s+)/);
       });
       reelCard.addEventListener('pointerleave', () => reelCard.classList.remove('is-hovered'));
     }
-    // A click or tap anywhere on the landed showreel plays it, on every
-    // device (the play box is just the cue).
+    // A click or tap anywhere on the statement screen plays the showreel,
+    // on every device (the play box is just the cue).
     reelCard?.addEventListener('click', (e) => {
       if (!(e.target as Element).closest('[data-reel-trigger]')) openReel();
     });
