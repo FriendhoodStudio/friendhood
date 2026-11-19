@@ -314,10 +314,12 @@ const afterParts = headlineAfter.split(/(\s+)/);
           aria-label="Watch our showreel"
           class="reel-trigger-btn absolute flex h-[28px] cursor-pointer items-center gap-[7px] rounded-small bg-grey-600 px-[9px] font-tag text-detail uppercase leading-[18px] text-front backdrop-blur-[14px] transition-[opacity,visibility] duration-150 ease-out data-[past=true]:invisible data-[past=true]:opacity-0"
         >
-          <svg width="9" height="10" viewBox="0 0 9 10" fill="currentColor" aria-hidden="true">
-            <path d="M8.5 5 0.5 9.6V0.4z" />
-          </svg>
-          Play showreel
+          <span class="flex items-center gap-[7px]" data-reel-trigger-label>
+            <svg width="9" height="10" viewBox="0 0 9 10" fill="currentColor" aria-hidden="true">
+              <path d="M8.5 5 0.5 9.6V0.4z" />
+            </svg>
+            Play showreel
+          </span>
         </button>
       </div>
     )}
@@ -747,7 +749,24 @@ const afterParts = headlineAfter.split(/(\s+)/);
     left: var(--page-margin);
     bottom: calc(28px + 0.48em - 14px);
   }
+  .reel-trigger-btn {
+    pointer-events: auto;
+  }
   @media (hover: none) {
+    /* On touch screens the case study ticker and the play box read as one
+       box at the bottom left: the same size, in the same place, its
+       contents changing from one to the other as the statement comes in
+       (the stage script). */
+    .hero-loop-tip,
+    .reel-trigger-btn {
+      width: 136px;
+    }
+    .reel-trigger-btn {
+      justify-content: center;
+      /* Shown and hidden by the scroll, not a fade of its own, so it takes
+         over from the ticker without a flicker. */
+      transition: none;
+    }
     .has-reel-tip [data-hero-tagline] {
       text-align: right;
       padding-right: var(--page-margin);
@@ -917,6 +936,13 @@ const afterParts = headlineAfter.split(/(\s+)/);
     const reel = document.querySelector<HTMLElement>('[data-hero-media]');
     const reelButton = document.querySelector<HTMLElement>('[data-reel-trigger]');
     const reelHit = document.querySelector<HTMLElement>('[data-reel-hit]');
+    const reelLabel = document.querySelector<HTMLElement>('[data-reel-trigger-label]');
+    const loopTipContents = document.querySelector<HTMLElement>('.hero-loop-tip-fade');
+    const touch = window.matchMedia('(hover: none)');
+    // On touch screens, when the box at the bottom left changes from the
+    // case study ticker to "Play showreel" (shares of the stage).
+    const BOX_SWAP_FROM = 0.3;
+    const BOX_SWAP_TO = 0.55;
     const statement = document.querySelector<HTMLElement>('[data-hero-statement]');
     const glow = document.querySelector<HTMLElement>('.hero-gradient');
     const overlay = document.querySelector<HTMLElement>('[data-hero-invert-overlay]');
@@ -1032,11 +1058,21 @@ const afterParts = headlineAfter.split(/(\s+)/);
       popups?.setPaused(p > 0.02);
       // The videos stop once they've faded out of sight behind the reel.
       loops?.setPaused(out >= 1);
-      // The case study link is only there on the first screen.
+      // On touch screens the box at the bottom left stays put through the
+      // stage and its contents change: the case study name fades out, the
+      // box swaps over at the halfway point (the two are drawn identically,
+      // so the swap doesn't show) and "Play showreel" fades in. Tapping it
+      // does whichever it says at the time.
+      const onTouch = touch.matches && !!reelButton;
+      const swap = clamp((p - BOX_SWAP_FROM) / (BOX_SWAP_TO - BOX_SWAP_FROM), 0, 1);
+      const tickerShowing = !!loopLink?.classList.contains('is-live');
+      // The case study link: on the first screen only with a mouse (it's
+      // the cursor); on touch until the box swaps over.
       if (loopLink) {
-        loopLink.style.visibility = p > 0.02 ? 'hidden' : '';
+        loopLink.style.visibility = (onTouch ? swap >= 0.5 : p > 0.02) ? 'hidden' : '';
         syncTipRow();
       }
+      if (loopTipContents) loopTipContents.style.opacity = onTouch ? String(1 - clamp(swap * 2, 0, 1)) : '';
 
       // The reel comes up as a dimmed, blurred, still-playing backdrop
       // behind the statement.
@@ -1044,7 +1080,23 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // The play box and the click-anywhere layer, only while resting on the
       // statement. Hidden, not just faded, so its backdrop blur isn't drawn.
       if (reelHit) reelHit.style.pointerEvents = reelLive ? 'auto' : 'none';
-      if (reelButton) reelButton.dataset.past = String(!reelLive);
+      if (reelButton) {
+        // With a mouse it's only on the resting statement; on touch it takes
+        // over from the ticker halfway through the swap (fading in whole if
+        // there was no ticker to take over from) and stays until the
+        // hand-over.
+        // In the hand-over it scrolls away and fades with "Find your
+        // possibility" beside it.
+        const leaving = 1 - clamp(after / 0.3, 0, 1);
+        const shown = onTouch ? swap >= 0.5 && leaving > 0 : reelLive;
+        reelButton.dataset.past = String(!shown);
+        const fadeIn = clamp(swap * 2 - 1, 0, 1);
+        if (reelLabel) reelLabel.style.opacity = onTouch && tickerShowing ? String(fadeIn) : '';
+        if (onTouch) {
+          reelButton.style.opacity = String((tickerShowing ? 1 : fadeIn) * leaving);
+          reelButton.style.translate = after ? `0 ${-after * fadePx}px` : '';
+        }
+      }
       // On touch screens "Find your possibility" sits to the right when a
       // box shares its row (the case study ticker on the first screen, the
       // play box on the statement), and with the play box there it stays
