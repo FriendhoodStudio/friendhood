@@ -1044,7 +1044,12 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // statement. Hidden, not just faded, so its backdrop blur isn't drawn.
       if (reelHit) reelHit.style.pointerEvents = reelLive ? 'auto' : 'none';
       if (reelButton) reelButton.dataset.past = String(!reelLive);
-      stage.classList.toggle('has-reel-tip', !!reelButton && reelLive);
+      // On touch screens "Find your possibility" sits to the right while a
+      // box shares its row (the case study ticker on the first screen, the
+      // play box on the statement). It holds there through the scroll in
+      // between, so it doesn't jump to the middle as the ticker goes; it
+      // only moves while it's faded right out (from p 0.07).
+      stage.classList.toggle('has-reel-tip', !!reelButton && (p >= 0.07 || !!loopLink?.classList.contains('is-live')));
       if (statement) {
         statement.style.opacity = String(statementIn * handoverFade);
         // Scrolls away at the page's own speed during the hand-over.
