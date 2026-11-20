@@ -239,10 +239,10 @@ const afterParts = headlineAfter.split(/(\s+)/);
   {/* gap reduced from gap-vertical-s to gap-vertical-xs — brings the
       tagline right up close to the showreel below it. */}
     <p class="absolute inset-x-0 bottom-[28px] z-40 text-center font-tag text-detail text-front" data-hero-tagline>
-      <span class="hero-tagline-shadow relative z-20 inline-flex items-baseline pointer-events-none">
+      <span class="hero-tagline-shadow hero-tagline-pulse relative z-20 inline-flex items-baseline pointer-events-none">
         {tagline}
         <svg
-          class="ml-[0.25em] h-[0.7em] w-auto drop-shadow-[0_1px_8px_rgba(0,0,0,0.7)]"
+          class="hero-tagline-arrow ml-[0.25em] h-[0.7em] w-auto drop-shadow-[0_1px_8px_rgba(0,0,0,0.7)]"
           viewBox="0 0 18 18"
           fill="none"
           aria-hidden="true"
@@ -671,6 +671,39 @@ const afterParts = headlineAfter.split(/(\s+)/);
      transitions play out over (the sticky screen inside holds still for
      that stretch): headline out, showreel in, a beat on the reel, then the
      reel out and the statement in, and the hand-over to the next section. */
+  /* "Find your possibility" breathes gently, its arrow dipping with it, as
+     a quiet cue to keep scrolling. */
+  @keyframes hero-tagline-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+  @keyframes hero-tagline-arrow {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    50% {
+      translate: 0 3px;
+    }
+  }
+  .hero-tagline-pulse {
+    animation: hero-tagline-pulse 2.6s ease-in-out infinite;
+  }
+  .hero-tagline-arrow {
+    animation: hero-tagline-arrow 2.6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-tagline-pulse,
+    .hero-tagline-arrow {
+      animation: none;
+    }
+  }
+
   .hero-stage {
     --hero-stage-scroll: 300vh;
     height: calc(100dvh + var(--hero-stage-scroll));
@@ -1221,6 +1254,12 @@ const afterParts = headlineAfter.split(/(\s+)/);
       // hold the whole page.)
       const REST_POINTS = [0, 0.975];
       const SETTLE_NUDGE_PX = 80;
+      // On touch, a swipe that moves the page this far (or a quick flick)
+      // goes on to the next stop that way, however short it was: a short
+      // swipe used to glide back where it started, which read as the page
+      // being stuck.
+      const SWIPE_COMMIT_PX = 40;
+      const SWIPE_COMMIT_SPEED = 0.3;
       // How far a fling would carry on, per px/ms of speed — about what
       // the browsers' own momentum does.
       const FLING_CARRY_MS = 500;
@@ -1441,6 +1480,17 @@ const afterParts = headlineAfter.split(/(\s+)/);
         const projected = m.scrolled + speed * FLING_CARRY_MS;
         const moved = window.scrollY - t.scroll;
         const dir = Math.abs(speed) > 0.15 ? Math.sign(speed) : 0;
+        // A deliberate swipe: on to the next stop that way from where it
+        // started (one stop per swipe, so a hard fling can't skip one).
+        const way = Math.abs(moved) >= SWIPE_COMMIT_PX ? Math.sign(moved) : Math.abs(speed) > SWIPE_COMMIT_SPEED ? Math.sign(speed) : 0;
+        if (way) {
+          const start = t.scroll - m.top;
+          const next = way > 0 ? m.points.find((pt) => pt > start + 2) : m.points.filter((pt) => pt < start - 2).pop();
+          if (next !== undefined) {
+            glideTo(m.top + next, speed);
+            return;
+          }
+        }
         let target = dir ? landingFor(m, dir, projected) : null;
         const wall = t.wall == null ? null : t.wall - m.top;
         if (wall !== null && (dir > 0 || m.scrolled > wall) && (target === null || target > wall)) target = wall;
