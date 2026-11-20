@@ -22,7 +22,7 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
 
 <div
   data-nav-overlay
-  class="pointer-events-none fixed inset-0 z-40 flex flex-col items-center justify-start overflow-y-auto bg-back/60 px-[var(--page-margin)] pt-[max(148px,min(var(--spacing-vertical-xl),12vh))] pb-[130px] text-center invisible opacity-0 backdrop-blur-[25px] transition-[opacity,visibility] duration-400 ease-in-out group-data-[open=true]:pointer-events-auto group-data-[open=true]:visible group-data-[open=true]:opacity-100"
+  class="pointer-events-none fixed inset-0 z-40 flex flex-col items-center justify-start overflow-y-auto overscroll-contain bg-back/60 px-[var(--page-margin)] pt-[max(148px,min(var(--spacing-vertical-xl),12vh))] pb-[130px] text-center invisible opacity-0 backdrop-blur-[25px] transition-[opacity,visibility] duration-400 ease-in-out group-data-[open=true]:pointer-events-auto group-data-[open=true]:visible group-data-[open=true]:opacity-100"
 >
   <div class="flex flex-1 flex-col items-center gap-vertical-l">
     <nav class="flex flex-col items-center gap-[15px]">
@@ -112,7 +112,7 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
 </style>
 
 <script>
-  const bar = document.querySelector<HTMLElement>('[data-nav-bar]');
+  const bar =document.querySelector<HTMLElement>('[data-nav-bar]');
   const overlay = document.querySelector<HTMLElement>('[data-nav-overlay]');
   const menuItems = overlay ? Array.from(overlay.querySelectorAll<HTMLElement>('.menu-item')) : [];
 
@@ -151,10 +151,28 @@ const contactLinks: ContactLink[] = navMenu?.contactLinks ?? [
   }
 
   if (bar && overlay) {
+    // The page behind stays put while the menu's open; the menu itself
+    // still scrolls if it's taller than the screen. (Not the shared
+    // lockBodyScroll: pinning the body jumps the page to the top for the
+    // hero's scroll stage, which then shows the wrong scene behind the
+    // menu and lands somewhere else on close.) `overflow:hidden` on <html>
+    // stops wheel and keys, and tells the hero to stop steering; iPhones
+    // still let a swipe through, so swipes outside the menu's own scroll
+    // are stopped too.
+    let locked = false;
+    const blockTouch = (e: TouchEvent) => {
+      if (overlay.scrollHeight > overlay.clientHeight && overlay.contains(e.target as Node)) return;
+      if (e.cancelable) e.preventDefault();
+    };
     const observer = new MutationObserver(() => {
       const isOpen = bar.dataset.open === 'true';
       overlay.toggleAttribute('inert', !isOpen);
       if (isOpen) playEntrance();
+      if (isOpen === locked) return;
+      locked = isOpen;
+      document.documentElement.style.overflow = isOpen ? 'hidden' : '';
+      if (isOpen) document.addEventListener('touchmove', blockTouch, { passive: false });
+      else document.removeEventListener('touchmove', blockTouch);
     });
     observer.observe(bar, { attributes: true, attributeFilter: ['data-open'] });
   }
